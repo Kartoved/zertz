@@ -114,12 +114,30 @@ export function countFreeEdges(ringId: string, rings: Map<string, Ring>): number
   return freeEdges;
 }
 
+export function hasTwoAdjacentFreeEdges(ringId: string, rings: Map<string, Ring>): boolean {
+  const { q, r } = idToCoord(ringId);
+  const free: boolean[] = [];
+  
+  for (const dir of HEX_DIRECTIONS) {
+    const neighborId = coordToId(q + dir.q, r + dir.r);
+    const neighbor = rings.get(neighborId);
+    free.push(!neighbor || neighbor.isRemoved);
+  }
+  
+  for (let i = 0; i < free.length; i++) {
+    const next = (i + 1) % free.length;
+    if (free[i] && free[next]) return true;
+  }
+  
+  return false;
+}
+
 export function isFreeRing(ringId: string, rings: Map<string, Ring>): boolean {
   const ring = rings.get(ringId);
   if (!ring || ring.isRemoved || ring.marble !== null) {
     return false;
   }
-  return countFreeEdges(ringId, rings) >= 2;
+  return hasTwoAdjacentFreeEdges(ringId, rings);
 }
 
 export function wouldDisconnectBoard(ringId: string, rings: Map<string, Ring>): boolean {

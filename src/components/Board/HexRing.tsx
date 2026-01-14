@@ -62,7 +62,7 @@ export default function HexRing({
     ringColor = '#fecaca';
     ringStrokeColor = '#ef4444';
   } else if (isRemovable) {
-    ringStrokeColor = '#eab308';
+    ringStrokeColor = '#22c55e'; // Green for removable rings
     ringStrokeWidth = 4;
   } else if (isValidPlacement) {
     ringStrokeColor = '#22c55e';

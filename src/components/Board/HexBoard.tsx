@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import { useState, useMemo, type WheelEvent } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { hexToPixel } from '../../game/Board';
 import { getValidRemovableRings } from '../../game/Board';
@@ -7,9 +7,14 @@ import HexRing from './HexRing';
 
 const HEX_SIZE = 28;
 const BOARD_PADDING = 60;
+const RING_SPACING = 35; // Increased spacing between rings
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 2;
+const ZOOM_STEP = 0.1;
 
 export default function HexBoard() {
   const { state, selectedRingId, highlightedCaptures } = useGameStore();
+  const [zoom, setZoom] = useState(1);
   
   const { rings, positions, bounds } = useMemo(() => {
     const ringsArray = Array.from(state.rings.values()).filter(r => !r.isRemoved);
@@ -19,7 +24,7 @@ export default function HexBoard() {
     let minY = Infinity, maxY = -Infinity;
     
     for (const ring of ringsArray) {
-      const pos = hexToPixel(ring.q, ring.r, HEX_SIZE);
+      const pos = hexToPixel(ring.q, ring.r, RING_SPACING);
       positions.set(ring.id, pos);
       minX = Math.min(minX, pos.x);
       maxX = Math.max(maxX, pos.x);
@@ -58,44 +63,57 @@ export default function HexBoard() {
     return new Set(highlightedCaptures.map(c => c.to));
   }, [highlightedCaptures]);
   
+  const handleWheel = (e: WheelEvent<SVGSVGElement>) => {
+    e.preventDefault();
+    // wheel down -> zoom out, wheel up -> zoom in
+    const delta = e.deltaY > 0 ? ZOOM_STEP : -ZOOM_STEP;
+    const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoom + delta));
+    setZoom(newZoom);
+  };
+
   return (
     <div className="flex items-center justify-center p-4">
-      <svg
-        width={width}
-        height={height}
-        viewBox={`0 0 ${width} ${height}`}
-        className="max-w-full max-h-[60vh]"
-      >
-        <g transform={`translate(${offsetX}, ${offsetY})`}>
-          {rings.map(ring => {
-            const pos = positions.get(ring.id);
-            if (!pos) return null;
-            
-            const isSelected = ring.id === selectedRingId;
-            const isRemovable = validRemovableRings.has(ring.id);
-            const isCaptureSource = captureTargets.has(ring.id);
-            const isCaptureTarget = highlightedRings.has(ring.id);
-            const isValidPlacement = state.phase === 'placement' && 
-              !ring.marble && 
-              !hasAvailableCaptures(state);
-            
-            return (
-              <HexRing
-                key={ring.id}
-                ring={ring}
-                x={pos.x}
-                y={pos.y}
-                size={HEX_SIZE}
-                isSelected={isSelected}
-                isRemovable={isRemovable}
-                isCaptureSource={isCaptureSource}
-                isCaptureTarget={isCaptureTarget}
-                isValidPlacement={isValidPlacement}
-              />
-            );
-          })}
-        </g>
-      </svg>
+      <div className="relative">
+        <svg
+          width={width}
+          height={height}
+          // Camera zoom: change viewBox, keep geometry (spacing) intact
+          viewBox={`0 0 ${width / zoom} ${height / zoom}`}
+          className="max-w-full max-h-[60vh] cursor-move"
+          onWheel={handleWheel}
+        >
+          <g transform={`translate(${offsetX}, ${offsetY})`}>
+            {rings.map(ring => {
+              const pos = positions.get(ring.id);
+              if (!pos) return null;
+              
+              const isSelected = ring.id === selectedRingId;
+              const isRemovable = validRemovableRings.has(ring.id);
+              const isCaptureSource = captureTargets.has(ring.id);
+              const isCaptureTarget = highlightedRings.has(ring.id);
+              const isValidPlacement = false; // Remove green highlight for placement
+              
+              return (
+                <HexRing
+                  key={ring.id}
+                  ring={ring}
+                  x={pos.x}
+                  y={pos.y}
+                  size={HEX_SIZE}
+                  isSelected={isSelected}
+                  isRemovable={isRemovable}
+                  isCaptureSource={isCaptureSource}
+                  isCaptureTarget={isCaptureTarget}
+                  isValidPlacement={isValidPlacement}
+                />
+              );
+            })}
+          </g>
+        </svg>
+        <div className="absolute bottom-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-xs">
+          Zoom: {Math.round(zoom * 100)}%
+        </div>
+      </div>
     </div>
   );
 }
