@@ -28,42 +28,49 @@ function MoveElement({ node, isCurrentMove, onNavigate }: MoveElementProps) {
 }
 
 function renderMoveTree(
-  node: GameNode, 
-  currentNodeId: string, 
-  onNavigate: (node: GameNode) => void,
-  depth: number = 0
+  node: GameNode,
+  currentNodeId: string,
+  onNavigate: (node: GameNode) => void
 ): JSX.Element[] {
+  // We treat node.children[0] as the main line, and node.children[1..] as variations.
+  // Rendering rule: show sibling variations in parentheses immediately after the parent,
+  // then show the main move, then continue along the main line.
   const elements: JSX.Element[] = [];
-  
-  for (let i = 0; i < node.children.length; i++) {
-    const child = node.children[i];
-    const isCurrentMove = child.id === currentNodeId;
-    const isVariation = i > 0;
-    
-    if (isVariation) {
-      elements.push(
-        <span key={`var-open-${child.id}`} className="text-gray-500"> (</span>
-      );
-    }
-    
+
+  const mainChild = node.children[0];
+  if (!mainChild) return elements;
+
+  const variations = node.children.slice(1);
+  for (const variation of variations) {
     elements.push(
-      <MoveElement 
-        key={child.id}
-        node={child}
-        isCurrentMove={isCurrentMove}
+      <span key={`var-open-${variation.id}`} className="text-gray-500"> (</span>
+    );
+    elements.push(
+      <MoveElement
+        key={variation.id}
+        node={variation}
+        isCurrentMove={variation.id === currentNodeId}
         onNavigate={onNavigate}
       />
     );
-    
-    elements.push(...renderMoveTree(child, currentNodeId, onNavigate, depth + 1));
-    
-    if (isVariation) {
-      elements.push(
-        <span key={`var-close-${child.id}`} className="text-gray-500">)</span>
-      );
-    }
+    elements.push(...renderMoveTree(variation, currentNodeId, onNavigate));
+    elements.push(
+      <span key={`var-close-${variation.id}`} className="text-gray-500">)</span>
+    );
   }
-  
+
+  elements.push(
+    <MoveElement
+      key={mainChild.id}
+      node={mainChild}
+      isCurrentMove={mainChild.id === currentNodeId}
+      onNavigate={onNavigate}
+    />
+  );
+
+  // Continue main line
+  elements.push(...renderMoveTree(mainChild, currentNodeId, onNavigate));
+
   return elements;
 }
 

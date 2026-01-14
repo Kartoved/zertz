@@ -1,0 +1,58 @@
+ZERTZ (Web)
+
+Overview
+- A browser implementation of the board game ZERTZ.
+- Tech stack: React + TypeScript + Vite, Zustand for state management, IndexedDB for autosave.
+- Rendering: SVG board with flat-top axial hex coordinates and a 37-ring layout.
+
+Game Rules Implemented
+- Two action types per turn:
+  1) Placement:
+     - Select a marble color from the reserve.
+     - Place it on an empty ring.
+     - Remove one removable ring (mandatory if available) and the turn ends.
+  2) Capture (mandatory):
+     - If any capture is available, the player must capture.
+     - Capture works like checkers: jump over an adjacent marble to the empty ring directly behind it.
+     - Multi-capture is mandatory: if further captures are available in the chain, the move must continue to the end.
+
+Ring Removal Rules
+- A ring can be removed only if:
+  - It is empty.
+  - It has at least two adjacent free edges (edge-of-board criterion).
+- Isolation is allowed: removing a ring may disconnect the board.
+  - If a disconnected group contains only marbles (no empty rings), all marbles in that group are captured.
+
+Move History / Variations
+- The game stores a move tree. Replaying to any move reconstructs the full game state.
+- Variations are displayed immediately after the parent move (in parentheses).
+- Navigation:
+  - Click a move in the history.
+  - Use ArrowLeft / ArrowRight.
+
+Autosave / Load
+- The current game is automatically saved to IndexedDB after every move.
+- Main menu includes a “Load Game” dialog showing all saved games (finished and unfinished).
+
+UI / UX
+- Circular rings (visible even when a marble is on top).
+- Board zoom (mouse wheel) implemented as camera zoom using SVG viewBox.
+- Sound effects on key actions (place, remove ring, capture, win, undo).
+
+Local Development
+- Install dependencies and run:
+  - npm install
+  - npm run dev
+
+Release (No installs on the friend’s PC)
+- A static build can be found in the release/ folder.
+- To run locally on Windows:
+  - Double-click release/Start.cmd (or run Start.ps1)
+  - Then open http://localhost:5173
+
+Project Structure (high level)
+- src/game/*: core rules/engine and board geometry.
+- src/store/*: Zustand stores.
+- src/components/*: UI components.
+- src/db/*: IndexedDB utilities.
+- release/*: built static files and a tiny PowerShell server script.

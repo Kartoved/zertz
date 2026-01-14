@@ -1,4 +1,3 @@
-import React from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { WIN_CONDITIONS } from '../../game/types';
 
@@ -12,19 +11,19 @@ export default function GameStats() {
         <span className="flex items-center gap-1">
           <div className="w-4 h-4 rounded-full bg-white border border-gray-300" />
           <span className={caps.white >= WIN_CONDITIONS.white ? 'text-green-500 font-bold' : ''}>
-            {caps.white}/{WIN_CONDITIONS.white}
+            {caps.white}
           </span>
         </span>
         <span className="flex items-center gap-1">
           <div className="w-4 h-4 rounded-full bg-gray-400" />
           <span className={caps.gray >= WIN_CONDITIONS.gray ? 'text-green-500 font-bold' : ''}>
-            {caps.gray}/{WIN_CONDITIONS.gray}
+            {caps.gray}
           </span>
         </span>
         <span className="flex items-center gap-1">
           <div className="w-4 h-4 rounded-full bg-gray-800" />
           <span className={caps.black >= WIN_CONDITIONS.black ? 'text-green-500 font-bold' : ''}>
-            {caps.black}/{WIN_CONDITIONS.black}
+            {caps.black}
           </span>
         </span>
       </div>

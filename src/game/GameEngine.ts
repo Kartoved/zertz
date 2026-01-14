@@ -1,11 +1,9 @@
 import {
   GameState,
-  Ring,
   MarbleColor,
   Player,
   CaptureMove,
   Move,
-  Captures,
   INITIAL_RESERVE,
   WIN_CONDITIONS,
 } from './types';

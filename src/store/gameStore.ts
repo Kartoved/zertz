@@ -20,7 +20,7 @@ import {
   moveToNotation,
   getWinType,
 } from '../game/GameEngine';
-import { getValidRemovableRings, idToAlgebraic } from '../game/Board';
+import { getValidRemovableRings } from '../game/Board';
 import { saveGame, loadGame, listGames } from '../db/indexedDB';
 import { playPlaceSound, playRemoveRingSound, playCaptureSound, playWinSound, playUndoSound } from '../utils/sounds';
 
@@ -300,7 +300,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
   
   undo: () => {
-    const { currentNode, gameTree } = get();
+    const { currentNode } = get();
     if (currentNode.parent) {
       const parentNode = currentNode.parent;
       const idx = parentNode.children.indexOf(currentNode);

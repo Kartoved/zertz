@@ -1,4 +1,3 @@
-import React from 'react';
 import { useUIStore } from '../../store/uiStore';
 
 export default function Rules() {

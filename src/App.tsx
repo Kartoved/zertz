@@ -1,4 +1,3 @@
-import React from 'react';
 import { useUIStore } from './store/uiStore';
 import MainMenu from './components/Layout/MainMenu';
 import GameScreen from './components/Layout/GameScreen';

@@ -1,4 +1,3 @@
-import React from 'react';
 import { MarbleColor } from '../../game/types';
 import { useGameStore } from '../../store/gameStore';
 import { hasAvailableCaptures } from '../../game/GameEngine';
@@ -21,7 +20,7 @@ export default function MarbleSelector() {
         {mustCapture ? 'Обязательное взятие!' : 'Выберите шарик:'}
       </div>
       <div className="flex gap-3">
-        {marbles.map(({ color, count, label }) => (
+        {marbles.map(({ color, count }) => (
           <button
             key={color}
             onClick={() => !isDisabled && count > 0 && selectMarbleColor(color)}
