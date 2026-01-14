@@ -43,6 +43,11 @@ export default function HexBoard() {
   const height = bounds.maxY - bounds.minY + BOARD_PADDING * 2;
   const offsetX = -bounds.minX + BOARD_PADDING;
   const offsetY = -bounds.minY + BOARD_PADDING;
+
+  const viewWidth = width / zoom;
+  const viewHeight = height / zoom;
+  const viewX = (width - viewWidth) / 2;
+  const viewY = (height - viewHeight) / 2;
   
   const validRemovableRings = useMemo(() => {
     if (state.phase === 'ringRemoval') {
@@ -72,14 +77,12 @@ export default function HexBoard() {
   };
 
   return (
-    <div className="flex items-center justify-center p-4">
-      <div className="relative">
+    <div className="flex items-center justify-center p-4 w-full">
+      <div className="relative w-full max-w-[1100px] rounded-2xl bg-gradient-to-b from-blue-950 to-slate-950 p-4 shadow-lg">
         <svg
-          width={width}
-          height={height}
           // Camera zoom: change viewBox, keep geometry (spacing) intact
-          viewBox={`0 0 ${width / zoom} ${height / zoom}`}
-          className="max-w-full max-h-[60vh] cursor-move"
+          viewBox={`${viewX} ${viewY} ${viewWidth} ${viewHeight}`}
+          className="w-full h-[80vh] cursor-move"
           onWheel={handleWheel}
         >
           <g transform={`translate(${offsetX}, ${offsetY})`}>

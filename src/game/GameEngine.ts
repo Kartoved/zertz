@@ -167,7 +167,11 @@ export function getEmptyRings(state: GameState): string[] {
 }
 
 export function canPlaceMarble(state: GameState, color: MarbleColor): boolean {
-  return state.reserve[color] > 0;
+  const reserveTotal = state.reserve.white + state.reserve.gray + state.reserve.black;
+  if (reserveTotal > 0) {
+    return state.reserve[color] > 0;
+  }
+  return state.captures[state.currentPlayer][color] > 0;
 }
 
 export function placeMarble(
@@ -177,10 +181,16 @@ export function placeMarble(
 ): boolean {
   const ring = state.rings.get(ringId);
   if (!ring || ring.isRemoved || ring.marble) return false;
-  if (state.reserve[color] <= 0) return false;
+  const reserveTotal = state.reserve.white + state.reserve.gray + state.reserve.black;
+  if (reserveTotal > 0) {
+    if (state.reserve[color] <= 0) return false;
+    state.reserve[color]--;
+  } else {
+    if (state.captures[state.currentPlayer][color] <= 0) return false;
+    state.captures[state.currentPlayer][color]--;
+  }
   
   ring.marble = { color };
-  state.reserve[color]--;
   state.pendingPlacement = { ringId, marbleColor: color };
   state.phase = 'ringRemoval';
   
@@ -293,10 +303,18 @@ export function getAvailableMoves(state: GameState): {
   
   const emptyRings = getEmptyRings(state);
   const availableColors: MarbleColor[] = [];
-  
-  if (state.reserve.white > 0) availableColors.push('white');
-  if (state.reserve.gray > 0) availableColors.push('gray');
-  if (state.reserve.black > 0) availableColors.push('black');
+
+  const reserveTotal = state.reserve.white + state.reserve.gray + state.reserve.black;
+  if (reserveTotal > 0) {
+    if (state.reserve.white > 0) availableColors.push('white');
+    if (state.reserve.gray > 0) availableColors.push('gray');
+    if (state.reserve.black > 0) availableColors.push('black');
+  } else {
+    const caps = state.captures[state.currentPlayer];
+    if (caps.white > 0) availableColors.push('white');
+    if (caps.gray > 0) availableColors.push('gray');
+    if (caps.black > 0) availableColors.push('black');
+  }
   
   return {
     type: 'placement',

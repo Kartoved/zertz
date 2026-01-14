@@ -7,11 +7,14 @@ export default function MarbleSelector() {
   
   const mustCapture = hasAvailableCaptures(state);
   const isDisabled = state.phase !== 'placement' || mustCapture;
+
+  const reserveTotal = state.reserve.white + state.reserve.gray + state.reserve.black;
+  const sourceCounts = reserveTotal > 0 ? state.reserve : state.captures[state.currentPlayer];
   
   const marbles: { color: MarbleColor; count: number; label: string }[] = [
-    { color: 'white', count: state.reserve.white, label: 'Белые' },
-    { color: 'gray', count: state.reserve.gray, label: 'Серые' },
-    { color: 'black', count: state.reserve.black, label: 'Чёрные' },
+    { color: 'white', count: sourceCounts.white, label: 'Белые' },
+    { color: 'gray', count: sourceCounts.gray, label: 'Серые' },
+    { color: 'black', count: sourceCounts.black, label: 'Чёрные' },
   ];
   
   return (

@@ -48,8 +48,9 @@ export default function HexRing({
   };
   
   // Ring visual styling
-  let ringColor = '#4b5563'; // Gray ring
-  let ringStrokeColor = '#374151';
+  // Muted warm stone color: contrasts with gray/black marbles without being too bright
+  let ringColor = '#8a7f6a';
+  let ringStrokeColor = '#5c5343';
   let ringStrokeWidth = 3;
   
   if (isSelected) {
@@ -71,7 +72,19 @@ export default function HexRing({
   
   const outerRadius = size * 0.85;
   const innerRadius = size * 0.55;
-  const marbleRadius = size * 0.4;
+  const marbleRadius = size * 0.46;
+
+  // Compound path (outer circle - inner circle) to create a true hole.
+  const ringPath = `
+    M 0 0
+    m -${outerRadius} 0
+    a ${outerRadius} ${outerRadius} 0 1 0 ${outerRadius * 2} 0
+    a ${outerRadius} ${outerRadius} 0 1 0 -${outerRadius * 2} 0
+    M 0 0
+    m -${innerRadius} 0
+    a ${innerRadius} ${innerRadius} 0 1 1 ${innerRadius * 2} 0
+    a ${innerRadius} ${innerRadius} 0 1 1 -${innerRadius * 2} 0
+  `;
   
   return (
     <g
@@ -79,24 +92,12 @@ export default function HexRing({
       onClick={handleClick}
       className="cursor-pointer transition-all duration-150 hover:opacity-90"
     >
-      {/* Outer ring circle */}
-      <circle
-        cx={0}
-        cy={0}
-        r={outerRadius}
+      <path
+        d={ringPath}
         fill={ringColor}
+        fillRule="evenodd"
         stroke={ringStrokeColor}
         strokeWidth={ringStrokeWidth}
-      />
-      
-      {/* Inner hole - makes it look like a ring */}
-      <circle
-        cx={0}
-        cy={0}
-        r={innerRadius}
-        fill="#111827"
-        stroke="#1f2937"
-        strokeWidth={1}
       />
       
       {/* Marble (smaller than inner hole, sits on top of ring) */}
