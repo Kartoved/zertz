@@ -1,23 +1,47 @@
 import { Ring } from './types';
 
-// Original 37-hex Zertz board using axial coordinates (q, r)
-// This creates a hexagonal shape with 4 rings on each edge
-const BOARD_37_COORDS = [
-  // Row 0: q = 0 to 3
-  { q: 0, r: 0 }, { q: 1, r: 0 }, { q: 2, r: 0 }, { q: 3, r: 0 },
-  // Row 1: q = -1 to 3
-  { q: -1, r: 1 }, { q: 0, r: 1 }, { q: 1, r: 1 }, { q: 2, r: 1 }, { q: 3, r: 1 },
-  // Row 2: q = -2 to 3
-  { q: -2, r: 2 }, { q: -1, r: 2 }, { q: 0, r: 2 }, { q: 1, r: 2 }, { q: 2, r: 2 }, { q: 3, r: 2 },
-  // Row 3: q = -3 to 3 (center row, 7 hexes)
-  { q: -3, r: 3 }, { q: -2, r: 3 }, { q: -1, r: 3 }, { q: 0, r: 3 }, { q: 1, r: 3 }, { q: 2, r: 3 }, { q: 3, r: 3 },
-  // Row 4: q = -3 to 2
-  { q: -3, r: 4 }, { q: -2, r: 4 }, { q: -1, r: 4 }, { q: 0, r: 4 }, { q: 1, r: 4 }, { q: 2, r: 4 },
-  // Row 5: q = -3 to 1
-  { q: -3, r: 5 }, { q: -2, r: 5 }, { q: -1, r: 5 }, { q: 0, r: 5 }, { q: 1, r: 5 },
-  // Row 6: q = -3 to 0
-  { q: -3, r: 6 }, { q: -2, r: 6 }, { q: -1, r: 6 }, { q: 0, r: 6 },
-];
+type BoardSize = 37 | 48 | 61;
+
+function generateCoords(rowLengths: number[], startQs: number[]): Array<{ q: number; r: number }> {
+  const coords: Array<{ q: number; r: number }> = [];
+  for (let r = 0; r < rowLengths.length; r++) {
+    const length = rowLengths[r];
+    const startQ = startQs[r];
+    for (let i = 0; i < length; i++) {
+      coords.push({ q: startQ + i, r });
+    }
+  }
+  return coords;
+}
+
+const BOARD_COORDS_BY_SIZE: Record<BoardSize, Array<{ q: number; r: number }>> = {
+  // Amateur 37 rings (side length 4)
+  37: generateCoords(
+    [4, 5, 6, 7, 6, 5, 4],
+    [0, -1, -2, -3, -3, -3, -3]
+  ),
+  // Tournament 48 rings (side length 4, extended middle band)
+  48: generateCoords(
+    [4, 5, 6, 7, 8, 7, 6, 5],
+    [0, -1, -2, -3, -4, -4, -4, -4]
+  ),
+  // Tournament 61 rings (side length 5)
+  61: generateCoords(
+    [5, 6, 7, 8, 9, 8, 7, 6, 5],
+    [0, -1, -2, -3, -4, -4, -4, -4, -4]
+  ),
+};
+
+function getBoardBounds(size: BoardSize): { minQ: number; maxR: number } {
+  const coords = BOARD_COORDS_BY_SIZE[size];
+  let minQ = Infinity;
+  let maxR = -Infinity;
+  for (const coord of coords) {
+    minQ = Math.min(minQ, coord.q);
+    maxR = Math.max(maxR, coord.r);
+  }
+  return { minQ, maxR };
+}
 
 // Axial hex directions for neighbors
 const HEX_DIRECTIONS = [
@@ -39,12 +63,11 @@ export function idToCoord(id: string): { q: number; r: number } {
 }
 
 // Convert axial coords to algebraic notation for display (a1, b2, etc.)
-export function idToAlgebraic(id: string): string {
+export function idToAlgebraic(id: string, boardSize: BoardSize = 37): string {
   const { q, r } = idToCoord(id);
-  // Map q to column letter: q=-3 -> 'a', q=3 -> 'g'
-  const col = String.fromCharCode(97 + q + 3); // 'a' + (q + 3)
-  // Map r to row number: r=0 -> 7, r=6 -> 1
-  const row = 7 - r;
+  const { minQ, maxR } = getBoardBounds(boardSize);
+  const col = String.fromCharCode(97 + (q - minQ));
+  const row = maxR + 1 - r;
   return `${col}${row}`;
 }
 
@@ -80,10 +103,9 @@ export function getRingBehind(
   return behind && !behind.isRemoved ? behindId : null;
 }
 
-export function createBoard(size: number = 37): Map<string, Ring> {
+export function createBoard(size: BoardSize = 37): Map<string, Ring> {
   const rings = new Map<string, Ring>();
-  
-  const coords = size === 37 ? BOARD_37_COORDS : BOARD_37_COORDS;
+  const coords = BOARD_COORDS_BY_SIZE[size];
   
   for (const coord of coords) {
     const id = coordToId(coord.q, coord.r);

@@ -34,10 +34,10 @@ interface GameStore {
   availableCaptureChains: CaptureMove[][];
   playerNames: { player1: string; player2: string };
   gameId: string;
-  savedGames: Array<{ id: string; playerNames: { player1: string; player2: string }; updatedAt: number; moveCount: number; winner: string | null }>;
+  savedGames: Array<{ id: string; playerNames: { player1: string; player2: string }; updatedAt: number; moveCount: number; winner: string | null; winType: string | null; boardSize: 37 | 48 | 61 }>;
   winType: string | null;
   
-  newGame: () => void;
+  newGame: (boardSize?: 37 | 48 | 61) => void;
   selectMarbleColor: (color: MarbleColor | null) => void;
   selectRing: (ringId: string) => void;
   handlePlacement: (ringId: string) => void;
@@ -69,14 +69,15 @@ function addMoveToTree(
   currentNode: GameNode,
   move: Move,
   player: Player,
-  moveNumber: number
+  moveNumber: number,
+  boardSize: 37 | 48 | 61
 ): GameNode {
   const newNode: GameNode = {
     id: `${moveNumber}-${Date.now()}`,
     moveNumber,
     player,
     move,
-    notation: moveToNotation(move),
+    notation: moveToNotation(move, boardSize),
     children: [],
     parent: currentNode,
     isMainLine: currentNode.children.length === 0,
@@ -84,6 +85,12 @@ function addMoveToTree(
   
   currentNode.children.push(newNode);
   return newNode;
+}
+
+function formatGameId(timestamp: number): string {
+  const d = new Date(timestamp);
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
@@ -95,15 +102,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
   highlightedCaptures: [],
   availableCaptureChains: [],
   playerNames: { player1: 'Игрок 1', player2: 'Игрок 2' },
-  gameId: `game-${Date.now()}`,
+  gameId: formatGameId(Date.now()),
   savedGames: [],
   winType: null,
   
-  newGame: () => {
+  newGame: (boardSize = 37) => {
     const rootNode = createRootNode();
-    const newGameId = `game-${Date.now()}`;
+    const newGameId = formatGameId(Date.now());
     set({
-      state: createInitialState(),
+      state: createInitialState(boardSize),
       gameTree: rootNode,
       currentNode: rootNode,
       selectedMarbleColor: null,
@@ -174,13 +181,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
           currentNode,
           move,
           state.currentPlayer,
-          state.moveNumber
+          state.moveNumber,
+          state.boardSize
         );
         
         const winner = checkWinCondition(newState);
+        let nextWinType: string | null = null;
         if (winner) {
           newState.winner = winner;
           newState.phase = 'gameOver';
+          nextWinType = getWinType(newState, winner);
         }
         
         playPlaceSound();
@@ -191,6 +201,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
           currentNode: newNode,
           selectedMarbleColor: null,
           selectedRingId: null,
+          winType: nextWinType,
         });
         
         // Auto-save after move
@@ -230,15 +241,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
         currentNode,
         move,
         previousPlayer,
-        previousMoveNumber
+        previousMoveNumber,
+        state.boardSize
       );
       
       playRemoveRingSound();
       
+      let nextWinType: string | null = null;
       const winner = checkWinCondition(newState);
       if (winner) {
         newState.winner = winner;
         newState.phase = 'gameOver';
+        nextWinType = getWinType(newState, winner);
         playWinSound();
       }
       
@@ -246,6 +260,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         state: newState,
         currentNode: newNode,
         selectedRingId: null,
+        winType: nextWinType,
       });
       
       // Auto-save after move
@@ -275,15 +290,18 @@ export const useGameStore = create<GameStore>((set, get) => ({
       currentNode,
       move,
       previousPlayer,
-      previousMoveNumber
+      previousMoveNumber,
+      state.boardSize
     );
     
     playCaptureSound();
     
+    let nextWinType: string | null = null;
     const winner = checkWinCondition(newState);
     if (winner) {
       newState.winner = winner;
       newState.phase = 'gameOver';
+      nextWinType = getWinType(newState, winner);
       playWinSound();
     }
     
@@ -293,6 +311,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       selectedRingId: null,
       highlightedCaptures: [],
       availableCaptureChains: [],
+      winType: nextWinType,
     });
     
     // Auto-save after move
@@ -308,7 +327,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         parentNode.children.splice(idx, 1);
       }
       
-      let newState = createInitialState();
+      let newState = createInitialState(get().state.boardSize);
       let node: GameNode | null = parentNode;
       const moves: GameNode[] = [];
       
@@ -360,7 +379,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         selectedMarbleColor: null,
         selectedRingId: null,
         highlightedCaptures: [],
-        winType: saved.state.winner ? getWinType(saved.state, saved.state.winner) : null,
+        winType: saved.winType,
       });
     }
   },
@@ -378,7 +397,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   
   navigateToNode: (targetNode: GameNode) => {
     // Rebuild state by replaying moves from root to targetNode
-    let newState = createInitialState();
+    let newState = createInitialState(get().state.boardSize);
     const moves: GameNode[] = [];
     let node: GameNode | null = targetNode;
     
@@ -415,7 +434,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
   
   autoSave: async () => {
-    const { state, gameTree, playerNames, gameId } = get();
-    await saveGame(gameId, state, gameTree, playerNames);
+    const { state, gameTree, playerNames, gameId, winType } = get();
+    await saveGame(gameId, state, gameTree, playerNames, winType);
   },
 }));

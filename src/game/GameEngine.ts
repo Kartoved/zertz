@@ -16,9 +16,10 @@ import {
   idToAlgebraic,
 } from './Board';
 
-export function createInitialState(boardSize: number = 37): GameState {
+export function createInitialState(boardSize: 37 | 48 | 61 = 37): GameState {
   return {
     rings: createBoard(boardSize),
+    boardSize,
     reserve: { ...INITIAL_RESERVE },
     currentPlayer: 'player1',
     captures: {
@@ -35,6 +36,7 @@ export function createInitialState(boardSize: number = 37): GameState {
 export function cloneState(state: GameState): GameState {
   return {
     ...state,
+    boardSize: state.boardSize,
     rings: new Map(Array.from(state.rings.entries()).map(([k, v]) => [k, { ...v }])),
     reserve: { ...state.reserve },
     captures: {
@@ -326,20 +328,20 @@ export function getAvailableMoves(state: GameState): {
 }
 
 // Format: "Wa2 -b4" for placement, "Ba1-c3-c5" for capture chain
-export function moveToNotation(move: Move): string {
+export function moveToNotation(move: Move, boardSize: 37 | 48 | 61 = 37): string {
   if (move.type === 'capture') {
     const chain = [move.data, ...(move.data.chain || [])];
     const fromRing = chain[0].from;
-    const fromAlg = idToAlgebraic(fromRing);
+    const fromAlg = idToAlgebraic(fromRing, boardSize);
     const marble = 'B'; // Captures don't specify color, use first letter based on actual marble
-    const positions = chain.map(c => idToAlgebraic(c.to));
+    const positions = chain.map(c => idToAlgebraic(c.to, boardSize));
     return `${marble}${fromAlg}-${positions.join('-')}`;
   } else {
     const { marbleColor, ringId, removedRingId } = move.data;
     const colorChar = marbleColor[0].toUpperCase();
-    const ringAlg = idToAlgebraic(ringId);
+    const ringAlg = idToAlgebraic(ringId, boardSize);
     if (removedRingId) {
-      const removedAlg = idToAlgebraic(removedRingId);
+      const removedAlg = idToAlgebraic(removedRingId, boardSize);
       return `${colorChar}${ringAlg} -${removedAlg}`;
     }
     return `${colorChar}${ringAlg}`;

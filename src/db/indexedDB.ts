@@ -1,7 +1,7 @@
 import { openDB, IDBPDatabase } from 'idb';
 import { GameState, GameNode } from '../game/types';
 
-const DB_NAME = 'zertz-games';
+const DB_NAME = 'zertz-games-summary';
 const DB_VERSION = 1;
 const STORE_NAME = 'games';
 
@@ -12,6 +12,8 @@ interface SavedGame {
   updatedAt: number;
   moveCount: number;
   winner: string | null;
+  winType: string | null;
+  boardSize: 37 | 48 | 61;
   stateJson: string;
   treeJson: string;
 }
@@ -76,7 +78,8 @@ export async function saveGame(
   id: string,
   state: GameState,
   tree: GameNode,
-  playerNames: { player1: string; player2: string }
+  playerNames: { player1: string; player2: string },
+  winType: string | null
 ): Promise<void> {
   const db = await getDB();
   
@@ -87,6 +90,8 @@ export async function saveGame(
     updatedAt: Date.now(),
     moveCount: state.moveNumber,
     winner: state.winner,
+    winType,
+    boardSize: state.boardSize,
     stateJson: serializeState(state),
     treeJson: serializeTree(tree),
   };
@@ -98,6 +103,7 @@ export async function loadGame(id: string): Promise<{
   state: GameState;
   tree: GameNode;
   playerNames: { player1: string; player2: string };
+  winType: string | null;
 } | null> {
   const db = await getDB();
   const game = await db.get(STORE_NAME, id) as SavedGame | undefined;
@@ -108,6 +114,7 @@ export async function loadGame(id: string): Promise<{
     state: deserializeState(game.stateJson),
     tree: deserializeTree(game.treeJson),
     playerNames: game.playerNames,
+    winType: game.winType,
   };
 }
 
@@ -117,6 +124,8 @@ export async function listGames(): Promise<Array<{
   updatedAt: number;
   moveCount: number;
   winner: string | null;
+  winType: string | null;
+  boardSize: 37 | 48 | 61;
 }>> {
   const db = await getDB();
   const games = await db.getAllFromIndex(STORE_NAME, 'updatedAt') as SavedGame[];
@@ -127,6 +136,8 @@ export async function listGames(): Promise<Array<{
     updatedAt: g.updatedAt,
     moveCount: g.moveCount,
     winner: g.winner,
+    winType: g.winType,
+    boardSize: g.boardSize,
   }));
 }
 

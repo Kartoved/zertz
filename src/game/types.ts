@@ -49,6 +49,7 @@ export interface Captures {
 
 export interface GameState {
   rings: Map<string, Ring>;
+  boardSize: 37 | 48 | 61;
   reserve: { white: number; gray: number; black: number };
   currentPlayer: Player;
   captures: {
@@ -62,7 +63,7 @@ export interface GameState {
 }
 
 export interface BoardConfig {
-  size: 37 | 40 | 43 | 44 | 48;
+  size: 37 | 48 | 61;
 }
 
 export const INITIAL_RESERVE = {

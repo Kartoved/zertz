@@ -12,13 +12,19 @@ export default function MainMenu() {
   const { setScreen, toggleDarkMode, isDarkMode } = useUIStore();
   const { newGame, savedGames, refreshSavedGames, loadSavedGame } = useGameStore();
   const [showLoadDialog, setShowLoadDialog] = useState(false);
+  const [showBoardDialog, setShowBoardDialog] = useState(false);
   
   useEffect(() => {
     refreshSavedGames();
   }, [refreshSavedGames]);
   
   const handleNewGame = () => {
-    newGame();
+    setShowBoardDialog(true);
+  };
+
+  const handleSelectBoard = (boardSize: 37 | 48 | 61) => {
+    newGame(boardSize);
+    setShowBoardDialog(false);
     setScreen('game');
   };
   
@@ -63,6 +69,14 @@ export default function MainMenu() {
             rounded-xl shadow-md hover:shadow-lg transition-all transform hover:scale-105"
         >
           Правила
+        </button>
+
+        <button
+          disabled
+          className="w-full py-4 px-6 bg-purple-500 text-white font-semibold rounded-xl 
+            shadow-lg opacity-60 cursor-not-allowed"
+        >
+          Сыграть онлайн
         </button>
       </div>
       
@@ -128,6 +142,45 @@ export default function MainMenu() {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showBoardDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+            <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Выберите поле</h2>
+              <button
+                onClick={() => setShowBoardDialog(false)}
+                className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4 space-y-3">
+              <button
+                onClick={() => handleSelectBoard(37)}
+                className="w-full p-3 text-left bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 
+                  dark:hover:bg-gray-600 rounded-lg transition-colors"
+              >
+                Любительское 37 колец
+              </button>
+              <button
+                onClick={() => handleSelectBoard(48)}
+                className="w-full p-3 text-left bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 
+                  dark:hover:bg-gray-600 rounded-lg transition-colors"
+              >
+                Турнирное 48 колец
+              </button>
+              <button
+                onClick={() => handleSelectBoard(61)}
+                className="w-full p-3 text-left bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 
+                  dark:hover:bg-gray-600 rounded-lg transition-colors"
+              >
+                Турнирное 61 кольцо
+              </button>
             </div>
           </div>
         </div>

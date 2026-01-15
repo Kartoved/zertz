@@ -71,7 +71,7 @@ export default function HexRing({
   }
   
   const outerRadius = size * 0.85;
-  const innerRadius = size * 0.55;
+  const innerRadius = size * (0.55 / 1.5);
   const marbleRadius = size * 0.46;
 
   // Compound path (outer circle - inner circle) to create a true hole.
