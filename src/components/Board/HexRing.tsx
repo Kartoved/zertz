@@ -48,8 +48,7 @@ export default function HexRing({
   };
   
   // Ring visual styling
-  // Pure black rings for contrast with marbles
-  let ringColor = '#000000';
+  // Pure black rings with gradient for contrast with marbles
   let ringStrokeColor = '#1a1a1a';
   let ringStrokeWidth = 3;
   
@@ -60,7 +59,6 @@ export default function HexRing({
     ringStrokeColor = '#ef4444';
     ringStrokeWidth = 4;
   } else if (isCaptureTarget) {
-    ringColor = '#fecaca';
     ringStrokeColor = '#ef4444';
   } else if (isRemovable) {
     ringStrokeColor = '#22c55e'; // Green for removable rings
@@ -99,9 +97,15 @@ export default function HexRing({
         fill="transparent"
         pointerEvents="all"
       />
+      <defs>
+        <radialGradient id={`ring-gradient-${ring.id}`}>
+          <stop offset="0%" stopColor="#4a4a4a" />
+          <stop offset="100%" stopColor="#000000" />
+        </radialGradient>
+      </defs>
       <path
         d={ringPath}
-        fill={ringColor}
+        fill={`url(#ring-gradient-${ring.id})`}
         fillRule="evenodd"
         stroke={ringStrokeColor}
         strokeWidth={ringStrokeWidth}
