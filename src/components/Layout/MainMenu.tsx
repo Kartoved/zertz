@@ -8,6 +8,20 @@ function formatDate(timestamp: number): string {
   return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 }
 
+const BOARD_LABELS: Record<number, string> = {
+  37: 'Любительское 37 колец',
+  48: 'Турнирное 48 колец',
+  61: 'Турнирное 61 кольцо',
+};
+
+const WIN_TYPE_LABELS: Record<string, string> = {
+  white: 'по белым',
+  gray: 'по серым',
+  black: 'по чёрным',
+  mixed: 'по разным',
+  unknown: 'победа',
+};
+
 export default function MainMenu() {
   const { setScreen, toggleDarkMode, isDarkMode } = useUIStore();
   const { newGame, savedGames, refreshSavedGames, loadSavedGame } = useGameStore();
@@ -125,6 +139,12 @@ export default function MainMenu() {
                           </div>
                           <div className="text-sm text-gray-500 dark:text-gray-400">
                             Ходов: {game.moveCount}
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            Поле: {BOARD_LABELS[game.boardSize] ?? `${game.boardSize} колец`}
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            Способ победы: {game.winType ? WIN_TYPE_LABELS[game.winType] ?? game.winType : '—'}
                           </div>
                         </div>
                         <div className="text-right">

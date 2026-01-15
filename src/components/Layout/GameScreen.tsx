@@ -74,7 +74,7 @@ export default function GameScreen() {
                 ⚠️ Выберите кольцо для удаления
               </div>
               <div className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                Жёлтым подсвечены доступные кольца
+                Зелёным подсвечены доступные кольца
               </div>
             </div>
           )}

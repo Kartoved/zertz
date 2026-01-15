@@ -21,7 +21,7 @@ import {
   getWinType,
 } from '../game/GameEngine';
 import { getValidRemovableRings } from '../game/Board';
-import { saveGame, loadGame, listGames } from '../db/indexedDB';
+import { saveGame, loadGame, listGames } from '../db/gamesApi';
 import { playPlaceSound, playRemoveRingSound, playCaptureSound, playWinSound, playUndoSound } from '../utils/sounds';
 
 interface GameStore {
@@ -36,6 +36,7 @@ interface GameStore {
   gameId: string;
   savedGames: Array<{ id: string; playerNames: { player1: string; player2: string }; updatedAt: number; moveCount: number; winner: string | null; winType: string | null; boardSize: 37 | 48 | 61 }>;
   winType: string | null;
+  isLoadedGame: boolean;
   
   newGame: (boardSize?: 37 | 48 | 61) => void;
   selectMarbleColor: (color: MarbleColor | null) => void;
@@ -45,6 +46,7 @@ interface GameStore {
   handleCapture: (capture: CaptureMove[]) => void;
   undo: () => void;
   setPlayerNames: (player1: string, player2: string) => void;
+  deleteBranchFrom: (nodeId: string) => void;
   loadSavedGame: (id: string) => Promise<void>;
   refreshSavedGames: () => Promise<void>;
   getMarbleColorAt: (ringId: string) => MarbleColor | null;
@@ -93,6 +95,28 @@ function formatGameId(timestamp: number): string {
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 }
 
+function findNodeAndParent(root: GameNode, targetId: string): { node: GameNode; parent: GameNode | null } | null {
+  const stack: Array<{ node: GameNode; parent: GameNode | null }> = [{ node: root, parent: null }];
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+    if (current.node.id === targetId) return current;
+    for (const child of current.node.children) {
+      stack.push({ node: child, parent: current.node });
+    }
+  }
+  return null;
+}
+
+function isDescendant(root: GameNode, targetId: string): boolean {
+  const stack = [root];
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+    if (current.id === targetId) return true;
+    stack.push(...current.children);
+  }
+  return false;
+}
+
 export const useGameStore = create<GameStore>((set, get) => ({
   state: createInitialState(),
   gameTree: createRootNode(),
@@ -105,6 +129,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   gameId: formatGameId(Date.now()),
   savedGames: [],
   winType: null,
+  isLoadedGame: false,
   
   newGame: (boardSize = 37) => {
     const rootNode = createRootNode();
@@ -119,6 +144,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       availableCaptureChains: [],
       gameId: newGameId,
       winType: null,
+      isLoadedGame: false,
     });
   },
   
@@ -365,6 +391,53 @@ export const useGameStore = create<GameStore>((set, get) => ({
   
   setPlayerNames: (player1, player2) => {
     set({ playerNames: { player1, player2 } });
+    get().autoSave();
+  },
+
+  deleteBranchFrom: (nodeId) => {
+    const { gameTree, currentNode, state } = get();
+    const result = findNodeAndParent(gameTree, nodeId);
+    if (!result || !result.parent) return;
+    const { node, parent } = result;
+    const idx = parent.children.indexOf(node);
+    if (idx >= 0) {
+      parent.children.splice(idx, 1);
+    }
+
+    const shouldRewind = isDescendant(node, currentNode.id);
+    const targetNode = shouldRewind ? parent : currentNode;
+    const newState = createInitialState(state.boardSize);
+    const moves: GameNode[] = [];
+    let cursor: GameNode | null = targetNode;
+    while (cursor && cursor.move) {
+      moves.unshift(cursor);
+      cursor = cursor.parent;
+    }
+    for (const moveNode of moves) {
+      if (moveNode.move?.type === 'placement') {
+        const { marbleColor, ringId, removedRingId } = moveNode.move.data;
+        placeMarble(newState, ringId, marbleColor);
+        if (removedRingId) {
+          removeRing(newState, removedRingId);
+        } else {
+          skipRingRemoval(newState);
+        }
+      } else if (moveNode.move?.type === 'capture') {
+        const captures = [moveNode.move.data, ...(moveNode.move.data.chain || [])];
+        executeCapture(newState, captures);
+      }
+    }
+
+    set({
+      state: newState,
+      currentNode: targetNode,
+      selectedMarbleColor: null,
+      selectedRingId: null,
+      highlightedCaptures: [],
+      availableCaptureChains: [],
+    });
+
+    get().autoSave();
   },
   
   loadSavedGame: async (id: string) => {
@@ -380,6 +453,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         selectedRingId: null,
         highlightedCaptures: [],
         winType: saved.winType,
+        isLoadedGame: true,
       });
     }
   },
@@ -396,6 +470,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
   
   navigateToNode: (targetNode: GameNode) => {
+    if (targetNode.id === 'root') return;
     // Rebuild state by replaying moves from root to targetNode
     let newState = createInitialState(get().state.boardSize);
     const moves: GameNode[] = [];

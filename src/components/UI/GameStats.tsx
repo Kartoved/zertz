@@ -1,8 +1,28 @@
+import { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { WIN_CONDITIONS } from '../../game/types';
 
 export default function GameStats() {
-  const { state, playerNames } = useGameStore();
+  const { state, playerNames, setPlayerNames } = useGameStore();
+  const [editingPlayer, setEditingPlayer] = useState<'player1' | 'player2' | null>(null);
+  const [draftName, setDraftName] = useState('');
+
+  const startEdit = (player: 'player1' | 'player2') => {
+    setEditingPlayer(player);
+    setDraftName(playerNames[player]);
+  };
+
+  const commitName = () => {
+    if (!editingPlayer) return;
+    const trimmed = draftName.trim();
+    const nextName = trimmed.length > 0 ? trimmed : playerNames[editingPlayer];
+    if (editingPlayer === 'player1') {
+      setPlayerNames(nextName, playerNames.player2);
+    } else {
+      setPlayerNames(playerNames.player1, nextName);
+    }
+    setEditingPlayer(null);
+  };
   
   const renderCaptures = (player: 'player1' | 'player2') => {
     const caps = state.captures[player];
@@ -38,8 +58,23 @@ export default function GameStats() {
           : 'bg-gray-50 dark:bg-gray-700'
       }`}>
         <div>
-          <div className="font-semibold text-gray-900 dark:text-white">
-            {playerNames.player1}
+          <div className="font-semibold text-gray-900 dark:text-white" onDoubleClick={() => startEdit('player1')}>
+            {editingPlayer === 'player1' ? (
+              <input
+                value={draftName}
+                onChange={(e) => setDraftName(e.target.value)}
+                onBlur={commitName}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    commitName();
+                  }
+                }}
+                autoFocus
+                className="w-36 bg-white dark:bg-gray-700 rounded px-2 py-1 text-sm text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600"
+              />
+            ) : (
+              playerNames.player1
+            )}
           </div>
           <div className="text-sm text-gray-500 dark:text-gray-400">Захваченные шарики:</div>
         </div>
@@ -52,8 +87,23 @@ export default function GameStats() {
           : 'bg-gray-50 dark:bg-gray-700'
       }`}>
         <div>
-          <div className="font-semibold text-gray-900 dark:text-white">
-            {playerNames.player2}
+          <div className="font-semibold text-gray-900 dark:text-white" onDoubleClick={() => startEdit('player2')}>
+            {editingPlayer === 'player2' ? (
+              <input
+                value={draftName}
+                onChange={(e) => setDraftName(e.target.value)}
+                onBlur={commitName}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    commitName();
+                  }
+                }}
+                autoFocus
+                className="w-36 bg-white dark:bg-gray-700 rounded px-2 py-1 text-sm text-gray-900 dark:text-white border border-gray-300 dark:border-gray-600"
+              />
+            ) : (
+              playerNames.player2
+            )}
           </div>
           <div className="text-sm text-gray-500 dark:text-gray-400">Захваченные шарики:</div>
         </div>
