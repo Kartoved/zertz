@@ -35,7 +35,7 @@ export default function MainMenu() {
           ZERTZ
         </h1>
         <p className="text-xl text-gray-600 dark:text-gray-400">
-          Стратегическая игра с шариками
+          Абстрактная стратегическая игра
         </p>
       </div>
       
@@ -60,7 +60,7 @@ export default function MainMenu() {
           onClick={() => setScreen('rules')}
           className="w-full py-4 px-6 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 
             dark:hover:bg-gray-600 text-gray-800 dark:text-white font-semibold 
-            rounded-xl shadow-md hover:shadow-lg transition-all"
+            rounded-xl shadow-md hover:shadow-lg transition-all transform hover:scale-105"
         >
           Правила
         </button>

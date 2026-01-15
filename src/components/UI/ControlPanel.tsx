@@ -3,7 +3,7 @@ import { useUIStore } from '../../store/uiStore';
 
 export default function ControlPanel() {
   const { newGame, undo, state } = useGameStore();
-  const { setScreen } = useUIStore();
+  const { setScreen, openRules } = useUIStore();
   
   return (
     <div className="flex flex-wrap gap-2 justify-center">
@@ -31,6 +31,14 @@ export default function ControlPanel() {
           dark:hover:bg-gray-600 transition-colors text-gray-800 dark:text-gray-200"
       >
         ≡ Меню
+      </button>
+
+      <button
+        onClick={openRules}
+        className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 
+          dark:hover:bg-gray-600 transition-colors text-gray-800 dark:text-gray-200"
+      >
+        📘 Правила
       </button>
     </div>
   );

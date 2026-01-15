@@ -48,9 +48,9 @@ export default function HexRing({
   };
   
   // Ring visual styling
-  // Muted warm stone color: contrasts with gray/black marbles without being too bright
-  let ringColor = '#8a7f6a';
-  let ringStrokeColor = '#5c5343';
+  // Pure black rings for contrast with marbles
+  let ringColor = '#000000';
+  let ringStrokeColor = '#1a1a1a';
   let ringStrokeWidth = 3;
   
   if (isSelected) {
@@ -92,6 +92,13 @@ export default function HexRing({
       onClick={handleClick}
       className="cursor-pointer transition-all duration-150 hover:opacity-90"
     >
+      <circle
+        cx={0}
+        cy={0}
+        r={outerRadius}
+        fill="transparent"
+        pointerEvents="all"
+      />
       <path
         d={ringPath}
         fill={ringColor}
@@ -109,12 +116,12 @@ export default function HexRing({
           fill={
             ring.marble.color === 'white' ? '#f9fafb' :
             ring.marble.color === 'gray' ? '#9ca3af' :
-            '#1f2937'
+            '#374151'
           }
           stroke={
             ring.marble.color === 'white' ? '#d1d5db' :
             ring.marble.color === 'gray' ? '#6b7280' :
-            '#374151'
+            '#4b5563'
           }
           strokeWidth={2}
           style={{

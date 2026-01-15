@@ -1,13 +1,13 @@
 import { useUIStore } from '../../store/uiStore';
 
 export default function Rules() {
-  const { setScreen } = useUIStore();
+  const { setScreen, previousScreen } = useUIStore();
   
   return (
     <div className="min-h-screen p-6 bg-gray-100 dark:bg-gray-900">
       <div className="max-w-2xl mx-auto">
         <button
-          onClick={() => setScreen('menu')}
+          onClick={() => setScreen(previousScreen)}
           className="mb-6 px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg 
             hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors
             text-gray-800 dark:text-white"
@@ -44,7 +44,7 @@ export default function Rules() {
               <ol className="list-decimal list-inside space-y-1">
                 <li>Выберите шарик любого цвета из резерва</li>
                 <li>Поставьте его на любое пустое кольцо</li>
-                <li>Удалите одно «свободное» кольцо с края доски</li>
+                <li>Удалите одно «свободное» кольцо с края доски, если это возможно</li>
               </ol>
             </div>
             
@@ -54,9 +54,30 @@ export default function Rules() {
               <ul className="list-disc list-inside mt-2 space-y-1">
                 <li>Прыгните через соседний шарик на пустое кольцо за ним</li>
                 <li>Цвет не имеет значения</li>
-                <li>Цепочки взятий — продолжайте пока возможно</li>
+                <li>Цепочки взятий - продолжайте захватывать шарики пока это возможно</li>
               </ul>
             </div>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              Запас шариков
+            </h2>
+            <p>
+              В начале игры в <strong>общем запасе</strong> у игроков 10 чёрных шариков,
+              8 серых и 6 белых. Если шарики в общем запасе закончились, игроки выставляют
+              уже захваченные ими шарики.
+            </p>
+          </section>
+          
+          <section>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+              Резерв
+            </h2>
+            <p>
+              Резерв - это место, где хранятся шарики, которые еще не были использованы в игре.
+              Игроки могут брать шарики из резерва и использовать их в своей игре.
+            </p>
           </section>
           
           <section>
@@ -66,8 +87,7 @@ export default function Rules() {
             <p>Кольцо можно удалить если:</p>
             <ul className="list-disc list-inside ml-4 mt-2">
               <li>На нём нет шарика</li>
-              <li>У него ≥2 свободных стороны (на краю)</li>
-              <li>Удаление не разрывает доску</li>
+              <li>У него ≥2 свободных соседних стороны</li>
             </ul>
           </section>
           

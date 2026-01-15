@@ -41,14 +41,14 @@ export default function MarbleSelector() {
                 w-8 h-8 rounded-full border-2
                 ${color === 'white' ? 'bg-white border-gray-300' : ''}
                 ${color === 'gray' ? 'bg-gray-400 border-gray-500' : ''}
-                ${color === 'black' ? 'bg-gray-800 border-gray-900' : ''}
+                ${color === 'black' ? 'bg-gray-700 border-gray-800' : ''}
               `}
               style={{
                 background: color === 'white' 
                   ? 'radial-gradient(circle at 30% 30%, #ffffff, #e0e0e0)'
                   : color === 'gray'
                   ? 'radial-gradient(circle at 30% 30%, #9ca3af, #6b7280)'
-                  : 'radial-gradient(circle at 30% 30%, #4b5563, #1f2937)',
+                  : 'radial-gradient(circle at 30% 30%, #6b7280, #374151)',
               }}
             />
             <span className="text-xs font-medium dark:text-gray-300">

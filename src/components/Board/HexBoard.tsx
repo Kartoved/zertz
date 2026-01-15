@@ -78,7 +78,7 @@ export default function HexBoard() {
 
   return (
     <div className="flex items-center justify-center p-4 w-full">
-      <div className="relative w-full max-w-[1100px] rounded-2xl bg-gradient-to-b from-blue-950 to-slate-950 p-4 shadow-lg">
+      <div className="relative w-full max-w-[1100px] rounded-2xl bg-[#3B82F6] p-4 shadow-lg">
         <svg
           // Camera zoom: change viewBox, keep geometry (spacing) intact
           viewBox={`${viewX} ${viewY} ${viewWidth} ${viewHeight}`}

@@ -21,7 +21,7 @@ export default function GameStats() {
           </span>
         </span>
         <span className="flex items-center gap-1">
-          <div className="w-4 h-4 rounded-full bg-gray-800" />
+          <div className="w-4 h-4 rounded-full bg-gray-700" />
           <span className={caps.black >= WIN_CONDITIONS.black ? 'text-green-500 font-bold' : ''}>
             {caps.black}
           </span>
@@ -41,7 +41,7 @@ export default function GameStats() {
           <div className="font-semibold text-gray-900 dark:text-white">
             {playerNames.player1}
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">Взятия:</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">Захваченные шарики:</div>
         </div>
         {renderCaptures('player1')}
       </div>
@@ -55,7 +55,7 @@ export default function GameStats() {
           <div className="font-semibold text-gray-900 dark:text-white">
             {playerNames.player2}
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">Взятия:</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">Захваченные шарики:</div>
         </div>
         {renderCaptures('player2')}
       </div>
