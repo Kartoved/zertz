@@ -2,7 +2,7 @@ import { useGameStore } from '../../store/gameStore';
 import { useUIStore } from '../../store/uiStore';
 
 export default function ControlPanel() {
-  const { newGame, undo, state } = useGameStore();
+  const { undo, state } = useGameStore();
   const { setScreen, openRules } = useUIStore();
   
   return (
@@ -18,7 +18,7 @@ export default function ControlPanel() {
       </button>
       
       <button
-        onClick={newGame}
+        onClick={() => setScreen('menu')}
         className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 
           transition-colors"
       >
