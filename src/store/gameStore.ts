@@ -21,7 +21,7 @@ import {
   getWinType,
 } from '../game/GameEngine';
 import { getValidRemovableRings } from '../game/Board';
-import { saveGame, loadGame, listGames } from '../db/gamesApi';
+import { saveGame, loadGame, listGames } from '../db/gamesStorage';
 import { playPlaceSound, playRemoveRingSound, playCaptureSound, playWinSound, playUndoSound } from '../utils/sounds';
 
 interface GameStore {

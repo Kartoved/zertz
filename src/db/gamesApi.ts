@@ -2,6 +2,14 @@ import { GameState, GameNode } from '../game/types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
+async function safeJson<T>(response: Response): Promise<T> {
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    throw new Error('Non-JSON response');
+  }
+  return response.json() as Promise<T>;
+}
+
 type SavedGameSummary = {
   id: string;
   playerNames: { player1: string; player2: string };
@@ -91,7 +99,12 @@ export async function loadGame(id: string): Promise<{
     throw new Error('Failed to load game');
   }
 
-  const data = await response.json();
+  const data = await safeJson<{
+    stateJson: string;
+    treeJson: string;
+    playerNames: { player1: string; player2: string };
+    winType: string | null;
+  }>(response);
   return {
     state: deserializeState(data.stateJson),
     tree: deserializeTree(data.treeJson),
@@ -105,7 +118,7 @@ export async function listGames(): Promise<SavedGameSummary[]> {
   if (!response.ok) {
     throw new Error('Failed to list games');
   }
-  return response.json();
+  return safeJson<SavedGameSummary[]>(response);
 }
 
 export async function deleteGame(id: string): Promise<void> {
