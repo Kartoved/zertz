@@ -1,100 +1,105 @@
 # Деплой ZERTZ Online
 
-## Требования
+## ⚡ ВАРИАНТ 1: Railway.app (самый простой)
 
-- **Node.js** 18+ 
-- **PostgreSQL** 14+
-- Домен с HTTPS (для продакшена)
+**Время:** 5 минут | **Цена:** Бесплатно
 
-## Быстрый старт (локально)
+### Шаги:
 
-```bash
-# 1. Установить зависимости
-npm install
+1. **Залей код на GitHub** (уже сделано)
 
-# 2. Создать базу данных PostgreSQL
-createdb zertz
+2. **Зайди на [railway.app](https://railway.app)** и войди через GitHub
 
-# 3. Настроить переменные окружения
-cp .env.example .env
-# Отредактируй .env с твоими данными Postgres
+3. **New Project → Deploy from GitHub repo** → выбери `zertz`
 
-# 4. Собрать фронтенд
-npm run build
+4. **Добавь PostgreSQL:**
+   - В проекте нажми "Add Service" → "Database" → "PostgreSQL"
+   - Railway сам создаст переменные окружения
 
-# 5. Запустить сервер
-npm start
-# Открыть http://localhost:5050
-```
+5. **Готово!** Railway даст ссылку типа `https://zertz-xxx.up.railway.app`
 
-## Деплой на VPS (Ubuntu/Debian)
+> ⚠️ Проект использует **Dockerfile** — билд происходит в контейнере, без ошибок с tsc.
 
-### 1. Установка зависимостей
+---
 
-```bash
-# Node.js
-curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
-sudo apt-get install -y nodejs
+## 🐳 ВАРИАНТ 2: VPS с Docker (полный контроль)
 
-# PostgreSQL
-sudo apt-get install -y postgresql postgresql-contrib
+**Время:** 15-30 минут | **Цена:** от $5/мес (DigitalOcean, Vultr, Selectel)
 
-# PM2 для управления процессами
-sudo npm install -g pm2
-```
+### Требования:
+- VPS с Ubuntu 22.04+
+- Docker и Docker Compose
+- Домен (опционально)
 
-### 2. Настройка PostgreSQL
+### Шаг 1: Установка Docker на VPS
 
 ```bash
-sudo -u postgres createuser zertz_user
-sudo -u postgres createdb zertz -O zertz_user
-sudo -u postgres psql -c "ALTER USER zertz_user PASSWORD 'your_password';"
+# Подключись к серверу
+ssh root@YOUR_SERVER_IP
+
+# Установи Docker
+curl -fsSL https://get.docker.com | sh
 ```
 
-### 3. Клонирование и настройка
+### Шаг 2: Клонирование проекта
 
 ```bash
-git clone <your-repo-url> /var/www/zertz
-cd /var/www/zertz
-npm install
-npm run build
+git clone https://github.com/Kartoved/zertz.git /opt/zertz
+cd /opt/zertz
 ```
 
-### 4. Переменные окружения
+### Шаг 3: Настройка переменных
 
 ```bash
 cat > .env << EOF
-PGHOST=localhost
+PGHOST=db
 PGPORT=5432
 PGDATABASE=zertz
-PGUSER=zertz_user
-PGPASSWORD=your_password
+PGUSER=zertz
+PGPASSWORD=zertz_secret_password
 PORT=5050
 EOF
 ```
 
-### 5. Запуск через PM2
+### Шаг 4: Запуск
 
 ```bash
-pm2 start server/server.js --name zertz
-pm2 save
-pm2 startup
+docker compose up -d
 ```
 
-### 6. Nginx (reverse proxy)
+### Шаг 5: Проверка
 
+```bash
+# Проверь что контейнеры работают
+docker compose ps
+
+# Открой в браузере
+curl http://localhost:5050/api/health
+```
+
+Игра доступна на `http://YOUR_SERVER_IP:5050`
+
+### Шаг 6: SSL с Nginx (опционально)
+
+```bash
+sudo apt install -y nginx certbot python3-certbot-nginx
+
+# Создай конфиг nginx
+sudo nano /etc/nginx/sites-available/zertz
+```
+
+Содержимое файла:
 ```nginx
 server {
     listen 80;
-    server_name zertz.example.com;
+    server_name YOUR_DOMAIN;
 
     location / {
-        proxy_pass http://localhost:5050;
+        proxy_pass http://127.0.0.1:5050;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';
         proxy_set_header Host $host;
-        proxy_cache_bypass $http_upgrade;
     }
 }
 ```
@@ -103,53 +108,7 @@ server {
 sudo ln -s /etc/nginx/sites-available/zertz /etc/nginx/sites-enabled/
 sudo nginx -t
 sudo systemctl reload nginx
-```
-
-### 7. SSL (Let's Encrypt)
-
-```bash
-sudo apt-get install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d zertz.example.com
-```
-
-## Деплой на Railway.app (бесплатно)
-
-1. Создать аккаунт на [railway.app](https://railway.app)
-2. Создать новый проект
-3. Добавить PostgreSQL из маркетплейса
-4. Подключить GitHub репозиторий
-5. Railway автоматически задеплоит
-
-Переменные окружения будут настроены автоматически.
-
-## Деплой на Render.com
-
-1. Создать Web Service из репозитория
-2. Build Command: `npm install && npm run build`
-3. Start Command: `npm start`
-4. Добавить PostgreSQL из маркетплейса
-5. Переменные окружения подхватятся автоматически
-
-## Деплой на Fly.io
-
-```bash
-# Установить flyctl
-curl -L https://fly.io/install.sh | sh
-
-# Авторизация
-flyctl auth login
-
-# Создать приложение
-flyctl launch
-
-# Создать Postgres
-flyctl postgres create
-
-# Привязать к приложению
-flyctl postgres attach <db-name>
-
-# Деплой
-flyctl deploy
+sudo certbot --nginx -d YOUR_DOMAIN
 ```
 
 ## Структура проекта
