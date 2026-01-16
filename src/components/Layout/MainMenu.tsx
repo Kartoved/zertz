@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useUIStore } from '../../store/uiStore';
 import { useGameStore } from '../../store/gameStore';
+import { useRoomStore } from '../../store/roomStore';
 
 function formatDate(timestamp: number): string {
   const d = new Date(timestamp);
@@ -23,10 +25,13 @@ const WIN_TYPE_LABELS: Record<string, string> = {
 };
 
 export default function MainMenu() {
+  const navigate = useNavigate();
   const { setScreen, toggleDarkMode, isDarkMode } = useUIStore();
   const { newGame, savedGames, refreshSavedGames, loadSavedGame } = useGameStore();
+  const { createRoom, isLoading: isCreatingRoom } = useRoomStore();
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [showBoardDialog, setShowBoardDialog] = useState(false);
+  const [showOnlineDialog, setShowOnlineDialog] = useState(false);
   
   useEffect(() => {
     refreshSavedGames();
@@ -86,9 +91,9 @@ export default function MainMenu() {
         </button>
 
         <button
-          disabled
-          className="w-full py-4 px-6 bg-purple-500 text-white font-semibold rounded-xl 
-            shadow-lg opacity-60 cursor-not-allowed"
+          onClick={() => setShowOnlineDialog(true)}
+          className="w-full py-4 px-6 bg-purple-500 hover:bg-purple-600 text-white font-semibold rounded-xl 
+            shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
         >
           Сыграть онлайн
         </button>
@@ -103,7 +108,7 @@ export default function MainMenu() {
       </button>
       
       <div className="mt-8 text-sm text-gray-500 dark:text-gray-500">
-        v1.0 • 2 игрока • Локальная игра
+        v2.0 • 2 игрока • Локальная и онлайн игра
       </div>
       
       {showLoadDialog && (
@@ -201,6 +206,51 @@ export default function MainMenu() {
               >
                 Турнирное 61 кольцо
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showOnlineDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
+            <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Создать онлайн-игру</h2>
+              <button
+                onClick={() => setShowOnlineDialog(false)}
+                className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4">
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                Выберите размер поля. После создания вы получите ссылку для приглашения друга.
+              </p>
+              <div className="space-y-3">
+                {[37, 48, 61].map((size) => (
+                  <button
+                    key={size}
+                    disabled={isCreatingRoom}
+                    onClick={async () => {
+                      try {
+                        const roomId = await createRoom(size as 37 | 48 | 61);
+                        setShowOnlineDialog(false);
+                        navigate(`/room/${roomId}`);
+                      } catch {
+                        alert('Не удалось создать комнату. Проверьте подключение к серверу.');
+                      }
+                    }}
+                    className="w-full p-3 text-left bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 
+                      dark:hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50"
+                  >
+                    {BOARD_LABELS[size]}
+                  </button>
+                ))}
+              </div>
+              {isCreatingRoom && (
+                <p className="text-center text-gray-500 mt-4">Создание комнаты...</p>
+              )}
             </div>
           </div>
         </div>

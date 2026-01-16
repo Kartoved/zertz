@@ -4,6 +4,7 @@ import { hexToPixel } from '../../game/Board';
 import { getValidRemovableRings } from '../../game/Board';
 import { hasAvailableCaptures, getAvailableCaptures } from '../../game/GameEngine';
 import HexRing from './HexRing';
+import { GameState, CaptureMove } from '../../game/types';
 
 const HEX_SIZE = 28;
 const BOARD_PADDING = 60;
@@ -12,8 +13,19 @@ const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 2;
 const ZOOM_STEP = 0.1;
 
-export default function HexBoard() {
-  const { state, selectedRingId, highlightedCaptures } = useGameStore();
+interface HexBoardProps {
+  state?: GameState;
+  selectedRingId?: string | null;
+  highlightedCaptures?: CaptureMove[];
+  validRemovableRings?: string[];
+  onRingClick?: (ringId: string) => void;
+}
+
+export default function HexBoard(props: HexBoardProps = {}) {
+  const gameStore = useGameStore();
+  const state = props.state || gameStore.state;
+  const selectedRingId = props.selectedRingId !== undefined ? props.selectedRingId : gameStore.selectedRingId;
+  const highlightedCaptures = props.highlightedCaptures || gameStore.highlightedCaptures;
   const [zoom, setZoom] = useState(1);
   
   const { rings, positions, bounds } = useMemo(() => {
@@ -50,11 +62,14 @@ export default function HexBoard() {
   const viewY = (height - viewHeight) / 2;
   
   const validRemovableRings = useMemo(() => {
+    if (props.validRemovableRings) {
+      return new Set(props.validRemovableRings);
+    }
     if (state.phase === 'ringRemoval') {
       return new Set(getValidRemovableRings(state.rings));
     }
     return new Set<string>();
-  }, [state.phase, state.rings]);
+  }, [state.phase, state.rings, props.validRemovableRings]);
   
   const captureTargets = useMemo(() => {
     if (hasAvailableCaptures(state)) {

@@ -1,15 +1,33 @@
-import { MarbleColor } from '../../game/types';
+import { MarbleColor, GameState, Captures } from '../../game/types';
 import { useGameStore } from '../../store/gameStore';
 import { hasAvailableCaptures } from '../../game/GameEngine';
 
-export default function MarbleSelector() {
-  const { state, selectedMarbleColor, selectMarbleColor } = useGameStore();
+interface MarbleSelectorProps {
+  reserve?: { white: number; gray: number; black: number };
+  selectedColor?: MarbleColor | null;
+  onSelect?: (color: MarbleColor | null) => void;
+  captures?: Captures;
+  phase?: GameState['phase'];
+  currentPlayer?: GameState['currentPlayer'];
+  stateForCaptures?: GameState;
+}
+
+export default function MarbleSelector(props: MarbleSelectorProps = {}) {
+  const gameStore = useGameStore();
+  
+  const state = props.stateForCaptures || gameStore.state;
+  const reserve = props.reserve || gameStore.state.reserve;
+  const selectedMarbleColor = props.selectedColor !== undefined ? props.selectedColor : gameStore.selectedMarbleColor;
+  const selectMarbleColor = props.onSelect || gameStore.selectMarbleColor;
+  const phase = props.phase || gameStore.state.phase;
+  const currentPlayer = props.currentPlayer || gameStore.state.currentPlayer;
+  const captures = props.captures || gameStore.state.captures[currentPlayer];
   
   const mustCapture = hasAvailableCaptures(state);
-  const isDisabled = state.phase !== 'placement' || mustCapture;
+  const isDisabled = phase !== 'placement' || mustCapture;
 
-  const reserveTotal = state.reserve.white + state.reserve.gray + state.reserve.black;
-  const sourceCounts = reserveTotal > 0 ? state.reserve : state.captures[state.currentPlayer];
+  const reserveTotal = reserve.white + reserve.gray + reserve.black;
+  const sourceCounts = reserveTotal > 0 ? reserve : captures;
   
   const marbles: { color: MarbleColor; count: number; label: string }[] = [
     { color: 'white', count: sourceCounts.white, label: 'Белые' },
