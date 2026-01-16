@@ -8,7 +8,9 @@
     "dev:server": "node server/server.js",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "start": "node server/server.js"
+    "start": "node server/server.js",
+    "railway:build": "npm run build",
+    "railway:start": "npm start"
   },
   "dependencies": {
     "cors": "^2.8.5",
