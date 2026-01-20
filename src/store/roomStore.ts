@@ -19,8 +19,9 @@ import { playPlaceSound, playRemoveRingSound, playCaptureSound, playWinSound } f
 
 interface RoomStore {
   // Room info
-  roomId: string | null;
+  roomId: number | null;
   myPlayer: 1 | 2 | null;
+  creatorPlayer: 1 | 2 | null;
   isLoading: boolean;
   error: string | null;
   lastUpdated: number;
@@ -42,8 +43,8 @@ interface RoomStore {
   lastMessageId: number;
 
   // Actions
-  createRoom: (boardSize: 37 | 48 | 61) => Promise<string>;
-  joinRoom: (roomId: string) => Promise<boolean>;
+  createRoom: (boardSize: 37 | 48 | 61, creatorPlayer?: 1 | 2) => Promise<number>;
+  joinRoom: (roomId: number | string) => Promise<boolean>;
   pollRoom: () => Promise<void>;
   pollMessages: () => Promise<void>;
   sendMessage: (text: string) => Promise<void>;
@@ -95,6 +96,7 @@ function addMoveToTree(
 export const useRoomStore = create<RoomStore>((set, get) => ({
   roomId: null,
   myPlayer: null,
+  creatorPlayer: null,
   isLoading: false,
   error: null,
   lastUpdated: 0,
@@ -112,17 +114,18 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   messages: [],
   lastMessageId: 0,
 
-  createRoom: async (boardSize) => {
+  createRoom: async (boardSize, creatorPlayer = 1) => {
     set({ isLoading: true, error: null });
     try {
       const initialState = createInitialState(boardSize);
       const rootNode = createRootNode();
 
-      const roomId = await roomsApi.createRoom(boardSize, initialState, rootNode);
+      const roomId = await roomsApi.createRoom(boardSize, initialState, rootNode, creatorPlayer);
       
       set({
         roomId,
-        myPlayer: 1,
+        myPlayer: creatorPlayer,
+        creatorPlayer,
         state: initialState,
         gameTree: rootNode,
         currentNode: rootNode,
@@ -149,12 +152,16 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         return false;
       }
 
-      // Determine which player we are (second to join)
-      const myPlayer = get().myPlayer || 2;
+      // Parse roomId as number if it's a string
+      const numericRoomId = typeof roomId === 'string' ? parseInt(roomId, 10) : roomId;
+
+      // Determine which player we are (opposite of creator, or use existing)
+      const myPlayer = get().myPlayer || (room.creatorPlayer === 1 ? 2 : 1);
 
       set({
-        roomId,
+        roomId: numericRoomId,
         myPlayer,
+        creatorPlayer: room.creatorPlayer,
         state: room.state,
         gameTree: room.tree,
         currentNode: room.tree,
@@ -393,6 +400,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     set({
       roomId: null,
       myPlayer: null,
+      creatorPlayer: null,
       isLoading: false,
       error: null,
       lastUpdated: 0,

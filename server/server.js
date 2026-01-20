@@ -39,12 +39,13 @@ async function ensureSchema() {
     );
   `);
 
-  // Online rooms table
+  // Online rooms table with sequential IDs
   await pool.query(`
     CREATE TABLE IF NOT EXISTS rooms (
-      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+      id SERIAL PRIMARY KEY,
       board_size INTEGER NOT NULL DEFAULT 37,
       current_player INTEGER NOT NULL DEFAULT 1,
+      creator_player INTEGER NOT NULL DEFAULT 1,
       winner INTEGER,
       win_type TEXT,
       state_json TEXT NOT NULL,
@@ -60,7 +61,7 @@ async function ensureSchema() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS chat_messages (
       id SERIAL PRIMARY KEY,
-      room_id UUID REFERENCES rooms(id) ON DELETE CASCADE,
+      room_id INTEGER REFERENCES rooms(id) ON DELETE CASCADE,
       player_index INTEGER NOT NULL,
       message TEXT NOT NULL,
       created_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -175,46 +176,57 @@ app.delete('/api/games/:id', async (req, res) => {
 
 // Create a new room
 app.post('/api/rooms', async (req, res) => {
-  const { boardSize = 37, stateJson, treeJson } = req.body;
+  const { boardSize = 37, creatorPlayer = 1, stateJson, treeJson } = req.body;
   
   if (!stateJson || !treeJson) {
     res.status(400).json({ error: 'Missing state or tree' });
     return;
   }
 
-  const result = await pool.query(
-    `INSERT INTO rooms (board_size, state_json, tree_json)
-     VALUES ($1, $2, $3)
-     RETURNING id`,
-    [boardSize, stateJson, treeJson]
-  );
-  
-  res.json({ id: result.rows[0].id });
+  try {
+    const result = await pool.query(
+      `INSERT INTO rooms (board_size, creator_player, state_json, tree_json)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id`,
+      [boardSize, creatorPlayer, stateJson, treeJson]
+    );
+    
+    res.json({ id: result.rows[0].id });
+  } catch (err) {
+    console.error('Error creating room:', err);
+    res.status(500).json({ error: 'Failed to create room' });
+  }
 });
 
 // Get room by ID
 app.get('/api/rooms/:id', async (req, res) => {
   const { id } = req.params;
-  const result = await pool.query('SELECT * FROM rooms WHERE id = $1', [id]);
-  
-  if (result.rows.length === 0) {
-    res.status(404).json({ error: 'Room not found' });
-    return;
+  try {
+    const result = await pool.query('SELECT * FROM rooms WHERE id = $1', [id]);
+    
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'Room not found' });
+      return;
+    }
+    
+    const row = result.rows[0];
+    res.json({
+      id: row.id,
+      boardSize: row.board_size,
+      currentPlayer: row.current_player,
+      creatorPlayer: row.creator_player || 1,
+      winner: row.winner,
+      winType: row.win_type,
+      stateJson: row.state_json,
+      treeJson: row.tree_json,
+      playerNames: { player1: row.player1_name, player2: row.player2_name },
+      createdAt: row.created_at.getTime(),
+      updatedAt: row.updated_at.getTime(),
+    });
+  } catch (err) {
+    console.error('Error getting room:', err);
+    res.status(500).json({ error: 'Failed to get room' });
   }
-  
-  const row = result.rows[0];
-  res.json({
-    id: row.id,
-    boardSize: row.board_size,
-    currentPlayer: row.current_player,
-    winner: row.winner,
-    winType: row.win_type,
-    stateJson: row.state_json,
-    treeJson: row.tree_json,
-    playerNames: { player1: row.player1_name, player2: row.player2_name },
-    createdAt: row.created_at.getTime(),
-    updatedAt: row.updated_at.getTime(),
-  });
 });
 
 // Update room state (after each move)

@@ -10,7 +10,8 @@ export function RoomScreen() {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
-  const [showChat, setShowChat] = useState(false);
+  const [showMobileChat, setShowMobileChat] = useState(false);
+  const [chatCollapsed, setChatCollapsed] = useState(false);
 
   const {
     state,
@@ -163,7 +164,7 @@ export function RoomScreen() {
               {copied ? '✓ Скопировано!' : '🔗 Скопировать ссылку'}
             </button>
             <button
-              onClick={() => setShowChat(!showChat)}
+              onClick={() => setShowMobileChat(!showMobileChat)}
               className="md:hidden px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg"
             >
               💬
@@ -262,15 +263,29 @@ export function RoomScreen() {
           />
         </div>
 
-        {/* Right panel - Chat (desktop) */}
-        <div className="hidden lg:block lg:w-80 h-[500px]">
-          <ChatPanel />
+        {/* Right panel - Chat (desktop, collapsible) */}
+        <div className={`hidden lg:flex flex-col transition-all duration-300 ${
+          chatCollapsed ? 'lg:w-12' : 'lg:w-80'
+        }`}>
+          <button
+            onClick={() => setChatCollapsed(!chatCollapsed)}
+            className="mb-2 p-2 bg-white dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 
+                       flex items-center justify-center transition-colors"
+            title={chatCollapsed ? 'Развернуть чат' : 'Свернуть чат'}
+          >
+            {chatCollapsed ? '💬' : '→'}
+          </button>
+          {!chatCollapsed && (
+            <div className="flex-1 h-[500px]">
+              <ChatPanel />
+            </div>
+          )}
         </div>
       </div>
 
       {/* Mobile chat overlay */}
-      {showChat && (
-        <div className="fixed inset-0 bg-black/50 z-50 lg:hidden" onClick={() => setShowChat(false)}>
+      {showMobileChat && (
+        <div className="fixed inset-0 bg-black/50 z-50 lg:hidden" onClick={() => setShowMobileChat(false)}>
           <div 
             className="absolute bottom-0 left-0 right-0 h-[70vh] bg-white dark:bg-gray-800 rounded-t-2xl"
             onClick={(e) => e.stopPropagation()}
@@ -278,7 +293,7 @@ export function RoomScreen() {
             <div className="h-full flex flex-col">
               <div className="flex justify-between items-center p-3 border-b border-gray-200 dark:border-gray-700">
                 <h3 className="font-semibold">Чат</h3>
-                <button onClick={() => setShowChat(false)} className="text-2xl">×</button>
+                <button onClick={() => setShowMobileChat(false)} className="text-2xl">×</button>
               </div>
               <div className="flex-1 overflow-hidden">
                 <ChatPanel />

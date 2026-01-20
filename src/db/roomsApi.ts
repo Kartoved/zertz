@@ -3,9 +3,10 @@ import { GameState, GameNode } from '../game/types';
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
 export interface RoomData {
-  id: string;
+  id: number;
   boardSize: 37 | 48 | 61;
   currentPlayer: 1 | 2;
+  creatorPlayer: 1 | 2;
   winner: number | null;
   winType: string | null;
   stateJson: string;
@@ -44,13 +45,15 @@ function deserializeTree(json: string): GameNode {
 export async function createRoom(
   boardSize: 37 | 48 | 61,
   state: GameState,
-  tree: GameNode
-): Promise<string> {
+  tree: GameNode,
+  creatorPlayer: 1 | 2 = 1
+): Promise<number> {
   const response = await fetch(`${API_BASE}/api/rooms`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       boardSize,
+      creatorPlayer,
       stateJson: serializeState(state),
       treeJson: serializeTree(tree),
     }),
@@ -64,10 +67,11 @@ export async function createRoom(
   return data.id;
 }
 
-export async function getRoom(id: string): Promise<{
+export async function getRoom(id: number | string): Promise<{
   state: GameState;
   tree: GameNode;
   currentPlayer: 1 | 2;
+  creatorPlayer: 1 | 2;
   winner: number | null;
   winType: string | null;
   playerNames: { player1: string; player2: string };
@@ -89,6 +93,7 @@ export async function getRoom(id: string): Promise<{
     state: deserializeState(data.stateJson),
     tree: deserializeTree(data.treeJson),
     currentPlayer: data.currentPlayer,
+    creatorPlayer: data.creatorPlayer || 1,
     winner: data.winner,
     winType: data.winType,
     playerNames: data.playerNames,
@@ -98,7 +103,7 @@ export async function getRoom(id: string): Promise<{
 }
 
 export async function updateRoomState(
-  id: string,
+  id: number | string,
   state: GameState,
   tree: GameNode,
   currentPlayer: 1 | 2,
@@ -123,7 +128,7 @@ export async function updateRoomState(
 }
 
 export async function updatePlayerName(
-  roomId: string,
+  roomId: number | string,
   playerIndex: 1 | 2,
   name: string
 ): Promise<void> {
@@ -139,7 +144,7 @@ export async function updatePlayerName(
 }
 
 export async function getChatMessages(
-  roomId: string,
+  roomId: number | string,
   afterId?: number
 ): Promise<ChatMessage[]> {
   const url = afterId
@@ -156,7 +161,7 @@ export async function getChatMessages(
 }
 
 export async function sendChatMessage(
-  roomId: string,
+  roomId: number | string,
   playerIndex: 1 | 2,
   message: string
 ): Promise<ChatMessage> {

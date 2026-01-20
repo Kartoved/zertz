@@ -32,6 +32,11 @@ export default function MainMenu() {
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [showBoardDialog, setShowBoardDialog] = useState(false);
   const [showOnlineDialog, setShowOnlineDialog] = useState(false);
+  const [onlineStep, setOnlineStep] = useState<'board' | 'player' | 'link'>('board');
+  const [selectedBoardSize, setSelectedBoardSize] = useState<37 | 48 | 61>(37);
+  const [selectedPlayer, setSelectedPlayer] = useState<1 | 2 | 'random'>(1);
+  const [createdRoomId, setCreatedRoomId] = useState<number | null>(null);
+  const [linkCopied, setLinkCopied] = useState(false);
   
   useEffect(() => {
     refreshSavedGames();
@@ -215,41 +220,162 @@ export default function MainMenu() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
             <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Создать онлайн-игру</h2>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                {onlineStep === 'board' && 'Выберите размер поля'}
+                {onlineStep === 'player' && 'Выберите игрока'}
+                {onlineStep === 'link' && 'Ссылка для приглашения'}
+              </h2>
               <button
-                onClick={() => setShowOnlineDialog(false)}
+                onClick={() => {
+                  setShowOnlineDialog(false);
+                  setOnlineStep('board');
+                  setCreatedRoomId(null);
+                  setLinkCopied(false);
+                }}
                 className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
               >
                 ✕
               </button>
             </div>
             <div className="p-4">
-              <p className="text-gray-600 dark:text-gray-400 mb-4">
-                Выберите размер поля. После создания вы получите ссылку для приглашения друга.
-              </p>
-              <div className="space-y-3">
-                {[37, 48, 61].map((size) => (
-                  <button
-                    key={size}
-                    disabled={isCreatingRoom}
-                    onClick={async () => {
-                      try {
-                        const roomId = await createRoom(size as 37 | 48 | 61);
+              {onlineStep === 'board' && (
+                <>
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    Выберите размер поля для онлайн-игры.
+                  </p>
+                  <div className="space-y-3">
+                    {([37, 48, 61] as const).map((size) => (
+                      <button
+                        key={size}
+                        onClick={() => {
+                          setSelectedBoardSize(size);
+                          setOnlineStep('player');
+                        }}
+                        className={`w-full p-3 text-left rounded-lg transition-colors ${
+                          selectedBoardSize === size
+                            ? 'bg-purple-100 dark:bg-purple-900 border-2 border-purple-500'
+                            : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        {BOARD_LABELS[size]}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {onlineStep === 'player' && (
+                <>
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    Каким игроком вы хотите играть?
+                  </p>
+                  <div className="space-y-3">
+                    <button
+                      onClick={() => setSelectedPlayer(1)}
+                      className={`w-full p-3 text-left rounded-lg transition-colors ${
+                        selectedPlayer === 1
+                          ? 'bg-purple-100 dark:bg-purple-900 border-2 border-purple-500'
+                          : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      <div className="font-medium">Первый игрок</div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">Ходите первым</div>
+                    </button>
+                    <button
+                      onClick={() => setSelectedPlayer(2)}
+                      className={`w-full p-3 text-left rounded-lg transition-colors ${
+                        selectedPlayer === 2
+                          ? 'bg-purple-100 dark:bg-purple-900 border-2 border-purple-500'
+                          : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      <div className="font-medium">Второй игрок</div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">Ходите вторым</div>
+                    </button>
+                    <button
+                      onClick={() => setSelectedPlayer('random')}
+                      className={`w-full p-3 text-left rounded-lg transition-colors ${
+                        selectedPlayer === 'random'
+                          ? 'bg-purple-100 dark:bg-purple-900 border-2 border-purple-500'
+                          : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                      }`}
+                    >
+                      <div className="font-medium">Случайно</div>
+                      <div className="text-sm text-gray-500 dark:text-gray-400">Случайный выбор</div>
+                    </button>
+                  </div>
+                  <div className="flex gap-2 mt-4">
+                    <button
+                      onClick={() => setOnlineStep('board')}
+                      className="flex-1 py-2 px-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white 
+                        rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                    >
+                      Назад
+                    </button>
+                    <button
+                      disabled={isCreatingRoom}
+                      onClick={async () => {
+                        try {
+                          const player = selectedPlayer === 'random' 
+                            ? (Math.random() < 0.5 ? 1 : 2) 
+                            : selectedPlayer;
+                          const roomId = await createRoom(selectedBoardSize, player);
+                          setCreatedRoomId(roomId);
+                          setOnlineStep('link');
+                        } catch {
+                          alert('Не удалось создать комнату. Проверьте подключение к серверу.');
+                        }
+                      }}
+                      className="flex-1 py-2 px-4 bg-purple-500 hover:bg-purple-600 text-white font-semibold 
+                        rounded-lg transition-colors disabled:opacity-50"
+                    >
+                      {isCreatingRoom ? 'Создание...' : 'Создать игру'}
+                    </button>
+                  </div>
+                </>
+              )}
+
+              {onlineStep === 'link' && createdRoomId && (
+                <>
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    Игра создана! Отправьте ссылку другу для подключения.
+                  </p>
+                  <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3 mb-4">
+                    <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">Ссылка на игру:</div>
+                    <a 
+                      href={`${window.location.origin}/room/${createdRoomId}`}
+                      className="text-purple-600 dark:text-purple-400 hover:underline break-all font-medium"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {window.location.origin}/room/{createdRoomId}
+                    </a>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/room/${createdRoomId}`);
+                        setLinkCopied(true);
+                        setTimeout(() => setLinkCopied(false), 2000);
+                      }}
+                      className="flex-1 py-2 px-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white 
+                        rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                    >
+                      {linkCopied ? '✓ Скопировано!' : 'Копировать ссылку'}
+                    </button>
+                    <button
+                      onClick={() => {
                         setShowOnlineDialog(false);
-                        navigate(`/room/${roomId}`);
-                      } catch {
-                        alert('Не удалось создать комнату. Проверьте подключение к серверу.');
-                      }
-                    }}
-                    className="w-full p-3 text-left bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 
-                      dark:hover:bg-gray-600 rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    {BOARD_LABELS[size]}
-                  </button>
-                ))}
-              </div>
-              {isCreatingRoom && (
-                <p className="text-center text-gray-500 mt-4">Создание комнаты...</p>
+                        setOnlineStep('board');
+                        navigate(`/room/${createdRoomId}`);
+                      }}
+                      className="flex-1 py-2 px-4 bg-purple-500 hover:bg-purple-600 text-white font-semibold 
+                        rounded-lg transition-colors"
+                    >
+                      Перейти к игре
+                    </button>
+                  </div>
+                </>
               )}
             </div>
           </div>
