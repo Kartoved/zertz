@@ -10,13 +10,17 @@ dotenv.config();
 const app = express();
 const port = process.env.PORT || 5050;
 
-const pool = new Pool({
-  host: process.env.PGHOST || 'localhost',
-  port: Number(process.env.PGPORT || 5432),
-  database: process.env.PGDATABASE || 'zertz',
-  user: process.env.PGUSER || 'postgres',
-  password: process.env.PGPASSWORD || 'postgres',
-});
+const pool = new Pool(
+  process.env.DATABASE_URL
+    ? { connectionString: process.env.DATABASE_URL }
+    : {
+        host: process.env.PGHOST || 'localhost',
+        port: Number(process.env.PGPORT || 5432),
+        database: process.env.PGDATABASE || 'zertz',
+        user: process.env.PGUSER || 'postgres',
+        password: process.env.PGPASSWORD || 'postgres',
+      }
+);
 
 app.use(cors());
 app.use(express.json({ limit: '2mb' }));
