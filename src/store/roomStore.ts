@@ -15,6 +15,7 @@ import {
 import { getValidRemovableRings } from '../game/Board';
 import * as roomsApi from '../db/roomsApi';
 import { ChatMessage } from '../db/roomsApi';
+import * as gamesStorage from '../db/gamesStorage';
 import { playPlaceSound, playRemoveRingSound, playCaptureSound, playWinSound } from '../utils/sounds';
 
 interface RoomStore {
@@ -91,6 +92,17 @@ function addMoveToTree(
   };
   currentNode.children.push(newNode);
   return newNode;
+}
+
+async function persistOnlineGame(
+  roomId: number | null,
+  state: GameState,
+  tree: GameNode,
+  playerNames: { player1: string; player2: string },
+  winType: string | null
+): Promise<void> {
+  if (!roomId) return;
+  await gamesStorage.saveGame(String(roomId), state, tree, playerNames, winType);
 }
 
 export const useRoomStore = create<RoomStore>((set, get) => ({
@@ -204,6 +216,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
           selectedRingId: null,
           highlightedCaptures: [],
         });
+        await persistOnlineGame(roomId, room.state, room.tree, room.playerNames, room.winType);
       }
     } catch {
       // Ignore polling errors
@@ -247,9 +260,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   },
 
   selectRing: (ringId) => {
-    const { state, myPlayer } = get();
-    const myPlayerStr = myPlayer === 1 ? 'player1' : 'player2';
-    if (!ringId || state.currentPlayer !== myPlayerStr) {
+    const { state } = get();
+    if (!ringId) {
       set({ selectedRingId: null, highlightedCaptures: [], availableCaptureChains: [] });
       return;
     }
@@ -272,9 +284,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   },
 
   handlePlacement: async (ringId) => {
-    const { state, selectedMarbleColor, roomId, gameTree, myPlayer } = get();
-    const myPlayerStr = myPlayer === 1 ? 'player1' : 'player2';
-    if (!selectedMarbleColor || !roomId || state.currentPlayer !== myPlayerStr) return;
+    const { state, selectedMarbleColor, roomId, gameTree, playerNames } = get();
+    if (!selectedMarbleColor || !roomId) return;
 
     const newState = cloneState(state);
     if (placeMarble(newState, ringId, selectedMarbleColor)) {
@@ -297,13 +308,13 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
       const currentPlayerNum = state.currentPlayer === 'player1' ? 1 : 2;
       await roomsApi.updateRoomState(roomId, newState, newNode, currentPlayerNum as 1 | 2, null, null);
+      await persistOnlineGame(roomId, newState, newNode, playerNames, null);
     }
   },
 
   handleRingRemoval: async (ringId) => {
-    const { state, roomId, gameTree, myPlayer } = get();
-    const myPlayerStr = myPlayer === 1 ? 'player1' : 'player2';
-    if (!roomId || state.currentPlayer !== myPlayerStr) return;
+    const { state, roomId, gameTree, playerNames } = get();
+    if (!roomId) return;
 
     const validRings = getValidRemovableRings(state.rings);
     if (!validRings.includes(ringId)) return;
@@ -334,13 +345,13 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       const winnerNum = winner === 'player1' ? 1 : winner === 'player2' ? 2 : null;
       const currentPlayerNum = newState.currentPlayer === 'player1' ? 1 : 2;
       await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, winnerNum, winType);
+      await persistOnlineGame(roomId, newState, gameTree, playerNames, winType);
     }
   },
 
   handleCapture: async (captures) => {
-    const { state, roomId, gameTree, myPlayer } = get();
-    const myPlayerStr = myPlayer === 1 ? 'player1' : 'player2';
-    if (!roomId || state.currentPlayer !== myPlayerStr) return;
+    const { state, roomId, gameTree, playerNames } = get();
+    if (!roomId) return;
 
     const newState = cloneState(state);
     executeCapture(newState, captures);
@@ -382,10 +393,11 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     const winnerNum = winner === 'player1' ? 1 : winner === 'player2' ? 2 : null;
     const currentPlayerNum = newState.currentPlayer === 'player1' ? 1 : 2;
     await roomsApi.updateRoomState(roomId, newState, newNode, currentPlayerNum as 1 | 2, winnerNum, winType);
+    await persistOnlineGame(roomId, newState, newNode, playerNames, winType);
   },
 
   setPlayerName: async (player, name) => {
-    const { roomId, playerNames } = get();
+    const { roomId, playerNames, state, gameTree } = get();
     if (!roomId) return;
 
     const newNames = { ...playerNames };
@@ -394,6 +406,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
     set({ playerNames: newNames });
     await roomsApi.updatePlayerName(roomId, player, name);
+    await persistOnlineGame(roomId, state, gameTree, newNames, null);
   },
 
   reset: () => {
