@@ -12,6 +12,7 @@ interface HexRingProps {
   isCaptureSource: boolean;
   isCaptureTarget: boolean;
   isValidPlacement: boolean;
+  onClick?: (ringId: string) => void;
 }
 
 export default function HexRing({
@@ -24,10 +25,15 @@ export default function HexRing({
   isCaptureSource,
   isCaptureTarget,
   isValidPlacement,
+  onClick,
 }: HexRingProps) {
   const { selectRing, handleCapture, state, selectedRingId } = useGameStore();
   
   const handleClick = () => {
+    if (onClick) {
+      onClick(ring.id);
+      return;
+    }
     if (isCaptureTarget && selectedRingId) {
       const chains = getCaptureChains(state, selectedRingId);
       // Find the longest chain that ends at this ring (mandatory full capture)

@@ -58,6 +58,7 @@ export function RoomScreen() {
   };
 
   const isMyTurn = () => {
+    if (!myPlayer) return false;
     const myPlayerStr = myPlayer === 1 ? 'player1' : 'player2';
     return state.currentPlayer === myPlayerStr;
   };
@@ -82,7 +83,7 @@ export function RoomScreen() {
     : [];
 
   const handleRingClick = (ringId: string) => {
-    if (!isMyTurn() || state.winner) return;
+    if (state.winner) return;
 
     const ring = state.rings.get(ringId);
     if (!ring || ring.isRemoved) return;
@@ -236,7 +237,7 @@ export function RoomScreen() {
           </div>
 
           {/* Marble selector */}
-          {isMyTurn() && state.phase === 'placement' && !state.winner && (
+          {state.phase === 'placement' && !state.winner && (
             <div className="p-3 bg-white dark:bg-gray-800 rounded-lg">
               <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">Выбери шарик:</div>
               <MarbleSelector

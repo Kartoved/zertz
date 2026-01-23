@@ -123,6 +123,7 @@ export default function HexBoard(props: HexBoardProps = {}) {
                   isCaptureSource={isCaptureSource}
                   isCaptureTarget={isCaptureTarget}
                   isValidPlacement={isValidPlacement}
+                  onClick={props.onRingClick}
                 />
               );
             })}

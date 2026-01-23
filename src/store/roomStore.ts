@@ -148,6 +148,14 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         lastMessageId: 0,
       });
 
+      await persistOnlineGame(
+        roomId,
+        initialState,
+        rootNode,
+        { player1: 'Игрок 1', player2: 'Игрок 2' },
+        null
+      );
+
       return roomId;
     } catch (err) {
       set({ error: 'Не удалось создать комнату', isLoading: false });
@@ -181,6 +189,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         isLoading: false,
         lastUpdated: room.updatedAt,
       });
+
+      await persistOnlineGame(numericRoomId, room.state, room.tree, room.playerNames, room.winType);
 
       // Load chat messages
       const messages = await roomsApi.getChatMessages(roomId);
