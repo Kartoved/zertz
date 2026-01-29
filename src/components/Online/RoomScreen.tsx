@@ -83,6 +83,7 @@ export function RoomScreen() {
     : [];
 
   const handleRingClick = (ringId: string) => {
+    console.log('[RoomScreen.handleRingClick]', { ringId, phase: state.phase, selectedMarbleColor, winner: state.winner });
     if (state.winner) return;
 
     const ring = state.rings.get(ringId);
@@ -105,6 +106,7 @@ export function RoomScreen() {
       }
     } else if (state.phase === 'placement') {
       if (!ring.marble && selectedMarbleColor) {
+        console.log('[RoomScreen] calling handlePlacement', ringId);
         handlePlacement(ringId);
       } else if (!ring.marble) {
         selectRing(ringId);

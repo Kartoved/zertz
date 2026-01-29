@@ -1,58 +1,188 @@
-ZERTZ (Web)
+ZERTZ (Web) — Project Description
+==================================
 
 Overview
-- A browser implementation of the board game ZERTZ.
-- Tech stack: React + TypeScript + Vite, Zustand for state management, IndexedDB for autosave.
-- Rendering: SVG board with flat-top axial hex coordinates and a 37-ring layout.
+--------
+A browser implementation of the abstract strategy board game ZÈRTZ.
+Supports both local (hot-seat) and online multiplayer modes.
 
-Game Rules Implemented
-- Two action types per turn:
-  1) Placement:
-     - Select a marble color from the reserve.
-     - Place it on an empty ring.
-     - Remove one removable ring (mandatory if available) and the turn ends.
-  2) Capture (mandatory):
-     - If any capture is available, the player must capture.
-     - Capture works like checkers: jump over an adjacent marble to the empty ring directly behind it.
-     - Multi-capture is mandatory: if further captures are available in the chain, the move must continue to the end.
+Tech Stack:
+- Frontend: React 18 + TypeScript + Vite
+- State Management: Zustand (two stores: gameStore for local, roomStore for online)
+- Styling: TailwindCSS
+- Persistence: IndexedDB (local) + PostgreSQL (server)
+- Backend: Express.js (Node) with pg driver
+- Routing: React Router v6
 
-Ring Removal Rules
-- A ring can be removed only if:
-  - It is empty.
-  - It has at least two adjacent free edges (edge-of-board criterion).
-- Isolation is allowed: removing a ring may disconnect the board.
-  - If a disconnected group contains only marbles (no empty rings), all marbles in that group are captured.
+================================================================================
+GAME RULES (Implemented)
+================================================================================
 
-Move History / Variations
-- The game stores a move tree. Replaying to any move reconstructs the full game state.
-- Variations are displayed immediately after the parent move (in parentheses).
-- Navigation:
-  - Click a move in the history.
-  - Use ArrowLeft / ArrowRight.
+Turn Structure:
+1) PLACEMENT (if no captures available):
+   - Select a marble color (white/gray/black) from the reserve (or own captures if reserve empty).
+   - Place it on any empty ring.
+   - Remove one "free" ring (mandatory if any exist). A ring is free if:
+     * It is empty (no marble).
+     * It has ≥2 adjacent edges exposed to the board boundary.
+   - Turn ends, switch player.
 
-Autosave / Load
-- The current game is automatically saved to IndexedDB after every move.
-- Main menu includes a “Load Game” dialog showing all saved games (finished and unfinished).
+2) CAPTURE (mandatory if available):
+   - Jump over an adjacent marble to an empty ring directly behind it (like checkers).
+   - The jumped marble is captured by the current player.
+   - Multi-capture is mandatory: if another capture is available from the landing ring, continue.
+   - After all captures complete, turn ends.
 
-UI / UX
-- Circular rings (visible even when a marble is on top).
-- Board zoom (mouse wheel) implemented as camera zoom using SVG viewBox.
-- Sound effects on key actions (place, remove ring, capture, win, undo).
+Ring Removal & Isolation:
+- Removing a ring may disconnect the board into groups.
+- If a disconnected group contains ONLY marbles (no empty rings), all those marbles are captured by the player who caused the isolation.
 
-Local Development
-- Install dependencies and run:
-  - npm install
-  - npm run dev
+Win Conditions (first to achieve any):
+- 4 white marbles captured
+- 5 gray marbles captured
+- 6 black marbles captured
+- 3 of each color captured
 
-Release (No installs on the friend’s PC)
-- A static build can be found in the release/ folder.
-- To run locally on Windows:
-  - Double-click release/Start.cmd (or run Start.ps1)
-  - Then open http://localhost:5173
+Board Sizes: 37 / 48 / 61 rings (selectable on new game).
 
-Project Structure (high level)
-- src/game/*: core rules/engine and board geometry.
-- src/store/*: Zustand stores.
-- src/components/*: UI components.
-- src/db/*: IndexedDB utilities.
-- release/*: built static files and a tiny PowerShell server script.
+================================================================================
+ARCHITECTURE
+================================================================================
+
+src/
+├── App.tsx                 # Router: "/" → LocalApp, "/room/:roomId" → RoomScreen
+├── main.tsx                # Entry point
+├── index.css               # Tailwind imports
+│
+├── game/
+│   ├── types.ts            # Core types: Ring, Marble, GameState, GameNode, Move, etc.
+│   ├── Board.ts            # Hex geometry, board layouts (37/48/61), ring adjacency, free-ring detection
+│   └── GameEngine.ts       # Game logic: placeMarble, removeRing, executeCapture, checkWinCondition, getCaptureChains, moveToNotation
+│
+├── store/
+│   ├── gameStore.ts        # Zustand store for LOCAL games (single-device hot-seat)
+│   ├── roomStore.ts        # Zustand store for ONLINE games (multiplayer via server)
+│   └── uiStore.ts          # UI state: current screen (menu/game/rules)
+│
+├── db/
+│   ├── indexedDB.ts        # IndexedDB wrapper for local game persistence
+│   ├── gamesStorage.ts     # Save/load games (local IndexedDB + remote PostgreSQL)
+│   ├── gamesApi.ts         # REST client for /api/games (local game sync)
+│   └── roomsApi.ts         # REST client for /api/rooms (online rooms, chat)
+│
+├── components/
+│   ├── Board/
+│   │   ├── HexBoard.tsx    # SVG board renderer with zoom (viewBox), passes onRingClick to HexRing
+│   │   └── HexRing.tsx     # Single ring + marble rendering, click handling
+│   │
+│   ├── Layout/
+│   │   ├── MainMenu.tsx    # Main menu: New Game, Load, Online, Rules
+│   │   ├── GameScreen.tsx  # Local game screen (board + sidebar + history)
+│   │   └── Rules.tsx       # Rules modal
+│   │
+│   ├── Online/
+│   │   ├── RoomScreen.tsx  # Online game screen (board + players + chat)
+│   │   └── ChatPanel.tsx   # In-game chat for online rooms
+│   │
+│   └── UI/
+│       ├── MarbleSelector.tsx  # Marble color picker (reserve or captures)
+│       ├── PlayerCard.tsx      # Player info + captured marbles
+│       ├── MoveHistory.tsx     # Move tree navigation
+│       └── LoadGameModal.tsx   # Saved games list
+│
+└── utils/
+    └── sounds.ts           # Sound effects (place, capture, remove, win, undo)
+
+server/
+└── server.js               # Express backend:
+                            #   - PostgreSQL connection (DATABASE_URL or PG* env vars)
+                            #   - Schema: games, rooms, chat_messages tables
+                            #   - REST API:
+                            #       GET/POST /api/games, GET/DELETE /api/games/:id
+                            #       POST /api/rooms, GET /api/rooms/:id
+                            #       PUT /api/rooms/:id/state, PUT /api/rooms/:id/players/:index
+                            #       GET/POST /api/rooms/:id/messages
+                            #   - Serves static dist/ for production
+
+================================================================================
+ONLINE MULTIPLAYER FLOW
+================================================================================
+
+1. Creator clicks "Play Online" → selects board size and role (Player 1/2/Random).
+2. Frontend calls POST /api/rooms → server returns sequential integer room ID.
+3. Creator is redirected to /room/{id}, sees a shareable link.
+4. Second player opens the link → joinRoom() fetches room state, assigns opposite role.
+5. Both players poll GET /api/rooms/:id every 2s to sync game state.
+6. On each move, the acting player:
+   - Updates local state
+   - Calls PUT /api/rooms/:id/state to persist
+   - Also saves to local IndexedDB via persistOnlineGame()
+7. Chat: GET/POST /api/rooms/:id/messages, polled every 2s.
+
+Key Online State (roomStore.ts):
+- roomId: number | null
+- myPlayer: 1 | 2 | null (which player am I)
+- creatorPlayer: 1 | 2 | null (who created the room)
+- state, gameTree, playerNames, messages, etc.
+
+================================================================================
+LOCAL DEVELOPMENT
+================================================================================
+
+Prerequisites: Node.js 18+, npm
+
+# Install dependencies
+npm install
+
+# Run frontend (Vite dev server on :5173)
+npm run dev
+
+# Run backend (Express on :5050, requires PostgreSQL or runs without persistence)
+npm run dev:server
+
+# Or run both concurrently
+npm run dev:all
+
+Environment Variables (.env):
+- VITE_API_URL: API base URL (empty for same-origin, or http://localhost:5050 for dev)
+- DATABASE_URL: PostgreSQL connection string (for server)
+- PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD: Alternative PG config
+
+================================================================================
+DEPLOYMENT
+================================================================================
+
+Railway (recommended):
+1. Push to GitHub.
+2. Create Railway project, add PostgreSQL service.
+3. Add web service from repo, set DATABASE_URL from Postgres.
+4. Railway auto-deploys on push.
+
+Static Release (offline):
+- release/ folder contains pre-built static files.
+- Run release/Start.cmd (Windows) to serve locally on :5173.
+
+================================================================================
+KNOWN ISSUES / TODO
+================================================================================
+
+- [ ] Online moves not working (marble placement blocked) — needs debugging
+- [ ] Turn enforcement: currently any player can move; should restrict to currentPlayer
+- [ ] Reconnection handling: if a player refreshes, myPlayer assignment may be incorrect
+
+================================================================================
+FILE QUICK REFERENCE
+================================================================================
+
+| File                          | Purpose                                      |
+|-------------------------------|----------------------------------------------|
+| src/game/types.ts             | All TypeScript types/interfaces              |
+| src/game/Board.ts             | Hex math, board layouts, adjacency           |
+| src/game/GameEngine.ts        | Core game logic (place, capture, win check)  |
+| src/store/gameStore.ts        | Local game state + actions                   |
+| src/store/roomStore.ts        | Online game state + actions + polling        |
+| src/db/roomsApi.ts            | REST client for rooms/chat                   |
+| src/components/Board/HexBoard.tsx | SVG board with zoom                       |
+| src/components/Board/HexRing.tsx  | Single ring rendering + click             |
+| src/components/Online/RoomScreen.tsx | Online game UI                         |
+| server/server.js              | Express backend + PostgreSQL                 |

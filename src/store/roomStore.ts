@@ -295,7 +295,11 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
   handlePlacement: async (ringId) => {
     const { state, selectedMarbleColor, roomId, gameTree, playerNames } = get();
-    if (!selectedMarbleColor || !roomId) return;
+    console.log('[roomStore.handlePlacement]', { ringId, selectedMarbleColor, roomId, phase: state.phase });
+    if (!selectedMarbleColor || !roomId) {
+      console.log('[roomStore.handlePlacement] BLOCKED: selectedMarbleColor=', selectedMarbleColor, 'roomId=', roomId);
+      return;
+    }
 
     const newState = cloneState(state);
     if (placeMarble(newState, ringId, selectedMarbleColor)) {
