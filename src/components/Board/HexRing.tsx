@@ -30,7 +30,9 @@ export default function HexRing({
   const { selectRing, handleCapture, state, selectedRingId } = useGameStore();
   
   const handleClick = () => {
+    console.log('[HexRing.handleClick]', { ringId: ring.id, hasOnClick: !!onClick });
     if (onClick) {
+      console.log('[HexRing] calling onClick', ring.id);
       onClick(ring.id);
       return;
     }
