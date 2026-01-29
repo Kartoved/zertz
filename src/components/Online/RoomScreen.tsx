@@ -67,6 +67,16 @@ export function RoomScreen() {
     return state.currentPlayer === 'player1' ? playerNames.player1 : playerNames.player2;
   };
 
+  // Debug info
+  console.log('[RoomScreen DEBUG]', { 
+    myPlayer, 
+    creatorPlayer: useRoomStore.getState().creatorPlayer,
+    currentPlayer: state.currentPlayer,
+    selectedMarbleColor,
+    roomId: useRoomStore.getState().roomId,
+    phase: state.phase
+  });
+
   const getPhaseText = () => {
     if (state.winner) {
       const winnerName = state.winner === 'player1' ? playerNames.player1 : playerNames.player2;

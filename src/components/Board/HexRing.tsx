@@ -29,13 +29,19 @@ export default function HexRing({
 }: HexRingProps) {
   const { selectRing, handleCapture, state, selectedRingId } = useGameStore();
   
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
     console.log('[HexRing.handleClick]', { ringId: ring.id, hasOnClick: !!onClick });
+    
+    // In online mode, always use the passed onClick handler
     if (onClick) {
       console.log('[HexRing] calling onClick', ring.id);
       onClick(ring.id);
       return;
     }
+    
+    // Local mode - use gameStore
     if (isCaptureTarget && selectedRingId) {
       const chains = getCaptureChains(state, selectedRingId);
       // Find the longest chain that ends at this ring (mandatory full capture)
