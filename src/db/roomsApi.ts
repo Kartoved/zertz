@@ -35,11 +35,27 @@ function deserializeState(json: string): GameState {
 }
 
 function serializeTree(node: GameNode): string {
-  return JSON.stringify(node);
+  function serializeNode(n: GameNode): object {
+    return {
+      ...n,
+      parent: null,
+      children: n.children.map(c => serializeNode(c)),
+    };
+  }
+  return JSON.stringify(serializeNode(node));
 }
 
 function deserializeTree(json: string): GameNode {
-  return JSON.parse(json) as GameNode;
+  const obj = JSON.parse(json);
+
+  function rebuildNode(n: any, parent: GameNode | null): GameNode {
+    const node = n as GameNode;
+    node.parent = parent;
+    node.children = (node.children || []).map((c: any) => rebuildNode(c, node));
+    return node;
+  }
+
+  return rebuildNode(obj, null);
 }
 
 export async function createRoom(

@@ -44,13 +44,26 @@ function renderMoveTree(
   canDeleteNode: (node: GameNode) => boolean
 ): JSX.Element[] {
   // We treat node.children[0] as the main line, and node.children[1..] as variations.
-  // Rendering rule: show sibling variations in parentheses immediately after the parent,
-  // then show the main move, then continue along the main line.
+  // Rendering rule: show the main move first, then sibling variations in parentheses,
+  // then continue along the main line.
   const elements: JSX.Element[] = [];
 
   const mainChild = node.children[0];
   if (!mainChild) return elements;
 
+  // Render main move first
+  elements.push(
+    <MoveElement
+      key={mainChild.id}
+      node={mainChild}
+      isCurrentMove={mainChild.id === currentNodeId}
+      onNavigate={onNavigate}
+      onDelete={onDelete}
+      canDelete={canDeleteNode(mainChild)}
+    />
+  );
+
+  // Then render variations in parentheses
   const variations = node.children.slice(1);
   for (const variation of variations) {
     elements.push(
@@ -71,17 +84,6 @@ function renderMoveTree(
       <span key={`var-close-${variation.id}`} className="text-gray-500">)</span>
     );
   }
-
-  elements.push(
-    <MoveElement
-      key={mainChild.id}
-      node={mainChild}
-      isCurrentMove={mainChild.id === currentNodeId}
-      onNavigate={onNavigate}
-      onDelete={onDelete}
-      canDelete={canDeleteNode(mainChild)}
-    />
-  );
 
   // Continue main line
   elements.push(...renderMoveTree(mainChild, currentNodeId, onNavigate, onDelete, canDeleteNode));

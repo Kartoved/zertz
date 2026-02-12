@@ -166,7 +166,12 @@ Static Release (offline):
 KNOWN ISSUES / TODO
 ================================================================================
 
-- [ ] Online moves not working (marble placement blocked) — needs debugging
+- [x] Online moves not working — FIXED (circular parent refs in tree serialization,
+      gameTree/currentNode confusion, double player switch in captures, missing
+      skipRingRemoval when no free rings exist)
+- [x] Move history: variations displayed before main line — FIXED (rendering order)
+- [x] Online game persistence: games are now saved to IndexedDB + PostgreSQL after
+      every move and available via "Load Game"
 - [ ] Turn enforcement: currently any player can move; should restrict to currentPlayer
 - [ ] Reconnection handling: if a player refreshes, myPlayer assignment may be incorrect
 
