@@ -100,6 +100,9 @@ function addMoveToTree(
   return newNode;
 }
 
+// Guard: block polling while a move is being persisted to server
+let pendingMoveCount = 0;
+
 async function persistOnlineGame(
   roomId: number | null,
   state: GameState,
@@ -111,6 +114,7 @@ async function persistOnlineGame(
   await gamesStorage.saveGame(String(roomId), state, tree, playerNames, winType);
 }
 
+const _initialRoot = createRootNode();
 export const useRoomStore = create<RoomStore>((set, get) => ({
   roomId: null,
   myPlayer: null,
@@ -120,8 +124,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   lastUpdated: 0,
 
   state: createInitialState(37),
-  gameTree: createRootNode(),
-  currentNode: createRootNode(),
+  gameTree: _initialRoot,
+  currentNode: _initialRoot,
   playerNames: { player1: 'Игрок 1', player2: 'Игрок 2' },
 
   selectedMarbleColor: null,
@@ -213,14 +217,15 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   },
 
   pollRoom: async () => {
-    const { roomId, lastUpdated } = get();
-    if (!roomId) return;
+    const { roomId } = get();
+    if (!roomId || pendingMoveCount > 0) return;
 
     try {
       const room = await roomsApi.getRoom(roomId);
-      if (!room) return;
+      if (!room || pendingMoveCount > 0) return;
 
-      // Only update if there are changes
+      // Re-read lastUpdated after fetch to avoid stale comparison
+      const { lastUpdated } = get();
       if (room.updatedAt > lastUpdated) {
         set({
           state: room.state,
@@ -301,10 +306,19 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
   handlePlacement: async (ringId) => {
     const { state, selectedMarbleColor, roomId, currentNode, gameTree, playerNames } = get();
-    if (!selectedMarbleColor || !roomId) return;
+    console.log('[roomStore.handlePlacement] ENTER', { ringId, selectedMarbleColor, roomId, phase: state.phase, currentPlayer: state.currentPlayer });
+    if (!selectedMarbleColor || !roomId) {
+      console.log('[roomStore.handlePlacement] BLOCKED', { selectedMarbleColor, roomId });
+      return;
+    }
 
-    const newState = cloneState(state);
-    if (placeMarble(newState, ringId, selectedMarbleColor)) {
+    pendingMoveCount++;
+    try {
+      const newState = cloneState(state);
+      const placeResult = placeMarble(newState, ringId, selectedMarbleColor);
+      console.log('[roomStore.handlePlacement] placeMarble result:', placeResult);
+      if (!placeResult) return;
+
       playPlaceSound();
 
       const move: Move = {
@@ -313,6 +327,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       };
 
       const validRemovable = getValidRemovableRings(newState.rings);
+      console.log('[roomStore.handlePlacement] validRemovable:', validRemovable.length);
 
       if (validRemovable.length === 0) {
         // No free rings to remove — skip ring removal and complete the turn
@@ -336,7 +351,6 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
           currentNode: newNode,
           selectedMarbleColor: null,
           selectedRingId: null,
-          lastUpdated: Date.now(),
         });
 
         const winnerNum = winner === 'player1' ? 1 : winner === 'player2' ? 2 : null;
@@ -352,13 +366,16 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
           currentNode: newNode,
           selectedMarbleColor: null,
           selectedRingId: null,
-          lastUpdated: Date.now(),
         });
 
         const currentPlayerNum = state.currentPlayer === 'player1' ? 1 : 2;
         await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, null, null);
         await persistOnlineGame(roomId, newState, gameTree, playerNames, null);
       }
+    } catch (err) {
+      console.error('[roomStore.handlePlacement] ERROR:', err);
+    } finally {
+      pendingMoveCount--;
     }
   },
 
@@ -369,8 +386,11 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     const validRings = getValidRemovableRings(state.rings);
     if (!validRings.includes(ringId)) return;
 
-    const newState = cloneState(state);
-    if (removeRing(newState, ringId)) {
+    pendingMoveCount++;
+    try {
+      const newState = cloneState(state);
+      if (!removeRing(newState, ringId)) return;
+
       playRemoveRingSound();
 
       // Update the previous placement move with the removed ring
@@ -395,13 +415,16 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       set({
         state: newState,
         selectedRingId: null,
-        lastUpdated: Date.now(),
       });
 
       const winnerNum = winner === 'player1' ? 1 : winner === 'player2' ? 2 : null;
       const currentPlayerNum = newState.currentPlayer === 'player1' ? 1 : 2;
       await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, winnerNum, winType);
       await persistOnlineGame(roomId, newState, gameTree, playerNames, winType);
+    } catch (err) {
+      console.error('[roomStore.handleRingRemoval] ERROR:', err);
+    } finally {
+      pendingMoveCount--;
     }
   },
 
@@ -409,51 +432,57 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     const { state, roomId, currentNode, gameTree, playerNames } = get();
     if (!roomId) return;
 
-    const newState = cloneState(state);
-    const previousPlayer = state.currentPlayer;
-    const previousMoveNumber = state.moveNumber;
+    pendingMoveCount++;
+    try {
+      const newState = cloneState(state);
+      const previousPlayer = state.currentPlayer;
+      const previousMoveNumber = state.moveNumber;
 
-    executeCapture(newState, captures);
-    playCaptureSound();
+      executeCapture(newState, captures);
+      playCaptureSound();
 
-    // Check if new player has mandatory captures
-    if (hasAvailableCaptures(newState)) {
-      newState.phase = 'capture';
-    } else {
-      newState.phase = 'placement';
+      // Check if new player has mandatory captures
+      if (hasAvailableCaptures(newState)) {
+        newState.phase = 'capture';
+      } else {
+        newState.phase = 'placement';
+      }
+
+      const winner = checkWinCondition(newState);
+      const winType = winner ? getWinType(newState, winner) : null;
+
+      if (winner) {
+        playWinSound();
+        newState.winner = winner;
+      }
+
+      const move: Move = {
+        type: 'capture',
+        data: {
+          ...captures[0],
+          chain: captures.slice(1),
+        },
+      };
+
+      const newNode = addMoveToTree(currentNode, move, previousPlayer, previousMoveNumber, state.boardSize);
+
+      set({
+        state: newState,
+        currentNode: newNode,
+        selectedRingId: null,
+        highlightedCaptures: [],
+        availableCaptureChains: [],
+      });
+
+      const winnerNum = winner === 'player1' ? 1 : winner === 'player2' ? 2 : null;
+      const currentPlayerNum = newState.currentPlayer === 'player1' ? 1 : 2;
+      await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, winnerNum, winType);
+      await persistOnlineGame(roomId, newState, gameTree, playerNames, winType);
+    } catch (err) {
+      console.error('[roomStore.handleCapture] ERROR:', err);
+    } finally {
+      pendingMoveCount--;
     }
-
-    const winner = checkWinCondition(newState);
-    const winType = winner ? getWinType(newState, winner) : null;
-
-    if (winner) {
-      playWinSound();
-      newState.winner = winner;
-    }
-
-    const move: Move = {
-      type: 'capture',
-      data: {
-        ...captures[0],
-        chain: captures.slice(1),
-      },
-    };
-
-    const newNode = addMoveToTree(currentNode, move, previousPlayer, previousMoveNumber, state.boardSize);
-
-    set({
-      state: newState,
-      currentNode: newNode,
-      selectedRingId: null,
-      highlightedCaptures: [],
-      availableCaptureChains: [],
-      lastUpdated: Date.now(),
-    });
-
-    const winnerNum = winner === 'player1' ? 1 : winner === 'player2' ? 2 : null;
-    const currentPlayerNum = newState.currentPlayer === 'player1' ? 1 : 2;
-    await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, winnerNum, winType);
-    await persistOnlineGame(roomId, newState, gameTree, playerNames, winType);
   },
 
   setPlayerName: async (player, name) => {
@@ -470,6 +499,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   },
 
   reset: () => {
+    const rootNode = createRootNode();
     set({
       roomId: null,
       myPlayer: null,
@@ -478,8 +508,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       error: null,
       lastUpdated: 0,
       state: createInitialState(37),
-      gameTree: createRootNode(),
-      currentNode: createRootNode(),
+      gameTree: rootNode,
+      currentNode: rootNode,
       playerNames: { player1: 'Игрок 1', player2: 'Игрок 2' },
       selectedMarbleColor: null,
       selectedRingId: null,
