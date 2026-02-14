@@ -2,6 +2,9 @@ import { useState, useRef, useEffect } from 'react';
 import { useI18n } from '../../i18n';
 import { useAuthStore } from '../../store/authStore';
 
+const GLOBAL_CHAT_STORAGE_KEY = 'zertz_global_chat_messages';
+const MAX_STORED_MESSAGES = 200;
+
 interface ChatMessage {
   id: string;
   username: string;
@@ -12,23 +15,41 @@ interface ChatMessage {
 export default function GlobalChat() {
   const { t, locale } = useI18n();
   const { user } = useAuthStore();
+  const isAuthed = !!user;
   const [text, setText] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(GLOBAL_CHAT_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as ChatMessage[];
+      if (Array.isArray(parsed)) {
+        setMessages(parsed);
+      }
+    } catch {
+      // ignore broken localStorage data
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem(GLOBAL_CHAT_STORAGE_KEY, JSON.stringify(messages));
+  }, [messages]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const handleSend = () => {
-    if (!text.trim()) return;
+    if (!isAuthed || !text.trim()) return;
     const msg: ChatMessage = {
       id: Date.now().toString(),
-      username: user?.username || t.guest,
+      username: user.username,
       message: text.trim(),
       timestamp: Date.now(),
     };
-    setMessages((prev) => [...prev, msg]);
+    setMessages((prev) => [...prev, msg].slice(-MAX_STORED_MESSAGES));
     setText('');
   };
 
@@ -59,7 +80,7 @@ export default function GlobalChat() {
           </p>
         ) : (
           messages.map((msg) => {
-            const isMe = msg.username === (user?.username || t.guest);
+            const isMe = msg.username === user?.username;
             return (
               <div key={msg.id} className="flex items-start gap-2">
                 <div className="w-7 h-7 rounded-full bg-teal-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
@@ -86,6 +107,11 @@ export default function GlobalChat() {
       </div>
 
       <div className="p-3 border-t border-gray-200 dark:border-gray-700">
+        {!isAuthed && (
+          <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+            {t.chatLoginToWrite}
+          </p>
+        )}
         <div className="flex gap-2">
           <input
             type="text"
@@ -93,18 +119,19 @@ export default function GlobalChat() {
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={t.messagePlaceholder}
+            disabled={!isAuthed}
             className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg
                        bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200
-                       focus:outline-none focus:ring-2 focus:ring-teal-500"
+                       focus:outline-none focus:ring-2 focus:ring-teal-500 disabled:opacity-60 disabled:cursor-not-allowed"
           />
           <button
             onClick={handleSend}
-            disabled={!text.trim()}
+            disabled={!isAuthed || !text.trim()}
             className="px-4 py-2 bg-teal-500 text-white rounded-lg text-sm font-bold
                        hover:bg-teal-600 disabled:opacity-50 disabled:cursor-not-allowed
                        transition-colors uppercase tracking-wide"
           >
-            Send
+            {t.send}
           </button>
         </div>
       </div>

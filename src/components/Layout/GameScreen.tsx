@@ -14,6 +14,7 @@ export default function GameScreen() {
   const { state, playerNames, newGame } = useGameStore();
   const { toggleDarkMode, isDarkMode, setScreen } = useUIStore();
   const [showRematchDialog, setShowRematchDialog] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   
   const isGameOver = state.phase === 'gameOver';
   const winType = state.winner ? getWinType(state, state.winner) : null;
@@ -23,17 +24,33 @@ export default function GameScreen() {
     <div className="min-h-screen flex flex-col bg-gray-100 dark:bg-gray-900 transition-colors">
       <header className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 shadow-sm">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white">ZERTZ</h1>
-        <div className="flex-1 mx-4">
+        <div className="flex-1 mx-4 hidden md:block">
           <MoveHistory />
         </div>
-        <button
-          onClick={toggleDarkMode}
-          className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 
-            dark:hover:bg-gray-600 transition-colors"
-        >
-          {isDarkMode ? '☀️' : '🌙'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setShowMobileMenu((prev) => !prev)}
+            className="md:hidden p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+            title={showMobileMenu ? t.closeMenu : t.openMenu}
+          >
+            {showMobileMenu ? '✕' : '☰'}
+          </button>
+          <button
+            onClick={toggleDarkMode}
+            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 
+              dark:hover:bg-gray-600 transition-colors"
+          >
+            {isDarkMode ? '☀️' : '🌙'}
+          </button>
+        </div>
       </header>
+
+      {showMobileMenu && (
+        <div className="md:hidden px-4 pb-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+          <MoveHistory />
+        </div>
+      )}
       
       <main className="flex-1 flex flex-col lg:flex-row gap-4 p-4 max-w-7xl mx-auto w-full">
         <div className="flex-1 flex flex-col items-center justify-center">

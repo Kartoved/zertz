@@ -18,6 +18,7 @@ export function RoomScreen() {
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
   const [showMobileChat, setShowMobileChat] = useState(false);
+  const [showMobileHeaderMenu, setShowMobileHeaderMenu] = useState(false);
   const [chatCollapsed, setChatCollapsed] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [winnerModalDismissed, setWinnerModalDismissed] = useState(false);
@@ -170,6 +171,14 @@ export function RoomScreen() {
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 md:gap-4">
             <button
+              type="button"
+              onClick={() => setShowMobileHeaderMenu((prev) => !prev)}
+              className="md:hidden px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg"
+              title={showMobileHeaderMenu ? t.closeMenu : t.openMenu}
+            >
+              {showMobileHeaderMenu ? '✕' : '☰'}
+            </button>
+            <button
               onClick={() => navigate('/')}
               className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
             >
@@ -180,11 +189,11 @@ export function RoomScreen() {
             </h1>
           </div>
 
-          <div className="flex-1 min-w-[220px] md:mx-3">
+          <div className="hidden md:block flex-1 min-w-[220px] md:mx-3">
             <OnlineMoveHistory />
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="hidden md:flex items-center gap-2">
             <button
               onClick={() => setShowRulesModal(true)}
               className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
@@ -199,13 +208,47 @@ export function RoomScreen() {
             </button>
             <button
               onClick={() => setShowMobileChat(!showMobileChat)}
-              className="md:hidden px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg"
+              className="px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg"
             >
               💬
             </button>
           </div>
         </div>
       </header>
+
+      {showMobileHeaderMenu && (
+        <div className="md:hidden px-3 pb-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+          <div className="space-y-2">
+            <OnlineMoveHistory />
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => {
+                  setShowMobileHeaderMenu(false);
+                  setShowRulesModal(true);
+                }}
+                className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg"
+              >
+                📘 {t.roomRules}
+              </button>
+              <button
+                onClick={copyLink}
+                className="px-3 py-1.5 text-sm bg-green-500 text-white rounded-lg"
+              >
+                {copied ? t.copied : `🔗 ${t.copyRoomLink}`}
+              </button>
+              <button
+                onClick={() => {
+                  setShowMobileHeaderMenu(false);
+                  setShowMobileChat(true);
+                }}
+                className="px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg"
+              >
+                💬 {t.chat}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main content */}
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 p-2 md:p-4 max-w-7xl mx-auto w-full">

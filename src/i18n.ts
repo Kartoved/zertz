@@ -219,6 +219,11 @@ type Dict = {
   selectTimeControl: string;
   darkMode: string;
   lightMode: string;
+  openMenu: string;
+  closeMenu: string;
+  chatLoginToWrite: string;
+  send: string;
+  zertzByKrisBurm: string;
 };
 
 export const I18N: Record<Language, Dict> = {
@@ -435,6 +440,11 @@ export const I18N: Record<Language, Dict> = {
     selectTimeControl: 'Выберите контроль времени',
     darkMode: 'Тёмная тема',
     lightMode: 'Светлая тема',
+    openMenu: 'Открыть меню',
+    closeMenu: 'Закрыть меню',
+    chatLoginToWrite: 'Войдите, чтобы писать в чат',
+    send: 'Отправить',
+    zertzByKrisBurm: 'Zertz by Kris Burm',
   },
   en: {
     appSubtitle: 'Abstract strategy game',
@@ -649,6 +659,11 @@ export const I18N: Record<Language, Dict> = {
     selectTimeControl: 'Select time control',
     darkMode: 'Dark mode',
     lightMode: 'Light mode',
+    openMenu: 'Open menu',
+    closeMenu: 'Close menu',
+    chatLoginToWrite: 'Log in to write in chat',
+    send: 'Send',
+    zertzByKrisBurm: 'Zertz by Kris Burm',
   },
   eo: {
     appSubtitle: 'Abstrakta strategia ludo',
@@ -863,6 +878,11 @@ export const I18N: Record<Language, Dict> = {
     selectTimeControl: 'Elektu tempkontrolon',
     darkMode: 'Malhela temo',
     lightMode: 'Hela temo',
+    openMenu: 'Malfermi menuon',
+    closeMenu: 'Fermi menuon',
+    chatLoginToWrite: 'Ensalutu por skribi en babilejo',
+    send: 'Sendi',
+    zertzByKrisBurm: 'Zertz by Kris Burm',
   },
 };
 

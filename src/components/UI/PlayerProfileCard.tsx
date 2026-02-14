@@ -5,10 +5,9 @@ import { normalizeCountryValue } from '../../utils/country';
 
 interface PlayerProfileCardProps {
   onLoginClick: () => void;
-  onProfileClick: () => void;
 }
 
-export default function PlayerProfileCard({ onLoginClick, onProfileClick }: PlayerProfileCardProps) {
+export default function PlayerProfileCard({ onLoginClick }: PlayerProfileCardProps) {
   const { t } = useI18n();
   const { user } = useAuthStore();
 
@@ -42,13 +41,10 @@ export default function PlayerProfileCard({ onLoginClick, onProfileClick }: Play
           {user.username.charAt(0).toUpperCase()}
         </div>
         <div className="min-w-0">
-          <button
-            onClick={onProfileClick}
-            className="font-bold text-gray-900 dark:text-white hover:text-indigo-500 dark:hover:text-indigo-400 transition-colors truncate block text-left"
-          >
+          <div className="font-bold text-gray-900 dark:text-white truncate block text-left">
             <CountryBadge country={country} size={16} className="mr-1.5" />
             {user.username}
-          </button>
+          </div>
           <div className="text-xs text-gray-500 dark:text-gray-400">
             {t.rating}: {Math.round(user.rating)}
           </div>
@@ -92,15 +88,16 @@ export default function PlayerProfileCard({ onLoginClick, onProfileClick }: Play
         </div>
       )}
 
-      {/* Profile button */}
-      <button
-        onClick={onProfileClick}
-        className="mt-auto w-full py-2 px-4 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200
-          dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 font-medium
-          rounded-xl transition-colors text-sm"
-      >
-        {t.profile}
-      </button>
+      {user.contactLink && (
+        <a
+          href={user.contactLink}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mt-3 text-xs text-blue-600 dark:text-blue-400 hover:underline break-all"
+        >
+          {t.contact}: {user.contactLink}
+        </a>
+      )}
     </div>
   );
 }

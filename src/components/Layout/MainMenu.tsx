@@ -54,6 +54,7 @@ export default function MainMenu() {
   const [loadFilter, setLoadFilter] = useState<'all' | 'local' | 'online'>('all');
   const [showChallengesModal, setShowChallengesModal] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const { user } = useAuthStore();
   const boardLabels: Record<number, string> = { 37: t.board37, 48: t.board48, 61: t.board61 };
   
@@ -78,6 +79,7 @@ export default function MainMenu() {
   };
 
   const handleNavTab = (tab: NavTab) => {
+    setShowMobileMenu(false);
     switch (tab) {
       case 'playOnline': setShowOnlineDialog(true); break;
       case 'playLocal': handleNewGame(); break;
@@ -89,12 +91,15 @@ export default function MainMenu() {
   };
 
   const navTabs: Array<{ id: NavTab; label: string; authOnly?: boolean }> = [
-    { id: 'playOnline', label: t.playOnline },
     { id: 'playLocal', label: t.playLocal },
     { id: 'loadGame', label: t.loadGame },
     { id: 'rules', label: t.rules },
     { id: 'players', label: t.players },
     { id: 'challenges', label: t.challenges, authOnly: true },
+  ];
+  const topExtraTabs: Array<{ id: 'tasks' | 'community'; label: string }> = [
+    { id: 'tasks', label: t.tasks },
+    { id: 'community', label: t.community },
   ];
   
   return (
@@ -107,7 +112,7 @@ export default function MainMenu() {
         </div>
 
         {/* Nav tabs */}
-        <nav className="flex items-center gap-1">
+        <nav className="hidden lg:flex items-center gap-1">
           {navTabs
             .filter((tab) => !tab.authOnly || user)
             .map((tab) => (
@@ -121,10 +126,29 @@ export default function MainMenu() {
                 {tab.label}
               </button>
             ))}
+          {topExtraTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors
+                text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700
+                hover:text-gray-900 dark:hover:text-white uppercase tracking-wide"
+            >
+              {tab.label}
+            </button>
+          ))}
         </nav>
 
         {/* Right: language, dark mode, user */}
         <div className="flex items-center gap-2 flex-shrink-0 relative">
+          <button
+            type="button"
+            onClick={() => setShowMobileMenu((prev) => !prev)}
+            className="lg:hidden p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+            title={showMobileMenu ? t.closeMenu : t.openMenu}
+          >
+            {showMobileMenu ? '✕' : '☰'}
+          </button>
           {/* Language dropdown */}
           <button
             onClick={() => setShowLanguageDropdown((prev) => !prev)}
@@ -177,7 +201,7 @@ export default function MainMenu() {
           ) : (
             <button
               onClick={() => setShowAuthModal(true)}
-              className="px-4 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold rounded-lg transition-colors"
+              className="hidden sm:block px-4 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold rounded-lg transition-colors"
             >
               {t.loginRegister}
             </button>
@@ -185,18 +209,53 @@ export default function MainMenu() {
         </div>
       </header>
 
+      {showMobileMenu && (
+        <div className="lg:hidden bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 space-y-2">
+          {navTabs
+            .filter((tab) => !tab.authOnly || user)
+            .map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => handleNavTab(tab.id)}
+                className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700"
+              >
+                {tab.label}
+              </button>
+            ))}
+          {topExtraTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 border border-dashed border-gray-300 dark:border-gray-600"
+            >
+              {tab.label}
+            </button>
+          ))}
+          {!user && (
+            <button
+              onClick={() => {
+                setShowMobileMenu(false);
+                setShowAuthModal(true);
+              }}
+              className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold text-white bg-indigo-500"
+            >
+              {t.loginRegister}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ═══════ MAIN CONTENT: 3 columns ═══════ */}
-      <main className="flex-1 flex gap-4 p-4 overflow-hidden max-w-[1400px] mx-auto w-full">
+      <main className="flex-1 flex flex-col lg:flex-row gap-4 p-3 md:p-4 overflow-visible lg:overflow-hidden max-w-[1400px] mx-auto w-full">
         {/* LEFT: Player profile card */}
-        <aside className="w-72 flex-shrink-0 hidden lg:flex flex-col">
+        <aside className="w-full lg:w-72 flex-shrink-0 flex flex-col order-2 lg:order-1">
           <PlayerProfileCard
             onLoginClick={() => setShowAuthModal(true)}
-            onProfileClick={() => setShowProfileModal(true)}
           />
         </aside>
 
         {/* CENTER: Time control modes */}
-        <section className="flex-1 flex flex-col min-w-0">
+        <section className="flex-1 flex flex-col min-w-0 order-1 lg:order-2">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 flex-1 flex flex-col">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-6">
               {t.selectTimeControl}
@@ -238,33 +297,21 @@ export default function MainMenu() {
               })}
             </div>
 
-            {/* Quick action buttons row */}
-            <div className="mt-6 flex flex-wrap gap-2">
-              <button
-                type="button"
-                className="py-2 px-4 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-xl border border-dashed border-gray-300 dark:border-gray-600 text-sm"
-              >
-                {t.tasks}
-              </button>
-              <button
-                type="button"
-                className="py-2 px-4 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-xl border border-dashed border-gray-300 dark:border-gray-600 text-sm"
-              >
-                {t.community}
-              </button>
-            </div>
           </div>
 
           {/* Footer */}
-          <div className="mt-3 text-xs text-gray-400 dark:text-gray-500 text-center">
-            <span>{t.versionFooter}</span>
-            <span className="mx-2">·</span>
-            <span>{t.developedBy}</span>
+          <div className="mt-3 text-xs text-gray-400 dark:text-gray-500 text-center leading-5">
+            <div>
+              <span>{t.versionFooter}</span>
+              <span className="mx-2">·</span>
+              <span>{t.developedBy}</span>
+            </div>
+            <div>{t.zertzByKrisBurm}</div>
           </div>
         </section>
 
         {/* RIGHT: Global chat */}
-        <aside className="w-80 flex-shrink-0 hidden lg:flex flex-col">
+        <aside className="w-full lg:w-80 flex-shrink-0 flex flex-col order-3">
           <GlobalChat />
         </aside>
       </main>
