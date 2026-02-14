@@ -3,11 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useUIStore } from '../../store/uiStore';
 import { useGameStore } from '../../store/gameStore';
 import { useRoomStore } from '../../store/roomStore';
-import { useAuthStore } from '../../store/authStore';
-import AuthModal from '../Auth/AuthModal';
-import ProfileModal from '../Auth/ProfileModal';
-import PlayersModal from '../Auth/PlayersModal';
-import ChallengesModal from '../Auth/ChallengesModal';
 
 function formatDate(timestamp: number): string {
   const d = new Date(timestamp);
@@ -42,14 +37,6 @@ export default function MainMenu() {
   const [selectedPlayer, setSelectedPlayer] = useState<1 | 2 | 'random'>(1);
   const [createdRoomId, setCreatedRoomId] = useState<number | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [showProfileModal, setShowProfileModal] = useState(false);
-  const [showPlayersModal, setShowPlayersModal] = useState(false);
-  const [isRated, setIsRated] = useState(false);
-  const [loadTab, setLoadTab] = useState<'current' | 'completed'>('current');
-  const [loadFilter, setLoadFilter] = useState<'all' | 'local' | 'online'>('all');
-  const [showChallengesModal, setShowChallengesModal] = useState(false);
-  const { user } = useAuthStore();
   
   useEffect(() => {
     refreshSavedGames();
@@ -83,30 +70,12 @@ export default function MainMenu() {
       </div>
       
       <div className="flex flex-col gap-4 w-full max-w-xs">
-        {user ? (
-          <button
-            onClick={() => setShowProfileModal(true)}
-            className="w-full py-4 px-6 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold 
-              rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
-          >
-            Профиль ({user.username})
-          </button>
-        ) : (
-          <button
-            onClick={() => setShowAuthModal(true)}
-            className="w-full py-4 px-6 bg-indigo-500 hover:bg-indigo-600 text-white font-semibold 
-              rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
-          >
-            Войти / Зарегистрироваться
-          </button>
-        )}
-
         <button
           onClick={handleNewGame}
           className="w-full py-4 px-6 bg-blue-500 hover:bg-blue-600 text-white font-semibold 
             rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
         >
-          Новая игра
+          Локальная игра
         </button>
         
         <button
@@ -133,24 +102,6 @@ export default function MainMenu() {
         >
           Сыграть онлайн
         </button>
-
-        <button
-          onClick={() => setShowPlayersModal(true)}
-          className="w-full py-4 px-6 bg-teal-500 hover:bg-teal-600 text-white font-semibold rounded-xl 
-            shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
-        >
-          Игроки
-        </button>
-
-        {user && (
-          <button
-            onClick={() => setShowChallengesModal(true)}
-            className="w-full py-4 px-6 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl 
-              shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
-          >
-            Вызовы
-          </button>
-        )}
       </div>
       
       <button
@@ -165,121 +116,66 @@ export default function MainMenu() {
         v2.0 • 2 игрока • Локальная и онлайн игра
       </div>
       
-      {showLoadDialog && (() => {
-        const isNumericId = (id: string) => /^\d+$/.test(id);
-        const currentGames = savedGames.filter(g => !g.winner);
-        const completedGames = savedGames.filter(g => !!g.winner);
-        const tabGames = loadTab === 'current' ? currentGames : completedGames;
-        const filteredGames = loadFilter === 'all' ? tabGames
-          : loadFilter === 'local' ? tabGames.filter(g => !isNumericId(g.id))
-          : tabGames.filter(g => isNumericId(g.id));
-
-        return (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-hidden">
-              <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Загрузить игру</h2>
-                <button 
-                  onClick={() => setShowLoadDialog(false)}
-                  className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                >
-                  ✕
-                </button>
-              </div>
-              {/* Tabs */}
-              <div className="flex border-b dark:border-gray-700">
-                <button
-                  onClick={() => setLoadTab('current')}
-                  className={`flex-1 py-2 px-4 text-center text-sm font-semibold transition-colors ${
-                    loadTab === 'current'
-                      ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
-                  }`}
-                >
-                  Текущие ({currentGames.length})
-                </button>
-                <button
-                  onClick={() => setLoadTab('completed')}
-                  className={`flex-1 py-2 px-4 text-center text-sm font-semibold transition-colors ${
-                    loadTab === 'completed'
-                      ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
-                  }`}
-                >
-                  Завершённые ({completedGames.length})
-                </button>
-              </div>
-              {/* Filters */}
-              <div className="flex gap-1 px-4 pt-3">
-                {(['all', 'local', 'online'] as const).map(f => (
-                  <button
-                    key={f}
-                    onClick={() => setLoadFilter(f)}
-                    className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                      loadFilter === f
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
-                    }`}
-                  >
-                    {f === 'all' ? 'Все' : f === 'local' ? 'Локальные' : 'Онлайн'}
-                  </button>
-                ))}
-              </div>
-              <div className="p-4 overflow-y-auto max-h-96">
-                {filteredGames.length === 0 ? (
-                  <p className="text-gray-500 dark:text-gray-400 text-center py-8">
-                    Нет игр
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {filteredGames.map(game => (
-                      <button
-                        key={game.id}
-                        onClick={() => handleLoadGame(game.id)}
-                        className="w-full p-3 text-left bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 
-                          dark:hover:bg-gray-600 rounded-lg transition-colors"
-                      >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <div className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                              {game.playerNames.player1} vs {game.playerNames.player2}
-                              <span className={`text-xs px-1.5 py-0.5 rounded ${
-                                isNumericId(game.id) 
-                                  ? 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300' 
-                                  : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300'
-                              }`}>
-                                {isNumericId(game.id) ? 'онлайн' : 'локальная'}
-                              </span>
-                            </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              Ходов: {game.moveCount} • Поле: {BOARD_LABELS[game.boardSize] ?? `${game.boardSize} колец`}
-                            </div>
-                            {game.winType && (
-                              <div className="text-sm text-gray-500 dark:text-gray-400">
-                                {WIN_TYPE_LABELS[game.winType] ?? game.winType}
-                              </div>
-                            )}
+      {showLoadDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-hidden">
+            <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Загрузить игру</h2>
+              <button 
+                onClick={() => setShowLoadDialog(false)}
+                className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto max-h-96">
+              {savedGames.length === 0 ? (
+                <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+                  Нет сохранённых игр
+                </p>
+              ) : (
+                <div className="space-y-2">
+                  {savedGames.map(game => (
+                    <button
+                      key={game.id}
+                      onClick={() => handleLoadGame(game.id)}
+                      className="w-full p-3 text-left bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 
+                        dark:hover:bg-gray-600 rounded-lg transition-colors"
+                    >
+                      <div className="flex justify-between items-start">
+                        <div>
+                          <div className="font-medium text-gray-900 dark:text-white">
+                            {game.playerNames.player1} vs {game.playerNames.player2}
                           </div>
-                          <div className="text-right">
-                            <div className={`text-sm font-medium ${
-                              game.winner ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'
-                            }`}>
-                              {game.winner ? `${game.winner === 'player1' ? game.playerNames.player1 : game.playerNames.player2}` : 'В процессе'}
-                            </div>
-                            <div className="text-xs text-gray-400">
-                              {formatDate(game.updatedAt)}
-                            </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            Ходов: {game.moveCount}
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            Поле: {BOARD_LABELS[game.boardSize] ?? `${game.boardSize} колец`}
+                          </div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">
+                            Способ победы: {game.winType ? WIN_TYPE_LABELS[game.winType] ?? game.winType : '—'}
                           </div>
                         </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+                        <div className="text-right">
+                          <div className={`text-sm font-medium ${
+                            game.winner ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'
+                          }`}>
+                            {game.winner ? `Победил ${game.winner === 'player1' ? game.playerNames.player1 : game.playerNames.player2}` : 'В процессе'}
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            {formatDate(game.updatedAt)}
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
-        );
-      })()}
+        </div>
+      )}
 
       {showBoardDialog && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -408,28 +304,6 @@ export default function MainMenu() {
                       <div className="text-sm text-gray-500 dark:text-gray-400">Случайный выбор</div>
                     </button>
                   </div>
-
-                  {/* Rated toggle — only for authenticated users */}
-                  {user && (
-                    <div className="flex items-center justify-between mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
-                      <div>
-                        <div className="font-medium text-gray-900 dark:text-white text-sm">Рейтинговая игра</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">Влияет на рейтинг Глико</div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setIsRated(!isRated)}
-                        className={`relative w-12 h-6 rounded-full transition-colors ${
-                          isRated ? 'bg-purple-500' : 'bg-gray-300 dark:bg-gray-600'
-                        }`}
-                      >
-                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                          isRated ? 'translate-x-6' : ''
-                        }`} />
-                      </button>
-                    </div>
-                  )}
-
                   <div className="flex gap-2 mt-4">
                     <button
                       onClick={() => setOnlineStep('board')}
@@ -445,7 +319,7 @@ export default function MainMenu() {
                           const player = selectedPlayer === 'random' 
                             ? (Math.random() < 0.5 ? 1 : 2) 
                             : selectedPlayer;
-                          const roomId = await createRoom(selectedBoardSize, player, isRated);
+                          const roomId = await createRoom(selectedBoardSize, player);
                           setCreatedRoomId(roomId);
                           setOnlineStep('link');
                         } catch {
@@ -507,11 +381,6 @@ export default function MainMenu() {
           </div>
         </div>
       )}
-
-      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
-      {showProfileModal && <ProfileModal onClose={() => setShowProfileModal(false)} />}
-      {showPlayersModal && <PlayersModal onClose={() => setShowPlayersModal(false)} />}
-      {showChallengesModal && <ChallengesModal onClose={() => setShowChallengesModal(false)} />}
     </div>
   );
 }

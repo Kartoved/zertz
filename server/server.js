@@ -961,11 +961,18 @@ app.put('/api/rooms/:id/state', authOptional, async (req, res) => {
   // Turn enforcement: validate the submitting player matches the room's current_player
   if (playerIndex) {
     try {
-      const roomCheck = await pool.query('SELECT current_player, winner FROM rooms WHERE id = $1', [id]);
+      const roomCheck = await pool.query('SELECT current_player, winner, user1_id, user2_id FROM rooms WHERE id = $1', [id]);
       if (roomCheck.rows.length > 0) {
         const room = roomCheck.rows[0];
+        const authUserId = req.user ? req.user.id : null;
+        const seatUserId = playerIndex === 1 ? room.user1_id : room.user2_id;
+
         if (room.winner) {
           res.status(400).json({ error: 'Игра уже завершена' });
+          return;
+        }
+        if (!authUserId || !seatUserId || Number(authUserId) !== Number(seatUserId)) {
+          res.status(403).json({ error: 'Нельзя ходить за другого игрока' });
           return;
         }
         if (room.current_player !== playerIndex) {
@@ -1074,6 +1081,25 @@ app.put('/api/rooms/:id/join', authOptional, async (req, res) => {
 
   if (!userId || (playerIndex !== 1 && playerIndex !== 2)) {
     res.status(400).json({ error: 'Invalid join request' });
+    return;
+  }
+
+  const roomResult = await pool.query('SELECT user1_id, user2_id FROM rooms WHERE id = $1', [id]);
+  if (roomResult.rows.length === 0) {
+    res.status(404).json({ error: 'Room not found' });
+    return;
+  }
+
+  const room = roomResult.rows[0];
+  const targetSeatUserId = playerIndex === 1 ? room.user1_id : room.user2_id;
+  const otherSeatUserId = playerIndex === 1 ? room.user2_id : room.user1_id;
+
+  if (targetSeatUserId && Number(targetSeatUserId) !== Number(userId)) {
+    res.status(409).json({ error: 'Это место уже занято' });
+    return;
+  }
+  if (otherSeatUserId && Number(otherSeatUserId) === Number(userId)) {
+    res.status(409).json({ error: 'Вы уже заняли другое место в этой комнате' });
     return;
   }
 
