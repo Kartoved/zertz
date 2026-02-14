@@ -51,6 +51,26 @@ export default function PlayerProfileCard({ onLoginClick }: PlayerProfileCardPro
         </div>
       </div>
 
+      {(user.quote || user.contactLink) && (
+        <div className="mb-4 border-t dark:border-gray-700 pt-3 space-y-2">
+          {user.quote && (
+            <div className="text-xs text-gray-500 dark:text-gray-400 italic">
+              "{user.quote}"
+            </div>
+          )}
+          {user.contactLink && (
+            <a
+              href={user.contactLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block text-xs text-blue-600 dark:text-blue-400 hover:underline break-all"
+            >
+              {t.contact}: {user.contactLink}
+            </a>
+          )}
+        </div>
+      )}
+
       {/* Stats */}
       <div className="grid grid-cols-2 gap-2 mb-4">
         <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-2.5 text-center">
@@ -80,24 +100,6 @@ export default function PlayerProfileCard({ onLoginClick }: PlayerProfileCardPro
         <div className="text-lg font-bold text-orange-500">{user.bestStreak}</div>
         <div className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t.bestStreak}</div>
       </div>
-
-      {/* Quote */}
-      {user.quote && (
-        <div className="text-xs text-gray-500 dark:text-gray-400 italic border-t dark:border-gray-700 pt-3 mt-auto">
-          "{user.quote}"
-        </div>
-      )}
-
-      {user.contactLink && (
-        <a
-          href={user.contactLink}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-3 text-xs text-blue-600 dark:text-blue-400 hover:underline break-all"
-        >
-          {t.contact}: {user.contactLink}
-        </a>
-      )}
     </div>
   );
 }

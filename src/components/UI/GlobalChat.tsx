@@ -1,41 +1,57 @@
 import { useState, useRef, useEffect } from 'react';
 import { useI18n } from '../../i18n';
 import { useAuthStore } from '../../store/authStore';
+import { getGlobalChatMessages, sendGlobalChatMessage, GlobalChatMessage } from '../../db/globalChatApi';
 
-const GLOBAL_CHAT_STORAGE_KEY = 'zertz_global_chat_messages';
 const MAX_STORED_MESSAGES = 200;
-
-interface ChatMessage {
-  id: string;
-  username: string;
-  message: string;
-  timestamp: number;
-}
 
 export default function GlobalChat() {
   const { t, locale } = useI18n();
   const { user } = useAuthStore();
   const isAuthed = !!user;
   const [text, setText] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<GlobalChatMessage[]>([]);
+  const [lastMessageId, setLastMessageId] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(GLOBAL_CHAT_STORAGE_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw) as ChatMessage[];
-      if (Array.isArray(parsed)) {
-        setMessages(parsed);
+    let cancelled = false;
+
+    const loadInitial = async () => {
+      try {
+        const initial = await getGlobalChatMessages();
+        if (!cancelled && Array.isArray(initial)) {
+          const trimmed = initial.slice(-MAX_STORED_MESSAGES);
+          setMessages(trimmed);
+          setLastMessageId(trimmed.length > 0 ? trimmed[trimmed.length - 1].id : 0);
+        }
+      } catch {
+        // ignore initial load errors
       }
-    } catch {
-      // ignore broken localStorage data
-    }
+    };
+
+    loadInitial();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   useEffect(() => {
-    localStorage.setItem(GLOBAL_CHAT_STORAGE_KEY, JSON.stringify(messages));
-  }, [messages]);
+    const interval = setInterval(async () => {
+      try {
+        const fresh = await getGlobalChatMessages(lastMessageId || undefined);
+        if (fresh.length > 0) {
+          setMessages((prev) => [...prev, ...fresh].slice(-MAX_STORED_MESSAGES));
+          setLastMessageId(fresh[fresh.length - 1].id);
+        }
+      } catch {
+        // ignore polling errors
+      }
+    }, 2000);
+
+    return () => clearInterval(interval);
+  }, [lastMessageId]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -43,14 +59,16 @@ export default function GlobalChat() {
 
   const handleSend = () => {
     if (!isAuthed || !text.trim()) return;
-    const msg: ChatMessage = {
-      id: Date.now().toString(),
-      username: user.username,
-      message: text.trim(),
-      timestamp: Date.now(),
-    };
-    setMessages((prev) => [...prev, msg].slice(-MAX_STORED_MESSAGES));
-    setText('');
+    const payload = text.trim();
+    sendGlobalChatMessage(payload)
+      .then((msg) => {
+        setMessages((prev) => [...prev, msg].slice(-MAX_STORED_MESSAGES));
+        setLastMessageId(msg.id);
+        setText('');
+      })
+      .catch(() => {
+        // ignore send errors
+      });
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -60,8 +78,8 @@ export default function GlobalChat() {
     }
   };
 
-  const formatTime = (timestamp: number) => {
-    const d = new Date(timestamp);
+  const formatTime = (createdAt: number) => {
+    const d = new Date(createdAt);
     return d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
   };
 
@@ -92,7 +110,7 @@ export default function GlobalChat() {
                       {msg.username}
                     </span>
                     <span className="text-xs text-gray-400 dark:text-gray-500">
-                      {formatTime(msg.timestamp)}
+                      {formatTime(msg.createdAt)}
                     </span>
                   </div>
                   <p className="text-sm text-gray-800 dark:text-gray-200 break-words">

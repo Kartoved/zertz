@@ -19,6 +19,7 @@ export function RoomScreen() {
   const [copied, setCopied] = useState(false);
   const [showMobileChat, setShowMobileChat] = useState(false);
   const [showMobileHeaderMenu, setShowMobileHeaderMenu] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'board' | 'players'>('board');
   const [chatCollapsed, setChatCollapsed] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [winnerModalDismissed, setWinnerModalDismissed] = useState(false);
@@ -251,9 +252,9 @@ export function RoomScreen() {
       )}
 
       {/* Main content */}
-      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 p-2 md:p-4 max-w-7xl mx-auto w-full">
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 p-2 md:p-4 max-w-7xl mx-auto w-full pb-16 lg:pb-4">
         {/* Left panel - Players */}
-        <div className="lg:w-64 flex lg:flex-col gap-2 lg:gap-4">
+        <div className={`lg:w-64 lg:flex lg:flex-col gap-2 lg:gap-4 ${mobileTab !== 'players' ? 'hidden lg:flex' : 'flex flex-col'}`}>
           {/* Player 1 */}
           <div className={`flex-1 p-3 rounded-lg ${
             state.currentPlayer === 'player1' && !state.winner
@@ -387,7 +388,7 @@ export function RoomScreen() {
         </div>
 
         {/* Center - Board */}
-        <div className="flex-1 min-h-0 flex items-center justify-center min-h-[300px] md:min-h-[400px]">
+        <div className={`flex-1 min-h-0 items-center justify-center min-h-[320px] md:min-h-[400px] ${mobileTab !== 'board' ? 'hidden lg:flex' : 'flex'}`}>
           <HexBoard
             state={state}
             onRingClick={handleRingClick}
@@ -414,6 +415,40 @@ export function RoomScreen() {
               <ChatPanel />
             </div>
           )}
+        </div>
+      </div>
+
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 px-3 pb-3">
+        <div className="grid grid-cols-3 bg-white dark:bg-gray-800 rounded-xl p-1 shadow-lg border border-gray-200 dark:border-gray-700">
+          <button
+            type="button"
+            onClick={() => setMobileTab('board')}
+            className={`py-2 text-sm font-semibold rounded-lg transition-colors ${
+              mobileTab === 'board'
+                ? 'bg-indigo-500 text-white'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
+          >
+            {t.tabBoard}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab('players')}
+            className={`py-2 text-sm font-semibold rounded-lg transition-colors ${
+              mobileTab === 'players'
+                ? 'bg-indigo-500 text-white'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
+          >
+            {t.tabPlayers}
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowMobileChat(true)}
+            className="py-2 text-sm font-semibold rounded-lg text-white bg-blue-500 hover:bg-blue-600 transition-colors"
+          >
+            {t.chat}
+          </button>
         </div>
       </div>
 

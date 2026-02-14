@@ -224,13 +224,17 @@ type Dict = {
   chatLoginToWrite: string;
   send: string;
   zertzByKrisBurm: string;
+  tabPlay: string;
+  tabBoard: string;
+  tabControls: string;
+  tabPlayers: string;
 };
 
 export const I18N: Record<Language, Dict> = {
   ru: {
     appSubtitle: 'Абстрактная стратегическая игра',
-    versionFooter: 'v1.0.1',
-    developedBy: 'Developed by Metaprepod',
+    versionFooter: 'v1.0.2',
+    developedBy: 'Developed by Wood Romanov',
     profile: 'Профиль',
     loginRegister: 'Войти / Зарегистрироваться',
     playLocal: 'Играть локально',
@@ -445,11 +449,15 @@ export const I18N: Record<Language, Dict> = {
     chatLoginToWrite: 'Войдите, чтобы писать в чат',
     send: 'Отправить',
     zertzByKrisBurm: 'Zertz by Kris Burm',
+    tabPlay: 'Игра',
+    tabBoard: 'Доска',
+    tabControls: 'Панель',
+    tabPlayers: 'Игроки',
   },
   en: {
     appSubtitle: 'Abstract strategy game',
-    versionFooter: 'v1.0.1',
-    developedBy: 'Developed by Metaprepod',
+    versionFooter: 'v1.0.2',
+    developedBy: 'Developed by Wood Romanov',
     profile: 'Profile',
     loginRegister: 'Login / Register',
     playLocal: 'Play Local',
@@ -664,11 +672,15 @@ export const I18N: Record<Language, Dict> = {
     chatLoginToWrite: 'Log in to write in chat',
     send: 'Send',
     zertzByKrisBurm: 'Zertz by Kris Burm',
+    tabPlay: 'Play',
+    tabBoard: 'Board',
+    tabControls: 'Controls',
+    tabPlayers: 'Players',
   },
   eo: {
     appSubtitle: 'Abstrakta strategia ludo',
-    versionFooter: 'v1.0.1',
-    developedBy: 'Developed by Metaprepod',
+    versionFooter: 'v1.0.2',
+    developedBy: 'Developed by Wood Romanov',
     profile: 'Profilo',
     loginRegister: 'Ensaluti / Registriĝi',
     playLocal: 'Ludi loke',
@@ -883,6 +895,10 @@ export const I18N: Record<Language, Dict> = {
     chatLoginToWrite: 'Ensalutu por skribi en babilejo',
     send: 'Sendi',
     zertzByKrisBurm: 'Zertz by Kris Burm',
+    tabPlay: 'Ludo',
+    tabBoard: 'Tabulo',
+    tabControls: 'Panelo',
+    tabPlayers: 'Ludantoj',
   },
 };
 

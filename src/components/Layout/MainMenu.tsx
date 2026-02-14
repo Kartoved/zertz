@@ -55,6 +55,7 @@ export default function MainMenu() {
   const [showChallengesModal, setShowChallengesModal] = useState(false);
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [mobileMainTab, setMobileMainTab] = useState<'play' | 'chat'>('play');
   const { user } = useAuthStore();
   const boardLabels: Record<number, string> = { 37: t.board37, 48: t.board48, 61: t.board61 };
   
@@ -245,17 +246,44 @@ export default function MainMenu() {
         </div>
       )}
 
+      <div className="lg:hidden px-3 pt-3">
+        <div className="grid grid-cols-2 bg-white dark:bg-gray-800 rounded-xl p-1 shadow-sm border border-gray-200 dark:border-gray-700">
+          <button
+            type="button"
+            onClick={() => setMobileMainTab('play')}
+            className={`py-2 text-sm font-semibold rounded-lg transition-colors ${
+              mobileMainTab === 'play'
+                ? 'bg-indigo-500 text-white'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
+          >
+            {t.tabPlay}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileMainTab('chat')}
+            className={`py-2 text-sm font-semibold rounded-lg transition-colors ${
+              mobileMainTab === 'chat'
+                ? 'bg-indigo-500 text-white'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
+          >
+            {t.globalChat}
+          </button>
+        </div>
+      </div>
+
       {/* ═══════ MAIN CONTENT: 3 columns ═══════ */}
       <main className="flex-1 flex flex-col lg:flex-row gap-4 p-3 md:p-4 overflow-visible lg:overflow-hidden max-w-[1400px] mx-auto w-full">
         {/* LEFT: Player profile card */}
-        <aside className="w-full lg:w-72 flex-shrink-0 flex flex-col order-2 lg:order-1">
+        <aside className="hidden lg:flex w-full lg:w-72 flex-shrink-0 flex-col order-2 lg:order-1">
           <PlayerProfileCard
             onLoginClick={() => setShowAuthModal(true)}
           />
         </aside>
 
         {/* CENTER: Time control modes */}
-        <section className="flex-1 flex flex-col min-w-0 order-1 lg:order-2">
+        <section className={`flex-1 flex flex-col min-w-0 order-1 lg:order-2 ${mobileMainTab !== 'play' ? 'hidden lg:flex' : ''}`}>
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 flex-1 flex flex-col">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-6">
               {t.selectTimeControl}
@@ -311,7 +339,7 @@ export default function MainMenu() {
         </section>
 
         {/* RIGHT: Global chat */}
-        <aside className="w-full lg:w-80 flex-shrink-0 flex flex-col order-3">
+        <aside className={`w-full lg:w-80 flex-shrink-0 flex-col order-3 ${mobileMainTab === 'chat' ? 'flex' : 'hidden lg:flex'}`}>
           <GlobalChat />
         </aside>
       </main>

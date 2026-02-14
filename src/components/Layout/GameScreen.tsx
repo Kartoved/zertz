@@ -15,6 +15,7 @@ export default function GameScreen() {
   const { toggleDarkMode, isDarkMode, setScreen } = useUIStore();
   const [showRematchDialog, setShowRematchDialog] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [mobileTab, setMobileTab] = useState<'board' | 'controls'>('board');
   
   const isGameOver = state.phase === 'gameOver';
   const winType = state.winner ? getWinType(state, state.winner) : null;
@@ -51,13 +52,43 @@ export default function GameScreen() {
           <MoveHistory />
         </div>
       )}
+
+      <div className="md:hidden px-3 pt-3">
+        <div className="grid grid-cols-2 bg-white dark:bg-gray-800 rounded-xl p-1 shadow-sm border border-gray-200 dark:border-gray-700">
+          <button
+            type="button"
+            onClick={() => setMobileTab('board')}
+            className={`py-2 text-sm font-semibold rounded-lg transition-colors ${
+              mobileTab === 'board'
+                ? 'bg-indigo-500 text-white'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
+          >
+            {t.tabBoard}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileTab('controls')}
+            className={`py-2 text-sm font-semibold rounded-lg transition-colors ${
+              mobileTab === 'controls'
+                ? 'bg-indigo-500 text-white'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
+          >
+            {t.tabControls}
+          </button>
+        </div>
+      </div>
       
       <main className="flex-1 flex flex-col lg:flex-row gap-4 p-4 max-w-7xl mx-auto w-full">
-        <div className="flex-1 flex flex-col items-center justify-center">
+        <div className={`flex-1 flex flex-col items-center justify-center ${mobileTab !== 'board' ? 'hidden md:flex' : ''}`}>
           <HexBoard />
         </div>
         
-        <aside className="lg:w-80 flex flex-col gap-4">
+        <aside className={`lg:w-80 flex flex-col gap-4 ${mobileTab !== 'controls' ? 'hidden md:flex' : ''}`}>
+          <div className="md:hidden p-3 bg-white dark:bg-gray-800 rounded-xl shadow-md">
+            <MoveHistory />
+          </div>
           <GameStats />
           
           {!isGameOver && (

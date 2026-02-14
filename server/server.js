@@ -82,6 +82,21 @@ async function ensureSchema() {
     CREATE INDEX IF NOT EXISTS idx_chat_room_id ON chat_messages(room_id);
   `);
 
+  // Global chat messages table
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS global_chat_messages (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER,
+      username TEXT NOT NULL,
+      message TEXT NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  await pool.query(`
+    CREATE INDEX IF NOT EXISTS idx_global_chat_id ON global_chat_messages(id);
+  `);
+
   // Users table
   await pool.query(`
     CREATE TABLE IF NOT EXISTS users (
@@ -1178,6 +1193,63 @@ app.post('/api/rooms/:id/messages', async (req, res) => {
     id: result.rows[0].id,
     playerIndex,
     message,
+    createdAt: result.rows[0].created_at.getTime(),
+  });
+});
+
+// Get global chat messages
+app.get('/api/global-chat', async (req, res) => {
+  const { after } = req.query;
+
+  let query = 'SELECT id, username, message, created_at FROM global_chat_messages';
+  const params = [];
+
+  if (after) {
+    query += ' WHERE id > $1';
+    params.push(after);
+  }
+
+  query += ' ORDER BY created_at ASC LIMIT 300';
+
+  const result = await pool.query(query, params);
+  res.json(result.rows.map((row) => ({
+    id: row.id,
+    username: row.username,
+    message: row.message,
+    createdAt: row.created_at.getTime(),
+  })));
+});
+
+// Send global chat message (auth only)
+app.post('/api/global-chat', authRequired, async (req, res) => {
+  const { message } = req.body;
+  const userId = req.user.id;
+
+  if (!message || !String(message).trim()) {
+    res.status(400).json({ error: 'Message is required' });
+    return;
+  }
+
+  const userResult = await pool.query('SELECT username FROM users WHERE id = $1', [userId]);
+  if (userResult.rows.length === 0) {
+    res.status(404).json({ error: 'User not found' });
+    return;
+  }
+
+  const username = userResult.rows[0].username;
+  const cleanMessage = String(message).trim().slice(0, 500);
+
+  const result = await pool.query(
+    `INSERT INTO global_chat_messages (user_id, username, message)
+     VALUES ($1, $2, $3)
+     RETURNING id, created_at`,
+    [userId, username, cleanMessage]
+  );
+
+  res.json({
+    id: result.rows[0].id,
+    username,
+    message: cleanMessage,
     createdAt: result.rows[0].created_at.getTime(),
   });
 });
