@@ -71,6 +71,7 @@ interface RoomStore {
   handleRingRemoval: (ringId: string) => Promise<void>;
   handleCapture: (captures: CaptureMove[]) => Promise<void>;
   undoLastMove: () => Promise<void>;
+  navigateToNode: (targetNode: GameNode) => void;
   setPlayerName: (player: 1 | 2, name: string) => Promise<void>;
   
   reset: () => void;
@@ -603,6 +604,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   undoLastMove: async () => {
     const { roomId, currentNode, state, gameTree, playerNames, myPlayer } = get();
     if (!roomId || !myPlayer || !currentNode.parent) return;
+    const myPlayerStr = myPlayer === 1 ? 'player1' : 'player2';
+    if (state.currentPlayer !== myPlayerStr) return;
 
     pendingMoveCount++;
     try {
@@ -634,6 +637,20 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     } finally {
       pendingMoveCount--;
     }
+  },
+
+  navigateToNode: (targetNode) => {
+    const { state } = get();
+    const newState = rebuildStateFromNode(targetNode, state.boardSize);
+
+    set({
+      state: newState,
+      currentNode: targetNode,
+      selectedMarbleColor: null,
+      selectedRingId: null,
+      highlightedCaptures: [],
+      availableCaptureChains: [],
+    });
   },
 
   setPlayerName: async (player, name) => {

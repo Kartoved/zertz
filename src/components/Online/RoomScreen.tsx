@@ -6,7 +6,18 @@ import HexBoard from '../Board/HexBoard';
 import { ChatPanel } from './ChatPanel';
 import MarbleSelector from '../UI/MarbleSelector';
 import { getValidRemovableRings } from '../../game/Board';
+import { getWinType } from '../../game/GameEngine';
 import PlayerProfileModal from '../Auth/PlayerProfileModal';
+import RulesContent from '../UI/RulesContent';
+import OnlineMoveHistory from '../UI/OnlineMoveHistory';
+
+const WIN_TYPE_LABELS: Record<string, string> = {
+  white: 'Победа по белым шарикам',
+  gray: 'Победа по серым шарикам',
+  black: 'Победа по чёрным шарикам',
+  mixed: 'Победа по 3 шарикам каждого цвета',
+  unknown: 'Победа',
+};
 
 export function RoomScreen() {
   const { roomId } = useParams<{ roomId: string }>();
@@ -16,6 +27,7 @@ export function RoomScreen() {
   const [chatCollapsed, setChatCollapsed] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [winnerModalDismissed, setWinnerModalDismissed] = useState(false);
+  const [showRulesModal, setShowRulesModal] = useState(false);
 
   const {
     state,
@@ -83,10 +95,6 @@ export function RoomScreen() {
     return state.currentPlayer === myPlayerStr;
   };
 
-  const getCurrentPlayerName = () => {
-    return state.currentPlayer === 'player1' ? playerNames.player1 : playerNames.player2;
-  };
-
   const getPhaseText = () => {
     if (state.phase === 'placement') return 'Размести шарик';
     if (state.phase === 'ringRemoval') return 'Удали кольцо';
@@ -95,6 +103,7 @@ export function RoomScreen() {
   };
 
   const winnerName = state.winner === 'player1' ? playerNames.player1 : playerNames.player2;
+  const winnerWinType = state.winner ? getWinType(state, state.winner) : null;
 
   const validRemovableRings = state.phase === 'ringRemoval' 
     ? getValidRemovableRings(state.rings) 
@@ -164,7 +173,7 @@ export function RoomScreen() {
     <div className="h-screen bg-gray-100 dark:bg-gray-900 flex flex-col overflow-hidden">
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 shadow-sm p-3 md:p-4">
-        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-2 md:gap-4">
             <button
               onClick={() => navigate('/')}
@@ -176,8 +185,18 @@ export function RoomScreen() {
               ZÈRTZ Online
             </h1>
           </div>
+
+          <div className="flex-1 min-w-[220px] md:mx-3">
+            <OnlineMoveHistory />
+          </div>
           
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowRulesModal(true)}
+              className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            >
+              📘 Правила
+            </button>
             <button
               onClick={copyLink}
               className="px-3 py-1.5 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
@@ -242,6 +261,12 @@ export function RoomScreen() {
               <span>🔘 {state.captures.player1.gray}</span>
               <span>⚫ {state.captures.player1.black}</span>
             </div>
+            {state.currentPlayer === 'player1' && !state.winner && (
+              <div className="mt-2 text-sm font-medium text-blue-700 dark:text-blue-200">
+                <div>{myPlayer === 1 ? 'Ваш ход' : 'Ход соперника'}</div>
+                <div className="text-xs text-blue-600/90 dark:text-blue-300/90">{getPhaseText()}</div>
+              </div>
+            )}
           </div>
 
           {/* Player 2 */}
@@ -288,21 +313,20 @@ export function RoomScreen() {
               <span>🔘 {state.captures.player2.gray}</span>
               <span>⚫ {state.captures.player2.black}</span>
             </div>
+            {state.currentPlayer === 'player2' && !state.winner && (
+              <div className="mt-2 text-sm font-medium text-blue-700 dark:text-blue-200">
+                <div>{myPlayer === 2 ? 'Ваш ход' : 'Ход соперника'}</div>
+                <div className="text-xs text-blue-600/90 dark:text-blue-300/90">{getPhaseText()}</div>
+              </div>
+            )}
           </div>
 
-          {/* Status */}
           <div className="p-3 bg-white dark:bg-gray-800 rounded-lg">
-            <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-              {isMyTurn() ? 'Ваш ход' : `Ход: ${getCurrentPlayerName()}`}
-            </div>
-            <div className="font-medium text-gray-800 dark:text-gray-200">
-              {getPhaseText()}
-            </div>
             <button
               type="button"
               onClick={() => void undoLastMove()}
-              disabled={!myPlayer || !currentNode.parent || !!state.winner}
-              className="mt-3 w-full px-3 py-1.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={!myPlayer || !currentNode.parent || !!state.winner || !isMyTurn()}
+              className="w-full px-3 py-1.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               ↶ Вернуть ход назад
             </button>
@@ -389,13 +413,38 @@ export function RoomScreen() {
             <div className="text-3xl font-bold text-green-700 dark:text-green-300 mb-2">
               🏆 {winnerName} победил!
             </div>
-            <div className="text-gray-600 dark:text-gray-300 mb-6">Партия завершена</div>
+            <div className="text-gray-600 dark:text-gray-300 mb-1">Партия завершена</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+              {winnerWinType ? WIN_TYPE_LABELS[winnerWinType] ?? WIN_TYPE_LABELS.unknown : WIN_TYPE_LABELS.unknown}
+            </div>
             <button
               onClick={() => setWinnerModalDismissed(true)}
               className="px-5 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold transition-colors"
             >
               Закрыть
             </button>
+          </div>
+        </div>
+      )}
+
+      {showRulesModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowRulesModal(false)}>
+          <div
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Правила игры ZERTZ</h2>
+              <button
+                onClick={() => setShowRulesModal(false)}
+                className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto">
+              <RulesContent />
+            </div>
           </div>
         </div>
       )}

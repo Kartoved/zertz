@@ -44,14 +44,13 @@ function renderMoveTree(
   canDeleteNode: (node: GameNode) => boolean
 ): JSX.Element[] {
   // We treat node.children[0] as the main line, and node.children[1..] as variations.
-  // Rendering rule: show the main move first, then sibling variations in parentheses,
+  // Rendering rule: show main move first, then sibling variations in parentheses,
   // then continue along the main line.
   const elements: JSX.Element[] = [];
 
   const mainChild = node.children[0];
   if (!mainChild) return elements;
 
-  // Render main move first
   elements.push(
     <MoveElement
       key={mainChild.id}
@@ -63,7 +62,6 @@ function renderMoveTree(
     />
   );
 
-  // Then render variations in parentheses
   const variations = node.children.slice(1);
   for (const variation of variations) {
     elements.push(

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import CountryBadge from '../UI/CountryBadge';
-import { normalizeCountryValue, toCountryEmoji } from '../../utils/country';
+import { normalizeCountryValue } from '../../utils/country';
 
 const COUNTRIES = [
   { code: '🌍', name: 'Земля' },
@@ -60,6 +60,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
   const [country, setCountry] = useState(normalizeCountryValue(user?.country || '🌍'));
   const [contactLink, setContactLink] = useState(user?.contactLink || '');
   const [isEditingQuote, setIsEditingQuote] = useState(false);
+  const [isCountryDropdownOpen, setIsCountryDropdownOpen] = useState(false);
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newPassword2, setNewPassword2] = useState('');
@@ -251,19 +252,41 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Страна
             </label>
-            <select
-              value={country}
-              onChange={(e) => setCountry(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
-                bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-            >
-              {COUNTRIES.map((c) => (
-                <option key={c.code} value={c.code}>
-                  {toCountryEmoji(c.code)} {c.name}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsCountryDropdownOpen((prev) => !prev)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                  bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                  focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none
+                  flex items-center justify-between"
+              >
+                <span className="flex items-center gap-2">
+                  <CountryBadge country={country} size={20} />
+                  {COUNTRIES.find((c) => c.code === country)?.name || 'Выберите страну'}
+                </span>
+                <span className="text-gray-500">{isCountryDropdownOpen ? '▴' : '▾'}</span>
+              </button>
+
+              {isCountryDropdownOpen && (
+                <div className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-lg">
+                  {COUNTRIES.map((c) => (
+                    <button
+                      key={c.code}
+                      type="button"
+                      onClick={() => {
+                        setCountry(c.code);
+                        setIsCountryDropdownOpen(false);
+                      }}
+                      className="w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-600 flex items-center gap-2 text-gray-900 dark:text-white"
+                    >
+                      <CountryBadge country={c.code} size={20} />
+                      {c.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
           <button

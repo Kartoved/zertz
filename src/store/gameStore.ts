@@ -474,7 +474,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
   
   navigateToNode: (targetNode: GameNode) => {
-    if (targetNode.id === 'root') return;
     // Rebuild state by replaying moves from root to targetNode
     let newState = createInitialState(get().state.boardSize);
     const moves: GameNode[] = [];
