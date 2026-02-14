@@ -4,6 +4,7 @@ import { getPlayerProfile, followUser, unfollowUser, createChallenge, PlayerProf
 import { useAuthStore } from '../../store/authStore';
 import { createInitialState } from '../../game/GameEngine';
 import { GameNode } from '../../game/types';
+import { toCountryEmoji } from '../../utils/country';
 
 const BOARD_LABELS: Record<number, string> = {
   37: 'Любительское 37',
@@ -149,7 +150,7 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
         {/* Header */}
         <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-            {profile.country} {profile.username}
+            {toCountryEmoji(profile.country)} {profile.username}
           </h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">✕</button>
         </div>

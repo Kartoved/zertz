@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getPlayers, getFollowing, getFollowIds, followUser, unfollowUser, PlayerInfo } from '../../db/authApi';
 import { useAuthStore } from '../../store/authStore';
 import PlayerProfileModal from './PlayerProfileModal';
+import { toCountryEmoji } from '../../utils/country';
 
 interface PlayersModalProps {
   onClose: () => void;
@@ -185,7 +186,7 @@ export default function PlayersModal({ onClose }: PlayersModalProps) {
                         onClick={() => setSelectedPlayerId(p.id)}
                         className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
                       >
-                        {p.country} {p.username}
+                        {toCountryEmoji(p.country)} {p.username}
                       </button>
                     </td>
                     <td className="px-3 py-2 font-bold text-blue-600 dark:text-blue-400">{p.rating}</td>

@@ -1,49 +1,50 @@
 import { useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
+import { toCountryEmoji } from '../../utils/country';
 
 const COUNTRIES = [
-  { emoji: '🌍', name: 'Земля' },
-  { emoji: '🟢', name: 'Эсперантия' },
-  { emoji: '🇷🇺', name: 'Россия' },
-  { emoji: '🇺🇦', name: 'Украина' },
-  { emoji: '🇧🇾', name: 'Беларусь' },
-  { emoji: '🇰🇿', name: 'Казахстан' },
-  { emoji: '🇺🇿', name: 'Узбекистан' },
-  { emoji: '🇬🇪', name: 'Грузия' },
-  { emoji: '🇦🇲', name: 'Армения' },
-  { emoji: '🇦🇿', name: 'Азербайджан' },
-  { emoji: '🇲🇩', name: 'Молдова' },
-  { emoji: '🇺🇸', name: 'США' },
-  { emoji: '🇬🇧', name: 'Великобритания' },
-  { emoji: '🇩🇪', name: 'Германия' },
-  { emoji: '🇫🇷', name: 'Франция' },
-  { emoji: '🇪🇸', name: 'Испания' },
-  { emoji: '🇮🇹', name: 'Италия' },
-  { emoji: '🇵🇱', name: 'Польша' },
-  { emoji: '🇳🇱', name: 'Нидерланды' },
-  { emoji: '🇧🇪', name: 'Бельгия' },
-  { emoji: '🇨🇿', name: 'Чехия' },
-  { emoji: '🇦🇹', name: 'Австрия' },
-  { emoji: '🇨🇭', name: 'Швейцария' },
-  { emoji: '🇸🇪', name: 'Швеция' },
-  { emoji: '🇳🇴', name: 'Норвегия' },
-  { emoji: '🇫🇮', name: 'Финляндия' },
-  { emoji: '🇩🇰', name: 'Дания' },
-  { emoji: '🇵🇹', name: 'Португалия' },
-  { emoji: '🇬🇷', name: 'Греция' },
-  { emoji: '🇹🇷', name: 'Турция' },
-  { emoji: '🇯🇵', name: 'Япония' },
-  { emoji: '🇰🇷', name: 'Южная Корея' },
-  { emoji: '🇨🇳', name: 'Китай' },
-  { emoji: '🇮🇳', name: 'Индия' },
-  { emoji: '🇧🇷', name: 'Бразилия' },
-  { emoji: '🇦🇷', name: 'Аргентина' },
-  { emoji: '🇲🇽', name: 'Мексика' },
-  { emoji: '🇨🇦', name: 'Канада' },
-  { emoji: '🇦🇺', name: 'Австралия' },
-  { emoji: '🇮🇱', name: 'Израиль' },
-  { emoji: '🇪🇬', name: 'Египет' },
-  { emoji: '🇿🇦', name: 'ЮАР' },
+  { code: '🌍', name: 'Земля' },
+  { code: '🟢', name: 'Эсперантия' },
+  { code: 'RU', name: 'Россия' },
+  { code: 'UA', name: 'Украина' },
+  { code: 'BY', name: 'Беларусь' },
+  { code: 'KZ', name: 'Казахстан' },
+  { code: 'UZ', name: 'Узбекистан' },
+  { code: 'GE', name: 'Грузия' },
+  { code: 'AM', name: 'Армения' },
+  { code: 'AZ', name: 'Азербайджан' },
+  { code: 'MD', name: 'Молдова' },
+  { code: 'US', name: 'США' },
+  { code: 'GB', name: 'Великобритания' },
+  { code: 'DE', name: 'Германия' },
+  { code: 'FR', name: 'Франция' },
+  { code: 'ES', name: 'Испания' },
+  { code: 'IT', name: 'Италия' },
+  { code: 'PL', name: 'Польша' },
+  { code: 'NL', name: 'Нидерланды' },
+  { code: 'BE', name: 'Бельгия' },
+  { code: 'CZ', name: 'Чехия' },
+  { code: 'AT', name: 'Австрия' },
+  { code: 'CH', name: 'Швейцария' },
+  { code: 'SE', name: 'Швеция' },
+  { code: 'NO', name: 'Норвегия' },
+  { code: 'FI', name: 'Финляндия' },
+  { code: 'DK', name: 'Дания' },
+  { code: 'PT', name: 'Португалия' },
+  { code: 'GR', name: 'Греция' },
+  { code: 'TR', name: 'Турция' },
+  { code: 'JP', name: 'Япония' },
+  { code: 'KR', name: 'Южная Корея' },
+  { code: 'CN', name: 'Китай' },
+  { code: 'IN', name: 'Индия' },
+  { code: 'BR', name: 'Бразилия' },
+  { code: 'AR', name: 'Аргентина' },
+  { code: 'MX', name: 'Мексика' },
+  { code: 'CA', name: 'Канада' },
+  { code: 'AU', name: 'Австралия' },
+  { code: 'IL', name: 'Израиль' },
+  { code: 'EG', name: 'Египет' },
+  { code: 'ZA', name: 'ЮАР' },
 ];
 
 const SPECIAL_CHARS = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/;
@@ -55,7 +56,7 @@ interface ProfileModalProps {
 export default function ProfileModal({ onClose }: ProfileModalProps) {
   const { user, updateProfile, logout, isLoading } = useAuthStore();
   const [quote, setQuote] = useState(user?.quote || '');
-  const [country, setCountry] = useState(user?.country || '🌍');
+  const [country, setCountry] = useState(toCountryEmoji(user?.country || '🌍'));
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newPassword2, setNewPassword2] = useState('');
@@ -208,8 +209,8 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
                 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
             >
               {COUNTRIES.map((c) => (
-                <option key={c.emoji} value={c.emoji}>
-                  {c.emoji} {c.name}
+                <option key={c.code} value={toCountryEmoji(c.code)}>
+                  {toCountryEmoji(c.code)} {c.name}
                 </option>
               ))}
             </select>

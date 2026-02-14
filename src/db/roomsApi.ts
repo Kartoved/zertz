@@ -105,6 +105,8 @@ export async function getRoom(id: number | string): Promise<{
   tree: GameNode;
   currentPlayer: 1 | 2;
   creatorPlayer: 1 | 2;
+  user1Id: number | null;
+  user2Id: number | null;
   winner: number | null;
   winType: string | null;
   playerNames: { player1: string; player2: string };
@@ -131,6 +133,8 @@ export async function getRoom(id: number | string): Promise<{
     tree: deserializeTree(data.treeJson),
     currentPlayer: data.currentPlayer,
     creatorPlayer: data.creatorPlayer || 1,
+    user1Id: data.user1Id,
+    user2Id: data.user2Id,
     winner: data.winner,
     winType: data.winType,
     playerNames: data.playerNames,

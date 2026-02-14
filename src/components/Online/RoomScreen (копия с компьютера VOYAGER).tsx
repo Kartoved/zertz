@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useRoomStore } from '../../store/roomStore';
-import { useAuthStore } from '../../store/authStore';
 import HexBoard from '../Board/HexBoard';
 import { ChatPanel } from './ChatPanel';
 import MarbleSelector from '../UI/MarbleSelector';
@@ -36,15 +35,8 @@ export function RoomScreen() {
     selectedRingId,
     highlightedCaptures,
     availableCaptureChains,
-    setPlayerName,
     reset,
-    rated,
-    user1Rating,
-    user2Rating,
-    ratingDelta,
   } = useRoomStore();
-  const { user } = useAuthStore();
-  const isAuthed = !!user;
 
   useEffect(() => {
     if (roomId) {
@@ -77,6 +69,16 @@ export function RoomScreen() {
   const getCurrentPlayerName = () => {
     return state.currentPlayer === 'player1' ? playerNames.player1 : playerNames.player2;
   };
+
+  // Debug info
+  console.log('[RoomScreen DEBUG]', { 
+    myPlayer, 
+    creatorPlayer: useRoomStore.getState().creatorPlayer,
+    currentPlayer: state.currentPlayer,
+    selectedMarbleColor,
+    roomId: useRoomStore.getState().roomId,
+    phase: state.phase
+  });
 
   const getPhaseText = () => {
     if (state.winner) {
@@ -122,12 +124,6 @@ export function RoomScreen() {
       } else if (!ring.marble) {
         selectRing(ringId);
       }
-    }
-  };
-
-  const handleNameEdit = (player: 1 | 2, name: string) => {
-    if (name.trim()) {
-      setPlayerName(player, name.trim());
     }
   };
 
@@ -197,39 +193,17 @@ export function RoomScreen() {
               ? 'bg-blue-100 dark:bg-blue-900 ring-2 ring-blue-500'
               : 'bg-white dark:bg-gray-800'
           }`}>
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-2">
               {myPlayer === 1 && <span className="text-xs bg-green-500 text-white px-1.5 py-0.5 rounded">Вы</span>}
-              {isAuthed ? (
-                <button
-                  type="button"
-                  disabled={!user1Id}
-                  onClick={() => user1Id && setSelectedPlayerId(user1Id)}
-                  className="font-semibold text-gray-800 dark:text-gray-200 text-left hover:text-blue-600 dark:hover:text-blue-400 hover:underline disabled:no-underline disabled:cursor-default disabled:hover:text-gray-800 dark:disabled:hover:text-gray-200"
-                >
-                  {playerNames.player1}
-                </button>
-              ) : (
-                <input
-                  type="text"
-                  defaultValue={playerNames.player1}
-                  onBlur={(e) => handleNameEdit(1, e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-                  className="font-semibold text-gray-800 dark:text-gray-200 bg-transparent border-b border-transparent 
-                             hover:border-gray-300 focus:border-blue-500 focus:outline-none w-full"
-                />
-              )}
-              {user1Rating != null && (
-                <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">{user1Rating}</span>
-              )}
+              <button
+                type="button"
+                disabled={!user1Id}
+                onClick={() => user1Id && setSelectedPlayerId(user1Id)}
+                className="font-semibold text-gray-800 dark:text-gray-200 text-left hover:text-blue-600 dark:hover:text-blue-400 hover:underline disabled:no-underline disabled:cursor-default disabled:hover:text-gray-800 dark:disabled:hover:text-gray-200"
+              >
+                {playerNames.player1}
+              </button>
             </div>
-            {ratingDelta && state.winner && rated && (
-              <div className="text-xs mb-1">
-                <span className="text-gray-500">{ratingDelta.player1.before} → {ratingDelta.player1.after}</span>
-                <span className={`ml-1 font-bold ${ratingDelta.player1.delta >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                  {ratingDelta.player1.delta >= 0 ? '+' : ''}{ratingDelta.player1.delta}
-                </span>
-              </div>
-            )}
             <div className="flex gap-2 text-sm">
               <span>⚪ {state.captures.player1.white}</span>
               <span>🔘 {state.captures.player1.gray}</span>
@@ -243,39 +217,17 @@ export function RoomScreen() {
               ? 'bg-blue-100 dark:bg-blue-900 ring-2 ring-blue-500'
               : 'bg-white dark:bg-gray-800'
           }`}>
-            <div className="flex items-center gap-2 mb-1">
+            <div className="flex items-center gap-2 mb-2">
               {myPlayer === 2 && <span className="text-xs bg-green-500 text-white px-1.5 py-0.5 rounded">Вы</span>}
-              {isAuthed ? (
-                <button
-                  type="button"
-                  disabled={!user2Id}
-                  onClick={() => user2Id && setSelectedPlayerId(user2Id)}
-                  className="font-semibold text-gray-800 dark:text-gray-200 text-left hover:text-blue-600 dark:hover:text-blue-400 hover:underline disabled:no-underline disabled:cursor-default disabled:hover:text-gray-800 dark:disabled:hover:text-gray-200"
-                >
-                  {playerNames.player2}
-                </button>
-              ) : (
-                <input
-                  type="text"
-                  defaultValue={playerNames.player2}
-                  onBlur={(e) => handleNameEdit(2, e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-                  className="font-semibold text-gray-800 dark:text-gray-200 bg-transparent border-b border-transparent 
-                             hover:border-gray-300 focus:border-blue-500 focus:outline-none w-full"
-                />
-              )}
-              {user2Rating != null && (
-                <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">{user2Rating}</span>
-              )}
+              <button
+                type="button"
+                disabled={!user2Id}
+                onClick={() => user2Id && setSelectedPlayerId(user2Id)}
+                className="font-semibold text-gray-800 dark:text-gray-200 text-left hover:text-blue-600 dark:hover:text-blue-400 hover:underline disabled:no-underline disabled:cursor-default disabled:hover:text-gray-800 dark:disabled:hover:text-gray-200"
+              >
+                {playerNames.player2}
+              </button>
             </div>
-            {ratingDelta && state.winner && rated && (
-              <div className="text-xs mb-1">
-                <span className="text-gray-500">{ratingDelta.player2.before} → {ratingDelta.player2.after}</span>
-                <span className={`ml-1 font-bold ${ratingDelta.player2.delta >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                  {ratingDelta.player2.delta >= 0 ? '+' : ''}{ratingDelta.player2.delta}
-                </span>
-              </div>
-            )}
             <div className="flex gap-2 text-sm">
               <span>⚪ {state.captures.player2.white}</span>
               <span>🔘 {state.captures.player2.gray}</span>

@@ -30,6 +30,8 @@ interface RoomStore {
   roomId: number | null;
   myPlayer: 1 | 2 | null;
   creatorPlayer: 1 | 2 | null;
+  user1Id: number | null;
+  user2Id: number | null;
   isLoading: boolean;
   error: string | null;
   lastUpdated: number;
@@ -126,6 +128,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   roomId: null,
   myPlayer: null,
   creatorPlayer: null,
+  user1Id: null,
+  user2Id: null,
   isLoading: false,
   error: null,
   lastUpdated: 0,
@@ -168,6 +172,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         roomId,
         myPlayer: creatorPlayer,
         creatorPlayer,
+        user1Id: creatorPlayer === 1 ? authUser?.id ?? null : null,
+        user2Id: creatorPlayer === 2 ? authUser?.id ?? null : null,
         state: initialState,
         gameTree: rootNode,
         currentNode: rootNode,
@@ -205,12 +211,25 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       // Parse roomId as number if it's a string
       const numericRoomId = typeof roomId === 'string' ? parseInt(roomId, 10) : roomId;
 
-      // Determine which player we are (opposite of creator, or use existing)
-      const myPlayer = get().myPlayer || (room.creatorPlayer === 1 ? 2 : 1);
+      // Determine seat by authenticated room binding first.
+      let myPlayer: 1 | 2 | null = null;
 
       const authUser = useAuthStore.getState().user;
       const names = { ...room.playerNames };
       if (authUser) {
+        if (room.user1Id === authUser.id) {
+          myPlayer = 1;
+        } else if (room.user2Id === authUser.id) {
+          myPlayer = 2;
+        } else if (room.user1Id == null) {
+          myPlayer = 1;
+        } else if (room.user2Id == null) {
+          myPlayer = 2;
+        }
+
+      }
+
+      if (authUser && myPlayer) {
         if (myPlayer === 1) names.player1 = authUser.username;
         else names.player2 = authUser.username;
         await roomsApi.updatePlayerName(numericRoomId, myPlayer, authUser.username);
@@ -232,6 +251,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         roomId: numericRoomId,
         myPlayer,
         creatorPlayer: room.creatorPlayer,
+        user1Id: myPlayer === 1 && authUser ? authUser.id : room.user1Id,
+        user2Id: myPlayer === 2 && authUser ? authUser.id : room.user2Id,
         state: room.state,
         gameTree: room.tree,
         currentNode: findDeepestMainLine(room.tree),
@@ -276,6 +297,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
           gameTree: room.tree,
           currentNode: findDeepestMainLine(room.tree),
           playerNames: room.playerNames,
+          user1Id: room.user1Id,
+          user2Id: room.user2Id,
           lastUpdated: room.updatedAt,
           selectedMarbleColor: null,
           selectedRingId: null,
@@ -326,15 +349,17 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
   selectMarbleColor: (color) => {
     const { myPlayer, state } = get();
+    if (!myPlayer) return;
     const myPlayerStr = myPlayer === 1 ? 'player1' : 'player2';
-    if (myPlayer && state.currentPlayer !== myPlayerStr) return; // Not my turn
+    if (state.currentPlayer !== myPlayerStr) return; // Not my turn
     set({ selectedMarbleColor: color, selectedRingId: null, highlightedCaptures: [] });
   },
 
   selectRing: (ringId) => {
     const { state, myPlayer } = get();
+    if (!myPlayer) return;
     const myPlayerStr = myPlayer === 1 ? 'player1' : 'player2';
-    if (myPlayer && state.currentPlayer !== myPlayerStr) return; // Not my turn
+    if (state.currentPlayer !== myPlayerStr) return; // Not my turn
     if (!ringId) {
       set({ selectedRingId: null, highlightedCaptures: [], availableCaptureChains: [] });
       return;
@@ -359,10 +384,10 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
   handlePlacement: async (ringId) => {
     const { state, selectedMarbleColor, roomId, currentNode, gameTree, playerNames, myPlayer } = get();
-    if (!selectedMarbleColor || !roomId) return;
+    if (!selectedMarbleColor || !roomId || !myPlayer) return;
     // Turn enforcement
     const myPlayerStr = myPlayer === 1 ? 'player1' : 'player2';
-    if (myPlayer && state.currentPlayer !== myPlayerStr) return;
+    if (state.currentPlayer !== myPlayerStr) return;
 
     pendingMoveCount++;
     try {
@@ -434,10 +459,10 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
   handleRingRemoval: async (ringId) => {
     const { state, roomId, currentNode, gameTree, playerNames, myPlayer } = get();
-    if (!roomId) return;
+    if (!roomId || !myPlayer) return;
     // Turn enforcement (ring removal is still current player's turn)
     const myPlayerStrRR = myPlayer === 1 ? 'player1' : 'player2';
-    if (myPlayer && state.currentPlayer !== myPlayerStrRR) return;
+    if (state.currentPlayer !== myPlayerStrRR) return;
 
     const validRings = getValidRemovableRings(state.rings);
     if (!validRings.includes(ringId)) return;
@@ -487,10 +512,10 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
   handleCapture: async (captures) => {
     const { state, roomId, currentNode, gameTree, playerNames, myPlayer } = get();
-    if (!roomId) return;
+    if (!roomId || !myPlayer) return;
     // Turn enforcement
     const myPlayerStrC = myPlayer === 1 ? 'player1' : 'player2';
-    if (myPlayer && state.currentPlayer !== myPlayerStrC) return;
+    if (state.currentPlayer !== myPlayerStrC) return;
 
     pendingMoveCount++;
     try {
@@ -565,6 +590,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       roomId: null,
       myPlayer: null,
       creatorPlayer: null,
+      user1Id: null,
+      user2Id: null,
       isLoading: false,
       error: null,
       lastUpdated: 0,
