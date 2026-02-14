@@ -23,6 +23,7 @@ export function RoomScreen() {
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [winnerModalDismissed, setWinnerModalDismissed] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
+  const [showSurrenderConfirm, setShowSurrenderConfirm] = useState(false);
 
   const navTabs: Array<{ id: string; label: string; authOnly?: boolean }> = [
     { id: 'playLocal', label: t.playLocal },
@@ -96,10 +97,10 @@ export function RoomScreen() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const isMyTurn = () => {
-    if (!myPlayer) return false;
+  const canUndoOwnLastMove = () => {
+    if (!myPlayer || !currentNode.parent || !!state.winner) return false;
     const myPlayerStr = myPlayer === 1 ? 'player1' : 'player2';
-    return state.currentPlayer === myPlayerStr;
+    return currentNode.player === myPlayerStr;
   };
 
   const getPhaseText = () => {
@@ -295,9 +296,9 @@ export function RoomScreen() {
       {/* Main content */}
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 p-2 md:p-4 max-w-7xl mx-auto w-full pb-16 lg:pb-4">
         {/* Left panel - Players */}
-        <div className={`lg:w-64 lg:flex lg:flex-col gap-2 lg:gap-4 ${mobileTab === 'chat' ? 'hidden lg:flex' : 'flex flex-col'}`}>
+        <div className={`lg:w-64 lg:flex lg:flex-col gap-2 lg:gap-4 ${mobileTab === 'chat' ? 'hidden lg:flex' : 'grid grid-cols-2 lg:grid-cols-1'}`}>
           {/* Player 1 */}
-          <div className={`flex-1 p-3 rounded-lg ${
+          <div className={`p-2 lg:p-3 rounded-lg ${
             state.currentPlayer === 'player1' && !state.winner
               ? 'bg-blue-100 dark:bg-blue-900 ring-2 ring-blue-500'
               : 'bg-white dark:bg-gray-800'
@@ -335,7 +336,7 @@ export function RoomScreen() {
                 </span>
               </div>
             )}
-            <div className="flex gap-2 text-sm">
+            <div className="flex gap-2 text-xs lg:text-sm">
               <span>⚪ {state.captures.player1.white}</span>
               <span>🔘 {state.captures.player1.gray}</span>
               <span>⚫ {state.captures.player1.black}</span>
@@ -349,7 +350,7 @@ export function RoomScreen() {
           </div>
 
           {/* Player 2 */}
-          <div className={`flex-1 p-3 rounded-lg ${
+          <div className={`p-2 lg:p-3 rounded-lg ${
             state.currentPlayer === 'player2' && !state.winner
               ? 'bg-blue-100 dark:bg-blue-900 ring-2 ring-blue-500'
               : 'bg-white dark:bg-gray-800'
@@ -387,7 +388,7 @@ export function RoomScreen() {
                 </span>
               </div>
             )}
-            <div className="flex gap-2 text-sm">
+            <div className="flex gap-2 text-xs lg:text-sm">
               <span>⚪ {state.captures.player2.white}</span>
               <span>🔘 {state.captures.player2.gray}</span>
               <span>⚫ {state.captures.player2.black}</span>
@@ -400,39 +401,42 @@ export function RoomScreen() {
             )}
           </div>
 
-          <div className="p-3 bg-white dark:bg-gray-800 rounded-lg">
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => void undoLastMove()}
-                disabled={!myPlayer || !currentNode.parent || !!state.winner || !isMyTurn()}
-                className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                ↶ {t.undoMove}
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate('/')}
-                className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-red-500 text-white hover:bg-red-600"
-              >
-                🏳️ {t.surrender}
-              </button>
-            </div>
-          </div>
-
           {/* Marble selector */}
-          {state.phase === 'placement' && !state.winner && (
-            <div className="p-3 bg-white dark:bg-gray-800 rounded-lg">
-              <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">{t.chooseMarbleShort}</div>
-              <MarbleSelector
-                reserve={state.reserve}
-                selectedColor={selectedMarbleColor}
-                onSelect={selectMarbleColor}
-                captures={state.captures[state.currentPlayer]}
-                phase={state.phase}
-                currentPlayer={state.currentPlayer}
-                stateForCaptures={state}
-              />
+          {!state.winner && (
+            <div className="p-3 bg-white dark:bg-gray-800 rounded-lg col-span-2 lg:col-span-1">
+              {state.phase === 'placement' && (
+                <>
+                  <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">{t.chooseMarbleShort}</div>
+                  <MarbleSelector
+                    reserve={state.reserve}
+                    selectedColor={selectedMarbleColor}
+                    onSelect={selectMarbleColor}
+                    captures={state.captures[state.currentPlayer]}
+                    phase={state.phase}
+                    currentPlayer={state.currentPlayer}
+                    stateForCaptures={state}
+                  />
+                </>
+              )}
+              <div className={state.phase === 'placement' ? 'mt-3' : ''}>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void undoLastMove()}
+                    disabled={!canUndoOwnLastMove()}
+                    className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    ↶ {t.undoMove}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowSurrenderConfirm(true)}
+                    className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-red-500 text-white hover:bg-red-600"
+                  >
+                    🏳️ {t.surrender}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
@@ -448,9 +452,9 @@ export function RoomScreen() {
           />
         </div>
 
-        <div className={`lg:hidden ${mobileTab === 'chat' ? 'flex-1 min-h-0' : 'hidden'}`}>
+        <div className={`lg:hidden ${mobileTab === 'chat' ? 'flex-1 min-h-0 pb-20' : 'hidden'}`}>
           <div className="h-full min-h-[320px] bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
-            <ChatPanel />
+            <ChatPanel inputBottomOffset={72} />
           </div>
         </div>
 
@@ -500,6 +504,33 @@ export function RoomScreen() {
           </button>
         </div>
       </div>
+
+      {showSurrenderConfirm && (
+        <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-sm w-full overflow-hidden">
+            <div className="p-4 border-b dark:border-gray-700">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">{t.confirmSurrenderTitle}</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">{t.confirmSurrenderText}</p>
+            </div>
+            <div className="p-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => setShowSurrenderConfirm(false)}
+                className="flex-1 py-2 px-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              >
+                {t.cancelAction}
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/')}
+                className="flex-1 py-2 px-4 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold transition-colors"
+              >
+                {t.confirmAction}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {selectedPlayerId && (
         <PlayerProfileModal

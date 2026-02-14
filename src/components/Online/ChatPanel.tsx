@@ -2,7 +2,11 @@ import { useState, useRef, useEffect } from 'react';
 import { useRoomStore } from '../../store/roomStore';
 import { useI18n } from '../../i18n';
 
-export function ChatPanel() {
+interface ChatPanelProps {
+  inputBottomOffset?: number;
+}
+
+export function ChatPanel({ inputBottomOffset = 0 }: ChatPanelProps) {
   const { t, locale } = useI18n();
   const { messages, playerNames, myPlayer, sendMessage } = useRoomStore();
   const [text, setText] = useState('');
@@ -81,7 +85,10 @@ export function ChatPanel() {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="p-3 border-t border-gray-200 dark:border-gray-700">
+      <div
+        className="p-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+        style={inputBottomOffset > 0 ? { position: 'sticky', bottom: `${inputBottomOffset}px`, zIndex: 10 } : undefined}
+      >
         <div className="flex gap-2">
           <input
             type="text"

@@ -229,6 +229,10 @@ type Dict = {
   tabControls: string;
   tabPlayers: string;
   surrender: string;
+  confirmSurrenderTitle: string;
+  confirmSurrenderText: string;
+  confirmAction: string;
+  cancelAction: string;
 };
 
 export const I18N: Record<Language, Dict> = {
@@ -455,6 +459,10 @@ export const I18N: Record<Language, Dict> = {
     tabControls: 'Панель',
     tabPlayers: 'Игроки',
     surrender: 'Сдаться',
+    confirmSurrenderTitle: 'Подтвердите сдачу',
+    confirmSurrenderText: 'Вы точно хотите сдаться?',
+    confirmAction: 'Да, сдаться',
+    cancelAction: 'Отмена',
   },
   en: {
     appSubtitle: 'Abstract strategy game',
@@ -679,6 +687,10 @@ export const I18N: Record<Language, Dict> = {
     tabControls: 'Controls',
     tabPlayers: 'Players',
     surrender: 'Resign',
+    confirmSurrenderTitle: 'Confirm resignation',
+    confirmSurrenderText: 'Are you sure you want to resign?',
+    confirmAction: 'Yes, resign',
+    cancelAction: 'Cancel',
   },
   eo: {
     appSubtitle: 'Abstrakta strategia ludo',
@@ -903,6 +915,10 @@ export const I18N: Record<Language, Dict> = {
     tabControls: 'Panelo',
     tabPlayers: 'Ludantoj',
     surrender: 'Rezigni',
+    confirmSurrenderTitle: 'Konfirmu rezignon',
+    confirmSurrenderText: 'Ĉu vi certe volas rezigni?',
+    confirmAction: 'Jes, rezigni',
+    cancelAction: 'Nuligi',
   },
 };
 

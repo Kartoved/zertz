@@ -2,10 +2,22 @@ import { useGameStore } from '../../store/gameStore';
 import { useUIStore } from '../../store/uiStore';
 import { useI18n } from '../../i18n';
 
-export default function ControlPanel() {
+interface ControlPanelProps {
+  onSurrender?: () => void;
+}
+
+export default function ControlPanel({ onSurrender }: ControlPanelProps) {
   const { t } = useI18n();
   const { undo, currentNode } = useGameStore();
   const { setScreen } = useUIStore();
+
+  const handleSurrender = () => {
+    if (onSurrender) {
+      onSurrender();
+      return;
+    }
+    setScreen('menu');
+  };
   
   return (
     <div className="flex flex-wrap gap-2 justify-center">
@@ -20,7 +32,7 @@ export default function ControlPanel() {
       </button>
       
       <button
-        onClick={() => setScreen('menu')}
+        onClick={handleSurrender}
         className="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg transition-colors text-white"
       >
         🏳️ {t.surrender}

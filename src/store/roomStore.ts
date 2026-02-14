@@ -616,7 +616,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     const { roomId, currentNode, state, gameTree, playerNames, myPlayer } = get();
     if (!roomId || !myPlayer || !currentNode.parent) return;
     const myPlayerStr = myPlayer === 1 ? 'player1' : 'player2';
-    if (state.currentPlayer !== myPlayerStr) return;
+    if (currentNode.player !== myPlayerStr) return;
 
     pendingMoveCount++;
     try {

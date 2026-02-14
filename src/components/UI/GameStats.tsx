@@ -59,11 +59,11 @@ export default function GameStats({ compact = false }: GameStatsProps) {
   };
 
   const containerClass = compact
-    ? 'flex flex-col gap-2 p-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm'
+    ? 'grid grid-cols-2 gap-2 p-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm'
     : 'flex flex-col gap-4 p-4 bg-white dark:bg-gray-800 rounded-xl shadow-md';
 
   const cardClass = (active: boolean) => {
-    const base = compact ? 'flex justify-between items-center p-2 rounded-lg' : 'flex justify-between items-center p-3 rounded-lg';
+    const base = compact ? 'flex flex-col gap-1 p-2 rounded-lg min-w-0' : 'flex justify-between items-center p-3 rounded-lg';
     const activeClass = 'bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-500';
     const idleClass = 'bg-gray-50 dark:bg-gray-700';
     return `${base} ${active ? activeClass : idleClass}`;
