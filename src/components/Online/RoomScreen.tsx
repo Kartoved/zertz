@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useRoomStore } from '../../store/roomStore';
+import { useAuthStore } from '../../store/authStore';
 import HexBoard from '../Board/HexBoard';
 import { ChatPanel } from './ChatPanel';
 import MarbleSelector from '../UI/MarbleSelector';
@@ -34,6 +35,8 @@ export function RoomScreen() {
     setPlayerName,
     reset,
   } = useRoomStore();
+  const { user } = useAuthStore();
+  const isAuthed = !!user;
 
   useEffect(() => {
     if (roomId) {
@@ -198,14 +201,18 @@ export function RoomScreen() {
           }`}>
             <div className="flex items-center gap-2 mb-2">
               {myPlayer === 1 && <span className="text-xs bg-green-500 text-white px-1.5 py-0.5 rounded">Вы</span>}
-              <input
-                type="text"
-                defaultValue={playerNames.player1}
-                onBlur={(e) => handleNameEdit(1, e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-                className="font-semibold text-gray-800 dark:text-gray-200 bg-transparent border-b border-transparent 
-                           hover:border-gray-300 focus:border-blue-500 focus:outline-none w-full"
-              />
+              {isAuthed ? (
+                <span className="font-semibold text-gray-800 dark:text-gray-200">{playerNames.player1}</span>
+              ) : (
+                <input
+                  type="text"
+                  defaultValue={playerNames.player1}
+                  onBlur={(e) => handleNameEdit(1, e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                  className="font-semibold text-gray-800 dark:text-gray-200 bg-transparent border-b border-transparent 
+                             hover:border-gray-300 focus:border-blue-500 focus:outline-none w-full"
+                />
+              )}
             </div>
             <div className="flex gap-2 text-sm">
               <span>⚪ {state.captures.player1.white}</span>
@@ -222,14 +229,18 @@ export function RoomScreen() {
           }`}>
             <div className="flex items-center gap-2 mb-2">
               {myPlayer === 2 && <span className="text-xs bg-green-500 text-white px-1.5 py-0.5 rounded">Вы</span>}
-              <input
-                type="text"
-                defaultValue={playerNames.player2}
-                onBlur={(e) => handleNameEdit(2, e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
-                className="font-semibold text-gray-800 dark:text-gray-200 bg-transparent border-b border-transparent 
-                           hover:border-gray-300 focus:border-blue-500 focus:outline-none w-full"
-              />
+              {isAuthed ? (
+                <span className="font-semibold text-gray-800 dark:text-gray-200">{playerNames.player2}</span>
+              ) : (
+                <input
+                  type="text"
+                  defaultValue={playerNames.player2}
+                  onBlur={(e) => handleNameEdit(2, e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLInputElement).blur()}
+                  className="font-semibold text-gray-800 dark:text-gray-200 bg-transparent border-b border-transparent 
+                             hover:border-gray-300 focus:border-blue-500 focus:outline-none w-full"
+                />
+              )}
             </div>
             <div className="flex gap-2 text-sm">
               <span>⚪ {state.captures.player2.white}</span>

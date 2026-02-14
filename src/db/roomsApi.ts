@@ -62,16 +62,22 @@ export async function createRoom(
   boardSize: 37 | 48 | 61,
   state: GameState,
   tree: GameNode,
-  creatorPlayer: 1 | 2 = 1
+  creatorPlayer: 1 | 2 = 1,
+  rated: boolean = false
 ): Promise<number> {
+  const token = localStorage.getItem('zertz_auth_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const response = await fetch(`${API_BASE}/api/rooms`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({
       boardSize,
       creatorPlayer,
       stateJson: serializeState(state),
       treeJson: serializeTree(tree),
+      rated,
     }),
   });
 

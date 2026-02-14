@@ -23,6 +23,7 @@ import {
 import { getValidRemovableRings } from '../game/Board';
 import { saveGame, loadGame, listGames } from '../db/gamesStorage';
 import { playPlaceSound, playRemoveRingSound, playCaptureSound, playWinSound, playUndoSound } from '../utils/sounds';
+import { useAuthStore } from './authStore';
 
 interface GameStore {
   state: GameState;
@@ -134,6 +135,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   newGame: (boardSize = 37) => {
     const rootNode = createRootNode();
     const newGameId = formatGameId(Date.now());
+    const authUser = useAuthStore.getState().user;
+    const player1Name = authUser ? authUser.username : 'Игрок 1';
     set({
       state: createInitialState(boardSize),
       gameTree: rootNode,
@@ -142,6 +145,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       selectedRingId: null,
       highlightedCaptures: [],
       availableCaptureChains: [],
+      playerNames: { player1: player1Name, player2: 'Игрок 2' },
       gameId: newGameId,
       winType: null,
       isLoadedGame: false,

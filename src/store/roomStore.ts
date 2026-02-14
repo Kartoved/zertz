@@ -18,6 +18,7 @@ import * as roomsApi from '../db/roomsApi';
 import { ChatMessage } from '../db/roomsApi';
 import * as gamesStorage from '../db/gamesStorage';
 import { playPlaceSound, playRemoveRingSound, playCaptureSound, playWinSound } from '../utils/sounds';
+import { useAuthStore } from './authStore';
 
 function findDeepestMainLine(node: GameNode): GameNode {
   if (node.children.length === 0) return node;
@@ -50,7 +51,7 @@ interface RoomStore {
   lastMessageId: number;
 
   // Actions
-  createRoom: (boardSize: 37 | 48 | 61, creatorPlayer?: 1 | 2) => Promise<number>;
+  createRoom: (boardSize: 37 | 48 | 61, creatorPlayer?: 1 | 2, rated?: boolean) => Promise<number>;
   joinRoom: (roomId: number | string) => Promise<boolean>;
   pollRoom: () => Promise<void>;
   pollMessages: () => Promise<void>;
@@ -136,14 +137,22 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   messages: [],
   lastMessageId: 0,
 
-  createRoom: async (boardSize, creatorPlayer = 1) => {
+  createRoom: async (boardSize, creatorPlayer = 1, rated = false) => {
     set({ isLoading: true, error: null });
     try {
       const initialState = createInitialState(boardSize);
       const rootNode = createRootNode();
 
-      const roomId = await roomsApi.createRoom(boardSize, initialState, rootNode, creatorPlayer);
+      const roomId = await roomsApi.createRoom(boardSize, initialState, rootNode, creatorPlayer, rated);
       
+      const authUser = useAuthStore.getState().user;
+      const names = { player1: 'Игрок 1', player2: 'Игрок 2' };
+      if (authUser) {
+        if (creatorPlayer === 1) names.player1 = authUser.username;
+        else names.player2 = authUser.username;
+        await roomsApi.updatePlayerName(roomId, creatorPlayer, authUser.username);
+      }
+
       set({
         roomId,
         myPlayer: creatorPlayer,
@@ -151,7 +160,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         state: initialState,
         gameTree: rootNode,
         currentNode: rootNode,
-        playerNames: { player1: 'Игрок 1', player2: 'Игрок 2' },
+        playerNames: names,
         isLoading: false,
         lastUpdated: Date.now(),
         messages: [],
@@ -162,7 +171,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         roomId,
         initialState,
         rootNode,
-        { player1: 'Игрок 1', player2: 'Игрок 2' },
+        names,
         null
       );
 
@@ -188,6 +197,26 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       // Determine which player we are (opposite of creator, or use existing)
       const myPlayer = get().myPlayer || (room.creatorPlayer === 1 ? 2 : 1);
 
+      const authUser = useAuthStore.getState().user;
+      const names = { ...room.playerNames };
+      if (authUser) {
+        if (myPlayer === 1) names.player1 = authUser.username;
+        else names.player2 = authUser.username;
+        await roomsApi.updatePlayerName(numericRoomId, myPlayer, authUser.username);
+        // Associate user_id with the room for rated games
+        try {
+          const token = localStorage.getItem('zertz_auth_token');
+          if (token) {
+            const API_BASE = import.meta.env.VITE_API_URL || '';
+            await fetch(`${API_BASE}/api/rooms/${numericRoomId}/join`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ playerIndex: myPlayer }),
+            });
+          }
+        } catch { /* ignore join errors */ }
+      }
+
       set({
         roomId: numericRoomId,
         myPlayer,
@@ -195,12 +224,12 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         state: room.state,
         gameTree: room.tree,
         currentNode: findDeepestMainLine(room.tree),
-        playerNames: room.playerNames,
+        playerNames: names,
         isLoading: false,
         lastUpdated: room.updatedAt,
       });
 
-      await persistOnlineGame(numericRoomId, room.state, room.tree, room.playerNames, room.winType);
+      await persistOnlineGame(numericRoomId, room.state, room.tree, names, room.winType);
 
       // Load chat messages
       const messages = await roomsApi.getChatMessages(roomId);

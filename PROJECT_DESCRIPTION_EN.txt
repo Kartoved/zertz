@@ -46,6 +46,37 @@ Win Conditions (first to achieve any):
 Board Sizes: 37 / 48 / 61 rings (selectable on new game).
 
 ================================================================================
+AUTHENTICATION & PROFILES
+================================================================================
+
+Registration & Login:
+- Username + password auth (bcrypt 12 rounds with auto-salt).
+- JWT token stored in localStorage (30-day expiry), auto-login on page load.
+- Validation: username 2-24 chars, password min 8 chars with at least 1 special char.
+- Errors shown inline in auth modal (e.g. "Ник уже занят", "Неверный пароль").
+
+User Profile:
+- View: username, Glicko-2 rating, registration date, wins/losses, win rate, best streak.
+- Edit: quote (up to 200 chars), country flag (emoji), password change.
+- Logout button.
+
+Game Integration:
+- Authenticated user's username auto-set as Player 1 in local games.
+- In online games: authenticated user's name auto-set and name editing disabled.
+- Unauthenticated users can still play (all game modes accessible without login).
+
+Rated Games & Glicko-2:
+- Glicko-2 rating system (initial: 1500, RD 350, volatility 0.06).
+- Authenticated users can toggle "Rated game" when creating online rooms.
+- On rated game completion, both players' ratings updated via Glicko-2 algorithm.
+- Win/loss/streak stats updated automatically.
+
+Players Leaderboard:
+- Accessible from main menu ("Игроки" button).
+- Table: rank, username, country, rating, games, wins, losses, winrate, registration date.
+- Sortable by any column (click header to toggle asc/desc).
+
+================================================================================
 ARCHITECTURE
 ================================================================================
 
@@ -62,13 +93,15 @@ src/
 ├── store/
 │   ├── gameStore.ts        # Zustand store for LOCAL games (single-device hot-seat)
 │   ├── roomStore.ts        # Zustand store for ONLINE games (multiplayer via server)
-│   └── uiStore.ts          # UI state: current screen (menu/game/rules)
+│   ├── uiStore.ts          # UI state: current screen (menu/game/rules)
+│   └── authStore.ts        # Zustand store for authentication state + token
 │
 ├── db/
 │   ├── indexedDB.ts        # IndexedDB wrapper for local game persistence
 │   ├── gamesStorage.ts     # Save/load games (local IndexedDB + remote PostgreSQL)
 │   ├── gamesApi.ts         # REST client for /api/games (local game sync)
-│   └── roomsApi.ts         # REST client for /api/rooms (online rooms, chat)
+│   ├── roomsApi.ts         # REST client for /api/rooms (online rooms, chat)
+│   └── authApi.ts          # REST client for /api/auth + /api/players
 │
 ├── components/
 │   ├── Board/
@@ -83,6 +116,11 @@ src/
 │   ├── Online/
 │   │   ├── RoomScreen.tsx  # Online game screen (board + players + chat)
 │   │   └── ChatPanel.tsx   # In-game chat for online rooms
+│   │
+│   ├── Auth/
+│   │   ├── AuthModal.tsx   # Login/Register modal with tabs
+│   │   ├── ProfileModal.tsx # User profile view/edit modal
+│   │   └── PlayersModal.tsx # Players leaderboard table
 │   │
 │   └── UI/
 │       ├── MarbleSelector.tsx  # Marble color picker (reserve or captures)
