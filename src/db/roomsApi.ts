@@ -2,6 +2,11 @@ import { GameState, GameNode } from '../game/types';
 
 const API_BASE = import.meta.env.VITE_API_URL || '';
 
+export interface RatingDelta {
+  player1: { before: number; after: number; delta: number };
+  player2: { before: number; after: number; delta: number };
+}
+
 export interface RoomData {
   id: number;
   boardSize: 37 | 48 | 61;
@@ -14,6 +19,12 @@ export interface RoomData {
   playerNames: { player1: string; player2: string };
   createdAt: number;
   updatedAt: number;
+  rated: boolean;
+  user1Id: number | null;
+  user2Id: number | null;
+  user1Rating: number | null;
+  user2Rating: number | null;
+  ratingDelta: RatingDelta | null;
 }
 
 export interface ChatMessage {
@@ -99,6 +110,10 @@ export async function getRoom(id: number | string): Promise<{
   playerNames: { player1: string; player2: string };
   boardSize: 37 | 48 | 61;
   updatedAt: number;
+  rated: boolean;
+  user1Rating: number | null;
+  user2Rating: number | null;
+  ratingDelta: RatingDelta | null;
 } | null> {
   const response = await fetch(`${API_BASE}/api/rooms/${id}`);
   
@@ -121,6 +136,10 @@ export async function getRoom(id: number | string): Promise<{
     playerNames: data.playerNames,
     boardSize: data.boardSize,
     updatedAt: data.updatedAt,
+    rated: data.rated || false,
+    user1Rating: data.user1Rating,
+    user2Rating: data.user2Rating,
+    ratingDelta: data.ratingDelta,
   };
 }
 
@@ -130,23 +149,32 @@ export async function updateRoomState(
   tree: GameNode,
   currentPlayer: 1 | 2,
   winner: number | null,
-  winType: string | null
-): Promise<void> {
+  winType: string | null,
+  playerIndex?: 1 | 2
+): Promise<{ ratingDelta: RatingDelta | null }> {
+  const token = localStorage.getItem('zertz_auth_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const response = await fetch(`${API_BASE}/api/rooms/${id}/state`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({
       stateJson: serializeState(state),
       treeJson: serializeTree(tree),
       currentPlayer,
       winner,
       winType,
+      playerIndex,
     }),
   });
 
   if (!response.ok) {
     throw new Error('Failed to update room state');
   }
+
+  const data = await response.json();
+  return { ratingDelta: data.ratingDelta || null };
 }
 
 export async function updatePlayerName(

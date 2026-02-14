@@ -1,37 +1,57 @@
 import { useState, useEffect } from 'react';
-import { getPlayers, PlayerInfo } from '../../db/authApi';
+import { getPlayers, getFollowing, getFollowIds, followUser, unfollowUser, PlayerInfo } from '../../db/authApi';
+import { useAuthStore } from '../../store/authStore';
+import PlayerProfileModal from './PlayerProfileModal';
 
 interface PlayersModalProps {
   onClose: () => void;
 }
 
 type SortKey = 'rating' | 'wins' | 'losses' | 'username' | 'created_at';
+type Tab = 'all' | 'friends';
 
-const COLUMN_HEADERS: { key: SortKey | 'games' | 'winrate'; label: string; sortKey?: SortKey }[] = [
+const COLUMN_HEADERS: { key: SortKey | 'games' | 'winrate' | 'action'; label: string; sortKey?: SortKey }[] = [
   { key: 'username', label: 'Игрок', sortKey: 'username' },
   { key: 'rating', label: 'Рейтинг', sortKey: 'rating' },
   { key: 'games', label: 'Игр' },
   { key: 'wins', label: 'Побед', sortKey: 'wins' },
-  { key: 'losses', label: 'Поражений', sortKey: 'losses' },
-  { key: 'winrate', label: 'Винрейт' },
-  { key: 'created_at', label: 'Регистрация', sortKey: 'created_at' },
+  { key: 'losses', label: 'Пораж.', sortKey: 'losses' },
+  { key: 'winrate', label: '%' },
+  { key: 'created_at', label: 'Рег.', sortKey: 'created_at' },
+  { key: 'action', label: '' },
 ];
 
 export default function PlayersModal({ onClose }: PlayersModalProps) {
-  const [players, setPlayers] = useState<PlayerInfo[]>([]);
+  const { user } = useAuthStore();
+  const [tab, setTab] = useState<Tab>('all');
+  const [allPlayers, setAllPlayers] = useState<PlayerInfo[]>([]);
+  const [friends, setFriends] = useState<PlayerInfo[]>([]);
+  const [followIds, setFollowIds] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [sortKey, setSortKey] = useState<SortKey>('rating');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [search, setSearch] = useState('');
+  const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
+  const [toast, setToast] = useState('');
 
   useEffect(() => {
-    loadPlayers();
-  }, [sortKey, sortOrder]);
+    loadData();
+  }, [sortKey, sortOrder, tab]);
 
-  const loadPlayers = async () => {
+  const loadData = async () => {
     setIsLoading(true);
     try {
-      const data = await getPlayers(sortKey, sortOrder);
-      setPlayers(data);
+      if (tab === 'all') {
+        const data = await getPlayers(sortKey, sortOrder);
+        setAllPlayers(data);
+      } else {
+        const data = await getFollowing();
+        setFriends(data);
+      }
+      if (user) {
+        const ids = await getFollowIds();
+        setFollowIds(new Set(ids));
+      }
     } catch {
       // ignore
     }
@@ -53,33 +73,88 @@ export default function PlayersModal({ onClose }: PlayersModalProps) {
   };
 
   const formatDate = (ts: number) => {
-    return new Date(ts).toLocaleDateString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
+    return new Date(ts).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 3000);
+  };
+
+  const handleFollow = async (playerId: number) => {
+    try {
+      if (followIds.has(playerId)) {
+        await unfollowUser(playerId);
+        setFollowIds(prev => { const n = new Set(prev); n.delete(playerId); return n; });
+        setFriends(prev => prev.filter(p => p.id !== playerId));
+        showToast('Отписка оформлена');
+      } else {
+        await followUser(playerId);
+        setFollowIds(prev => new Set(prev).add(playerId));
+        showToast('Подписка оформлена');
+      }
+    } catch (err: any) {
+      showToast(err.message);
+    }
+  };
+
+  const players = tab === 'all' ? allPlayers : friends;
+  const filtered = search.trim()
+    ? players.filter(p => p.username.toLowerCase().includes(search.trim().toLowerCase()))
+    : players;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden flex flex-col">
         {/* Header */}
-        <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Игроки</h2>
-          <button
-            onClick={onClose}
-            className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-          >
-            ✕
-          </button>
+        <div className="p-4 border-b dark:border-gray-700">
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Игроки</h2>
+            <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">✕</button>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex gap-1 mb-3">
+            <button
+              onClick={() => setTab('all')}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                tab === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
+              }`}
+            >
+              Все игроки
+            </button>
+            {user && (
+              <button
+                onClick={() => setTab('friends')}
+                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                  tab === 'friends' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
+                }`}
+              >
+                Друзья
+              </button>
+            )}
+          </div>
+
+          {/* Search */}
+          <input
+            type="text"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Поиск по нику..."
+            className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg
+              bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+              focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+          />
         </div>
 
         {/* Table */}
         <div className="flex-1 overflow-auto">
           {isLoading ? (
             <div className="p-8 text-center text-gray-500 dark:text-gray-400">Загрузка...</div>
-          ) : players.length === 0 ? (
-            <div className="p-8 text-center text-gray-500 dark:text-gray-400">Нет зарегистрированных игроков</div>
+          ) : filtered.length === 0 ? (
+            <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+              {tab === 'friends' ? 'Нет подписок' : 'Нет игроков'}
+            </div>
           ) : (
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
@@ -99,14 +174,19 @@ export default function PlayersModal({ onClose }: PlayersModalProps) {
                 </tr>
               </thead>
               <tbody>
-                {players.map((p, i) => (
+                {filtered.map((p, i) => (
                   <tr
                     key={p.id}
                     className="border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750"
                   >
                     <td className="px-3 py-2 text-gray-400">{i + 1}</td>
-                    <td className="px-3 py-2 font-medium text-gray-900 dark:text-white">
-                      {p.country} {p.username}
+                    <td className="px-3 py-2">
+                      <button
+                        onClick={() => setSelectedPlayerId(p.id)}
+                        className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                      >
+                        {p.country} {p.username}
+                      </button>
                     </td>
                     <td className="px-3 py-2 font-bold text-blue-600 dark:text-blue-400">{p.rating}</td>
                     <td className="px-3 py-2 text-gray-700 dark:text-gray-300">{p.games}</td>
@@ -114,13 +194,42 @@ export default function PlayersModal({ onClose }: PlayersModalProps) {
                     <td className="px-3 py-2 text-red-500">{p.losses}</td>
                     <td className="px-3 py-2 text-gray-700 dark:text-gray-300">{p.winrate}%</td>
                     <td className="px-3 py-2 text-gray-500 dark:text-gray-400">{formatDate(p.createdAt)}</td>
+                    <td className="px-3 py-2">
+                      {user && user.id !== p.id && (
+                        <button
+                          onClick={() => handleFollow(p.id)}
+                          className={`text-xs px-2 py-1 rounded transition-colors ${
+                            followIds.has(p.id)
+                              ? 'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 hover:bg-red-100 hover:text-red-600'
+                              : 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 hover:bg-blue-200'
+                          }`}
+                        >
+                          {followIds.has(p.id) ? '✓' : '+'}
+                        </button>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           )}
         </div>
+
+        {/* Toast */}
+        {toast && (
+          <div className="p-2 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 text-sm text-center">
+            {toast}
+          </div>
+        )}
       </div>
+
+      {/* Player Profile Modal */}
+      {selectedPlayerId && (
+        <PlayerProfileModal
+          playerId={selectedPlayerId}
+          onClose={() => { setSelectedPlayerId(null); loadData(); }}
+        />
+      )}
     </div>
   );
 }

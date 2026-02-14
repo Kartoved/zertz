@@ -7,6 +7,7 @@ import { useAuthStore } from '../../store/authStore';
 import AuthModal from '../Auth/AuthModal';
 import ProfileModal from '../Auth/ProfileModal';
 import PlayersModal from '../Auth/PlayersModal';
+import ChallengesModal from '../Auth/ChallengesModal';
 
 function formatDate(timestamp: number): string {
   const d = new Date(timestamp);
@@ -45,7 +46,9 @@ export default function MainMenu() {
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showPlayersModal, setShowPlayersModal] = useState(false);
   const [isRated, setIsRated] = useState(false);
-  const [loadTab, setLoadTab] = useState<'local' | 'online'>('local');
+  const [loadTab, setLoadTab] = useState<'current' | 'completed'>('current');
+  const [loadFilter, setLoadFilter] = useState<'all' | 'local' | 'online'>('all');
+  const [showChallengesModal, setShowChallengesModal] = useState(false);
   const { user } = useAuthStore();
   
   useEffect(() => {
@@ -138,6 +141,16 @@ export default function MainMenu() {
         >
           Игроки
         </button>
+
+        {user && (
+          <button
+            onClick={() => setShowChallengesModal(true)}
+            className="w-full py-4 px-6 bg-orange-500 hover:bg-orange-600 text-white font-semibold rounded-xl 
+              shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
+          >
+            Вызовы
+          </button>
+        )}
       </div>
       
       <button
@@ -154,9 +167,12 @@ export default function MainMenu() {
       
       {showLoadDialog && (() => {
         const isNumericId = (id: string) => /^\d+$/.test(id);
-        const localGames = savedGames.filter(g => !isNumericId(g.id));
-        const onlineGames = savedGames.filter(g => isNumericId(g.id));
-        const filteredGames = loadTab === 'local' ? localGames : onlineGames;
+        const currentGames = savedGames.filter(g => !g.winner);
+        const completedGames = savedGames.filter(g => !!g.winner);
+        const tabGames = loadTab === 'current' ? currentGames : completedGames;
+        const filteredGames = loadFilter === 'all' ? tabGames
+          : loadFilter === 'local' ? tabGames.filter(g => !isNumericId(g.id))
+          : tabGames.filter(g => isNumericId(g.id));
 
         return (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -173,30 +189,46 @@ export default function MainMenu() {
               {/* Tabs */}
               <div className="flex border-b dark:border-gray-700">
                 <button
-                  onClick={() => setLoadTab('local')}
+                  onClick={() => setLoadTab('current')}
                   className={`flex-1 py-2 px-4 text-center text-sm font-semibold transition-colors ${
-                    loadTab === 'local'
+                    loadTab === 'current'
                       ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
                       : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
                   }`}
                 >
-                  Локальные ({localGames.length})
+                  Текущие ({currentGames.length})
                 </button>
                 <button
-                  onClick={() => setLoadTab('online')}
+                  onClick={() => setLoadTab('completed')}
                   className={`flex-1 py-2 px-4 text-center text-sm font-semibold transition-colors ${
-                    loadTab === 'online'
+                    loadTab === 'completed'
                       ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
                       : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
                   }`}
                 >
-                  Онлайн ({onlineGames.length})
+                  Завершённые ({completedGames.length})
                 </button>
+              </div>
+              {/* Filters */}
+              <div className="flex gap-1 px-4 pt-3">
+                {(['all', 'local', 'online'] as const).map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setLoadFilter(f)}
+                    className={`px-3 py-1 text-xs rounded-full transition-colors ${
+                      loadFilter === f
+                        ? 'bg-blue-500 text-white'
+                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
+                    }`}
+                  >
+                    {f === 'all' ? 'Все' : f === 'local' ? 'Локальные' : 'Онлайн'}
+                  </button>
+                ))}
               </div>
               <div className="p-4 overflow-y-auto max-h-96">
                 {filteredGames.length === 0 ? (
                   <p className="text-gray-500 dark:text-gray-400 text-center py-8">
-                    Нет сохранённых игр
+                    Нет игр
                   </p>
                 ) : (
                   <div className="space-y-2">
@@ -209,24 +241,30 @@ export default function MainMenu() {
                       >
                         <div className="flex justify-between items-start">
                           <div>
-                            <div className="font-medium text-gray-900 dark:text-white">
+                            <div className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
                               {game.playerNames.player1} vs {game.playerNames.player2}
+                              <span className={`text-xs px-1.5 py-0.5 rounded ${
+                                isNumericId(game.id) 
+                                  ? 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300' 
+                                  : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300'
+                              }`}>
+                                {isNumericId(game.id) ? 'онлайн' : 'локальная'}
+                              </span>
                             </div>
                             <div className="text-sm text-gray-500 dark:text-gray-400">
-                              Ходов: {game.moveCount}
+                              Ходов: {game.moveCount} • Поле: {BOARD_LABELS[game.boardSize] ?? `${game.boardSize} колец`}
                             </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              Поле: {BOARD_LABELS[game.boardSize] ?? `${game.boardSize} колец`}
-                            </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              Способ победы: {game.winType ? WIN_TYPE_LABELS[game.winType] ?? game.winType : '—'}
-                            </div>
+                            {game.winType && (
+                              <div className="text-sm text-gray-500 dark:text-gray-400">
+                                {WIN_TYPE_LABELS[game.winType] ?? game.winType}
+                              </div>
+                            )}
                           </div>
                           <div className="text-right">
                             <div className={`text-sm font-medium ${
                               game.winner ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'
                             }`}>
-                              {game.winner ? `Победил ${game.winner === 'player1' ? game.playerNames.player1 : game.playerNames.player2}` : 'В процессе'}
+                              {game.winner ? `${game.winner === 'player1' ? game.playerNames.player1 : game.playerNames.player2}` : 'В процессе'}
                             </div>
                             <div className="text-xs text-gray-400">
                               {formatDate(game.updatedAt)}
@@ -473,6 +511,7 @@ export default function MainMenu() {
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
       {showProfileModal && <ProfileModal onClose={() => setShowProfileModal(false)} />}
       {showPlayersModal && <PlayersModal onClose={() => setShowPlayersModal(false)} />}
+      {showChallengesModal && <ChallengesModal onClose={() => setShowChallengesModal(false)} />}
     </div>
   );
 }

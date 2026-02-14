@@ -15,7 +15,7 @@ import {
 } from '../game/GameEngine';
 import { getValidRemovableRings } from '../game/Board';
 import * as roomsApi from '../db/roomsApi';
-import { ChatMessage } from '../db/roomsApi';
+import { ChatMessage, RatingDelta } from '../db/roomsApi';
 import * as gamesStorage from '../db/gamesStorage';
 import { playPlaceSound, playRemoveRingSound, playCaptureSound, playWinSound } from '../utils/sounds';
 import { useAuthStore } from './authStore';
@@ -45,6 +45,12 @@ interface RoomStore {
   selectedRingId: string | null;
   highlightedCaptures: CaptureMove[];
   availableCaptureChains: CaptureMove[][];
+
+  // Rating
+  rated: boolean;
+  user1Rating: number | null;
+  user2Rating: number | null;
+  ratingDelta: RatingDelta | null;
 
   // Chat
   messages: ChatMessage[];
@@ -133,6 +139,11 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   selectedRingId: null,
   highlightedCaptures: [],
   availableCaptureChains: [],
+
+  rated: false,
+  user1Rating: null,
+  user2Rating: null,
+  ratingDelta: null,
 
   messages: [],
   lastMessageId: 0,
@@ -227,6 +238,10 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         playerNames: names,
         isLoading: false,
         lastUpdated: room.updatedAt,
+        rated: room.rated,
+        user1Rating: room.user1Rating,
+        user2Rating: room.user2Rating,
+        ratingDelta: room.ratingDelta,
       });
 
       await persistOnlineGame(numericRoomId, room.state, room.tree, names, room.winType);
@@ -265,6 +280,10 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
           selectedMarbleColor: null,
           selectedRingId: null,
           highlightedCaptures: [],
+          rated: room.rated,
+          user1Rating: room.user1Rating,
+          user2Rating: room.user2Rating,
+          ratingDelta: room.ratingDelta || get().ratingDelta,
         });
         await persistOnlineGame(roomId, room.state, room.tree, room.playerNames, room.winType);
       }
@@ -306,11 +325,16 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   },
 
   selectMarbleColor: (color) => {
+    const { myPlayer, state } = get();
+    const myPlayerStr = myPlayer === 1 ? 'player1' : 'player2';
+    if (myPlayer && state.currentPlayer !== myPlayerStr) return; // Not my turn
     set({ selectedMarbleColor: color, selectedRingId: null, highlightedCaptures: [] });
   },
 
   selectRing: (ringId) => {
-    const { state } = get();
+    const { state, myPlayer } = get();
+    const myPlayerStr = myPlayer === 1 ? 'player1' : 'player2';
+    if (myPlayer && state.currentPlayer !== myPlayerStr) return; // Not my turn
     if (!ringId) {
       set({ selectedRingId: null, highlightedCaptures: [], availableCaptureChains: [] });
       return;
@@ -334,12 +358,11 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   },
 
   handlePlacement: async (ringId) => {
-    const { state, selectedMarbleColor, roomId, currentNode, gameTree, playerNames } = get();
-    console.log('[roomStore.handlePlacement] ENTER', { ringId, selectedMarbleColor, roomId, phase: state.phase, currentPlayer: state.currentPlayer });
-    if (!selectedMarbleColor || !roomId) {
-      console.log('[roomStore.handlePlacement] BLOCKED', { selectedMarbleColor, roomId });
-      return;
-    }
+    const { state, selectedMarbleColor, roomId, currentNode, gameTree, playerNames, myPlayer } = get();
+    if (!selectedMarbleColor || !roomId) return;
+    // Turn enforcement
+    const myPlayerStr = myPlayer === 1 ? 'player1' : 'player2';
+    if (myPlayer && state.currentPlayer !== myPlayerStr) return;
 
     pendingMoveCount++;
     try {
@@ -384,7 +407,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
         const winnerNum = winner === 'player1' ? 1 : winner === 'player2' ? 2 : null;
         const currentPlayerNum = newState.currentPlayer === 'player1' ? 1 : 2;
-        await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, winnerNum, winType);
+        const result = await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, winnerNum, winType, myPlayer || undefined);
+        if (result.ratingDelta) set({ ratingDelta: result.ratingDelta });
         await persistOnlineGame(roomId, newState, gameTree, playerNames, winType);
       } else {
         // Normal case: wait for ring removal
@@ -398,7 +422,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         });
 
         const currentPlayerNum = state.currentPlayer === 'player1' ? 1 : 2;
-        await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, null, null);
+        await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, null, null, myPlayer || undefined);
         await persistOnlineGame(roomId, newState, gameTree, playerNames, null);
       }
     } catch (err) {
@@ -409,8 +433,11 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   },
 
   handleRingRemoval: async (ringId) => {
-    const { state, roomId, currentNode, gameTree, playerNames } = get();
+    const { state, roomId, currentNode, gameTree, playerNames, myPlayer } = get();
     if (!roomId) return;
+    // Turn enforcement (ring removal is still current player's turn)
+    const myPlayerStrRR = myPlayer === 1 ? 'player1' : 'player2';
+    if (myPlayer && state.currentPlayer !== myPlayerStrRR) return;
 
     const validRings = getValidRemovableRings(state.rings);
     if (!validRings.includes(ringId)) return;
@@ -448,7 +475,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
       const winnerNum = winner === 'player1' ? 1 : winner === 'player2' ? 2 : null;
       const currentPlayerNum = newState.currentPlayer === 'player1' ? 1 : 2;
-      await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, winnerNum, winType);
+      const result = await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, winnerNum, winType, myPlayer || undefined);
+      if (result.ratingDelta) set({ ratingDelta: result.ratingDelta });
       await persistOnlineGame(roomId, newState, gameTree, playerNames, winType);
     } catch (err) {
       console.error('[roomStore.handleRingRemoval] ERROR:', err);
@@ -458,8 +486,11 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   },
 
   handleCapture: async (captures) => {
-    const { state, roomId, currentNode, gameTree, playerNames } = get();
+    const { state, roomId, currentNode, gameTree, playerNames, myPlayer } = get();
     if (!roomId) return;
+    // Turn enforcement
+    const myPlayerStrC = myPlayer === 1 ? 'player1' : 'player2';
+    if (myPlayer && state.currentPlayer !== myPlayerStrC) return;
 
     pendingMoveCount++;
     try {
@@ -505,7 +536,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
       const winnerNum = winner === 'player1' ? 1 : winner === 'player2' ? 2 : null;
       const currentPlayerNum = newState.currentPlayer === 'player1' ? 1 : 2;
-      await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, winnerNum, winType);
+      const result = await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, winnerNum, winType, myPlayer || undefined);
+      if (result.ratingDelta) set({ ratingDelta: result.ratingDelta });
       await persistOnlineGame(roomId, newState, gameTree, playerNames, winType);
     } catch (err) {
       console.error('[roomStore.handleCapture] ERROR:', err);
@@ -544,6 +576,10 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       selectedRingId: null,
       highlightedCaptures: [],
       availableCaptureChains: [],
+      rated: false,
+      user1Rating: null,
+      user2Rating: null,
+      ratingDelta: null,
       messages: [],
       lastMessageId: 0,
     });

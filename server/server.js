@@ -106,9 +106,39 @@ async function ensureSchema() {
       ALTER TABLE rooms ADD COLUMN IF NOT EXISTS rated BOOLEAN NOT NULL DEFAULT false;
       ALTER TABLE rooms ADD COLUMN IF NOT EXISTS user1_id INTEGER REFERENCES users(id);
       ALTER TABLE rooms ADD COLUMN IF NOT EXISTS user2_id INTEGER REFERENCES users(id);
+      ALTER TABLE rooms ADD COLUMN IF NOT EXISTS rating1_before REAL;
+      ALTER TABLE rooms ADD COLUMN IF NOT EXISTS rating2_before REAL;
+      ALTER TABLE rooms ADD COLUMN IF NOT EXISTS rating1_after REAL;
+      ALTER TABLE rooms ADD COLUMN IF NOT EXISTS rating2_after REAL;
     EXCEPTION WHEN others THEN NULL;
     END $$;
   `);
+
+  // Follows table (one-way subscriptions)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS follows (
+      follower_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      following_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (follower_id, following_id)
+    );
+  `);
+
+  // Challenges table
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS challenges (
+      id SERIAL PRIMARY KEY,
+      from_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      to_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      room_id INTEGER REFERENCES rooms(id) ON DELETE CASCADE,
+      board_size INTEGER NOT NULL DEFAULT 37,
+      rated BOOLEAN NOT NULL DEFAULT false,
+      status TEXT NOT NULL DEFAULT 'pending',
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_challenges_to ON challenges(to_user_id);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_challenges_from ON challenges(from_user_id);`);
 }
 
 app.get('/api/health', async (_req, res) => {
@@ -445,6 +475,304 @@ app.get('/api/players', async (req, res) => {
   }
 });
 
+// ==================== FOLLOWS API ====================
+
+app.post('/api/follows/:userId', authRequired, async (req, res) => {
+  const targetId = parseInt(req.params.userId, 10);
+  if (targetId === req.user.id) {
+    res.status(400).json({ error: 'Нельзя подписаться на себя' });
+    return;
+  }
+  try {
+    await pool.query(
+      'INSERT INTO follows (follower_id, following_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+      [req.user.id, targetId]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Follow error:', err);
+    res.status(500).json({ error: 'Ошибка подписки' });
+  }
+});
+
+app.delete('/api/follows/:userId', authRequired, async (req, res) => {
+  const targetId = parseInt(req.params.userId, 10);
+  try {
+    await pool.query('DELETE FROM follows WHERE follower_id = $1 AND following_id = $2', [req.user.id, targetId]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Unfollow error:', err);
+    res.status(500).json({ error: 'Ошибка отписки' });
+  }
+});
+
+app.get('/api/follows', authRequired, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT u.id, u.username, u.country, u.rating, u.wins, u.losses, u.best_streak, u.created_at
+       FROM follows f JOIN users u ON u.id = f.following_id
+       WHERE f.follower_id = $1
+       ORDER BY u.rating DESC`,
+      [req.user.id]
+    );
+    res.json(result.rows.map(u => ({
+      id: u.id,
+      username: u.username,
+      country: u.country,
+      rating: Math.round(u.rating),
+      wins: u.wins,
+      losses: u.losses,
+      games: u.wins + u.losses,
+      winrate: (u.wins + u.losses) > 0 ? Math.round(u.wins / (u.wins + u.losses) * 100) : 0,
+      bestStreak: u.best_streak,
+      createdAt: u.created_at.getTime(),
+    })));
+  } catch (err) {
+    console.error('Get follows error:', err);
+    res.status(500).json({ error: 'Ошибка получения подписок' });
+  }
+});
+
+// Get list of user IDs the current user follows (for quick lookup)
+app.get('/api/follows/ids', authRequired, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT following_id FROM follows WHERE follower_id = $1', [req.user.id]);
+    res.json(result.rows.map(r => r.following_id));
+  } catch (err) {
+    console.error('Get follow ids error:', err);
+    res.status(500).json({ error: 'Ошибка' });
+  }
+});
+
+// ==================== CHALLENGES API ====================
+
+// Create a challenge (immediately creates a room)
+app.post('/api/challenges', authRequired, async (req, res) => {
+  const { toUserId, boardSize = 37, rated = false, creatorPlayer = 1 } = req.body;
+  const fromUserId = req.user.id;
+
+  if (fromUserId === toUserId) {
+    res.status(400).json({ error: 'Нельзя вызвать самого себя' });
+    return;
+  }
+
+  try {
+    // Check active outgoing challenges limit (max 3)
+    const activeCount = await pool.query(
+      "SELECT COUNT(*) FROM challenges WHERE from_user_id = $1 AND status = 'pending'",
+      [fromUserId]
+    );
+    if (parseInt(activeCount.rows[0].count) >= 3) {
+      res.status(400).json({ error: 'Максимум 3 активных вызова' });
+      return;
+    }
+
+    // Create the room immediately
+    const { createInitialState, createRootNode, serializeState, serializeTree } = await import('./gameHelpers.js').catch(() => null) || {};
+    
+    // Build initial state/tree JSON inline since we can't import game logic in server
+    // The room will be populated with proper state when the challenge is accepted
+    const stateJson = req.body.stateJson;
+    const treeJson = req.body.treeJson;
+
+    if (!stateJson || !treeJson) {
+      res.status(400).json({ error: 'Missing state or tree' });
+      return;
+    }
+
+    const userCol = creatorPlayer === 1 ? 'user1_id' : 'user2_id';
+    const roomResult = await pool.query(
+      `INSERT INTO rooms (board_size, creator_player, state_json, tree_json, rated, ${userCol})
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id`,
+      [boardSize, creatorPlayer, stateJson, treeJson, rated, fromUserId]
+    );
+    const roomId = roomResult.rows[0].id;
+
+    // Set creator's name
+    const userRow = await pool.query('SELECT username FROM users WHERE id = $1', [fromUserId]);
+    const playerNameCol = creatorPlayer === 1 ? 'player1_name' : 'player2_name';
+    await pool.query(`UPDATE rooms SET ${playerNameCol} = $2 WHERE id = $1`, [roomId, userRow.rows[0].username]);
+
+    // Create the challenge
+    const challengeResult = await pool.query(
+      `INSERT INTO challenges (from_user_id, to_user_id, room_id, board_size, rated)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, created_at`,
+      [fromUserId, toUserId, roomId, boardSize, rated]
+    );
+
+    res.json({
+      id: challengeResult.rows[0].id,
+      roomId,
+      createdAt: challengeResult.rows[0].created_at.getTime(),
+    });
+  } catch (err) {
+    console.error('Create challenge error:', err);
+    res.status(500).json({ error: 'Ошибка создания вызова' });
+  }
+});
+
+// Cancel a challenge (only sender can cancel)
+app.delete('/api/challenges/:id', authRequired, async (req, res) => {
+  const challengeId = parseInt(req.params.id, 10);
+  try {
+    const result = await pool.query(
+      "UPDATE challenges SET status = 'cancelled' WHERE id = $1 AND from_user_id = $2 AND status = 'pending' RETURNING room_id",
+      [challengeId, req.user.id]
+    );
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'Вызов не найден' });
+      return;
+    }
+    // Delete the room too
+    await pool.query('DELETE FROM rooms WHERE id = $1', [result.rows[0].room_id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Cancel challenge error:', err);
+    res.status(500).json({ error: 'Ошибка отмены вызова' });
+  }
+});
+
+// Accept a challenge (only receiver can accept)
+app.put('/api/challenges/:id/accept', authRequired, async (req, res) => {
+  const challengeId = parseInt(req.params.id, 10);
+  try {
+    const result = await pool.query(
+      "SELECT * FROM challenges WHERE id = $1 AND to_user_id = $2 AND status = 'pending'",
+      [challengeId, req.user.id]
+    );
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'Вызов не найден' });
+      return;
+    }
+
+    const challenge = result.rows[0];
+
+    // Get room to determine which player slot to fill
+    const roomRow = await pool.query('SELECT creator_player FROM rooms WHERE id = $1', [challenge.room_id]);
+    const joinerPlayer = roomRow.rows[0].creator_player === 1 ? 2 : 1;
+    const userCol = joinerPlayer === 1 ? 'user1_id' : 'user2_id';
+    const nameCol = joinerPlayer === 1 ? 'player1_name' : 'player2_name';
+
+    // Get acceptor's username
+    const userRow = await pool.query('SELECT username FROM users WHERE id = $1', [req.user.id]);
+
+    // Update room with joiner info
+    await pool.query(`UPDATE rooms SET ${userCol} = $2, ${nameCol} = $3 WHERE id = $1`, [challenge.room_id, req.user.id, userRow.rows[0].username]);
+
+    // Mark challenge as accepted
+    await pool.query("UPDATE challenges SET status = 'accepted' WHERE id = $1", [challengeId]);
+
+    res.json({ roomId: challenge.room_id });
+  } catch (err) {
+    console.error('Accept challenge error:', err);
+    res.status(500).json({ error: 'Ошибка принятия вызова' });
+  }
+});
+
+// Decline a challenge (only receiver can decline)
+app.put('/api/challenges/:id/decline', authRequired, async (req, res) => {
+  const challengeId = parseInt(req.params.id, 10);
+  try {
+    const result = await pool.query(
+      "UPDATE challenges SET status = 'declined' WHERE id = $1 AND to_user_id = $2 AND status = 'pending' RETURNING room_id",
+      [challengeId, req.user.id]
+    );
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'Вызов не найден' });
+      return;
+    }
+    await pool.query('DELETE FROM rooms WHERE id = $1', [result.rows[0].room_id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Decline challenge error:', err);
+    res.status(500).json({ error: 'Ошибка отклонения вызова' });
+  }
+});
+
+// Get my challenges (incoming + outgoing)
+app.get('/api/challenges', authRequired, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT c.*, 
+        fu.username AS from_username, fu.rating AS from_rating, fu.country AS from_country,
+        tu.username AS to_username, tu.rating AS to_rating, tu.country AS to_country
+       FROM challenges c
+       JOIN users fu ON fu.id = c.from_user_id
+       JOIN users tu ON tu.id = c.to_user_id
+       WHERE (c.from_user_id = $1 OR c.to_user_id = $1) AND c.status = 'pending'
+       ORDER BY c.created_at DESC`,
+      [req.user.id]
+    );
+    res.json(result.rows.map(r => ({
+      id: r.id,
+      fromUserId: r.from_user_id,
+      toUserId: r.to_user_id,
+      fromUsername: r.from_username,
+      fromRating: Math.round(r.from_rating),
+      fromCountry: r.from_country,
+      toUsername: r.to_username,
+      toRating: Math.round(r.to_rating),
+      toCountry: r.to_country,
+      roomId: r.room_id,
+      boardSize: r.board_size,
+      rated: r.rated,
+      status: r.status,
+      createdAt: r.created_at.getTime(),
+    })));
+  } catch (err) {
+    console.error('Get challenges error:', err);
+    res.status(500).json({ error: 'Ошибка получения вызовов' });
+  }
+});
+
+// Get player profile by ID
+app.get('/api/players/:id', authOptional, async (req, res) => {
+  const userId = parseInt(req.params.id, 10);
+  try {
+    const result = await pool.query(
+      'SELECT id, username, quote, country, rating, rating_rd, wins, losses, best_streak, current_streak, created_at FROM users WHERE id = $1',
+      [userId]
+    );
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'Игрок не найден' });
+      return;
+    }
+    const u = result.rows[0];
+    const data = {
+      id: u.id,
+      username: u.username,
+      quote: u.quote,
+      country: u.country,
+      rating: Math.round(u.rating),
+      ratingRd: u.rating_rd,
+      wins: u.wins,
+      losses: u.losses,
+      games: u.wins + u.losses,
+      winrate: (u.wins + u.losses) > 0 ? Math.round(u.wins / (u.wins + u.losses) * 100) : 0,
+      bestStreak: u.best_streak,
+      currentStreak: u.current_streak,
+      createdAt: u.created_at.getTime(),
+      isFollowing: false,
+    };
+
+    // Check if current user follows this player
+    if (req.user) {
+      const followCheck = await pool.query(
+        'SELECT 1 FROM follows WHERE follower_id = $1 AND following_id = $2',
+        [req.user.id, userId]
+      );
+      data.isFollowing = followCheck.rows.length > 0;
+    }
+
+    res.json(data);
+  } catch (err) {
+    console.error('Get player error:', err);
+    res.status(500).json({ error: 'Ошибка получения профиля игрока' });
+  }
+});
+
 // ==================== GAMES API ====================
 
 app.get('/api/games', async (_req, res) => {
@@ -582,6 +910,24 @@ app.get('/api/rooms/:id', async (req, res) => {
     }
     
     const row = result.rows[0];
+
+    // Fetch user ratings if users are associated
+    let user1Rating = null;
+    let user2Rating = null;
+    if (row.user1_id) {
+      const u = await pool.query('SELECT rating FROM users WHERE id = $1', [row.user1_id]);
+      if (u.rows.length > 0) user1Rating = Math.round(u.rows[0].rating);
+    }
+    if (row.user2_id) {
+      const u = await pool.query('SELECT rating FROM users WHERE id = $1', [row.user2_id]);
+      if (u.rows.length > 0) user2Rating = Math.round(u.rows[0].rating);
+    }
+
+    const ratingDelta = (row.rating1_before != null && row.rating1_after != null) ? {
+      player1: { before: Math.round(row.rating1_before), after: Math.round(row.rating1_after), delta: Math.round(row.rating1_after) - Math.round(row.rating1_before) },
+      player2: { before: Math.round(row.rating2_before), after: Math.round(row.rating2_after), delta: Math.round(row.rating2_after) - Math.round(row.rating2_before) },
+    } : null;
+
     res.json({
       id: row.id,
       boardSize: row.board_size,
@@ -597,6 +943,9 @@ app.get('/api/rooms/:id', async (req, res) => {
       rated: row.rated || false,
       user1Id: row.user1_id || null,
       user2Id: row.user2_id || null,
+      user1Rating,
+      user2Rating,
+      ratingDelta,
     });
   } catch (err) {
     console.error('Error getting room:', err);
@@ -605,9 +954,29 @@ app.get('/api/rooms/:id', async (req, res) => {
 });
 
 // Update room state (after each move)
-app.put('/api/rooms/:id/state', async (req, res) => {
+app.put('/api/rooms/:id/state', authOptional, async (req, res) => {
   const { id } = req.params;
-  const { stateJson, treeJson, currentPlayer, winner, winType } = req.body;
+  const { stateJson, treeJson, currentPlayer, winner, winType, playerIndex } = req.body;
+
+  // Turn enforcement: validate the submitting player matches the room's current_player
+  if (playerIndex) {
+    try {
+      const roomCheck = await pool.query('SELECT current_player, winner FROM rooms WHERE id = $1', [id]);
+      if (roomCheck.rows.length > 0) {
+        const room = roomCheck.rows[0];
+        if (room.winner) {
+          res.status(400).json({ error: 'Игра уже завершена' });
+          return;
+        }
+        if (room.current_player !== playerIndex) {
+          res.status(403).json({ error: 'Не ваш ход' });
+          return;
+        }
+      }
+    } catch (err) {
+      console.error('Turn check error:', err);
+    }
+  }
   
   await pool.query(
     `UPDATE rooms SET
@@ -620,6 +989,8 @@ app.put('/api/rooms/:id/state', async (req, res) => {
      WHERE id = $1`,
     [id, stateJson, treeJson, currentPlayer, winner, winType]
   );
+
+  let ratingDelta = null;
 
   // Glicko-2 rating update for rated games when winner is determined
   if (winner) {
@@ -639,6 +1010,12 @@ app.put('/api/rooms/:id/state', async (req, res) => {
           const new1 = glicko2Update(u1.rating, u1.rating_rd, u1.rating_vol, u2.rating, u2.rating_rd, score1);
           const new2 = glicko2Update(u2.rating, u2.rating_rd, u2.rating_vol, u1.rating, u1.rating_rd, score2);
 
+          // Store before/after ratings in room
+          await pool.query(
+            `UPDATE rooms SET rating1_before=$2, rating2_before=$3, rating1_after=$4, rating2_after=$5 WHERE id=$1`,
+            [id, Math.round(u1.rating), Math.round(u2.rating), new1.rating, new2.rating]
+          );
+
           // Update player 1
           const streak1 = winner === 1 ? u1.current_streak + 1 : 0;
           const best1 = Math.max(u1.best_streak, streak1);
@@ -654,6 +1031,11 @@ app.put('/api/rooms/:id/state', async (req, res) => {
             `UPDATE users SET rating=$2, rating_rd=$3, rating_vol=$4, wins=wins+$5, losses=losses+$6, current_streak=$7, best_streak=$8 WHERE id=$1`,
             [u2.id, new2.rating, new2.rd, new2.vol, score2, score1, streak2, best2]
           );
+
+          ratingDelta = {
+            player1: { before: Math.round(u1.rating), after: new1.rating, delta: new1.rating - Math.round(u1.rating) },
+            player2: { before: Math.round(u2.rating), after: new2.rating, delta: new2.rating - Math.round(u2.rating) },
+          };
         }
       }
     } catch (err) {
@@ -661,7 +1043,7 @@ app.put('/api/rooms/:id/state', async (req, res) => {
     }
   }
   
-  res.json({ ok: true });
+  res.json({ ok: true, ratingDelta });
 });
 
 // Update player name
