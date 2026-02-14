@@ -7,11 +7,12 @@ export async function saveGame(
   state: GameState,
   tree: GameNode,
   playerNames: { player1: string; player2: string },
-  winType: string | null
+  winType: string | null,
+  isOnline: boolean
 ): Promise<void> {
-  await local.saveGame(id, state, tree, playerNames, winType);
+  await local.saveGame(id, state, tree, playerNames, winType, isOnline);
   try {
-    await api.saveGame(id, state, tree, playerNames, winType);
+    await api.saveGame(id, state, tree, playerNames, winType, isOnline);
   } catch {
     // Keep local save as fallback
   }
@@ -40,6 +41,7 @@ export async function listGames(): Promise<Array<{
   winner: string | null;
   winType: string | null;
   boardSize: 37 | 48 | 61;
+  isOnline: boolean;
 }>> {
   try {
     const remote = await api.listGames();

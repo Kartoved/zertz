@@ -150,7 +150,7 @@ async function persistOnlineGame(
   winType: string | null
 ): Promise<void> {
   if (!roomId) return;
-  await gamesStorage.saveGame(String(roomId), state, tree, playerNames, winType);
+  await gamesStorage.saveGame(String(roomId), state, tree, playerNames, winType, true);
 }
 
 const _initialRoot = createRootNode();

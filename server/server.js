@@ -41,6 +41,7 @@ async function ensureSchema() {
       move_count INTEGER NOT NULL,
       winner TEXT,
       win_type TEXT,
+      is_online BOOLEAN NOT NULL DEFAULT false,
       board_size INTEGER NOT NULL,
       state_json TEXT NOT NULL,
       tree_json TEXT NOT NULL
@@ -112,6 +113,7 @@ async function ensureSchema() {
       ALTER TABLE rooms ADD COLUMN IF NOT EXISTS rating1_after REAL;
       ALTER TABLE rooms ADD COLUMN IF NOT EXISTS rating2_after REAL;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS contact_link TEXT NOT NULL DEFAULT '';
+      ALTER TABLE games ADD COLUMN IF NOT EXISTS is_online BOOLEAN NOT NULL DEFAULT false;
     EXCEPTION WHEN others THEN NULL;
     END $$;
   `);
@@ -796,7 +798,7 @@ app.get('/api/players/:id', authOptional, async (req, res) => {
 
 app.get('/api/games', async (_req, res) => {
   const result = await pool.query(
-    `SELECT id, player1_name, player2_name, updated_at, move_count, winner, win_type, board_size
+    `SELECT id, player1_name, player2_name, updated_at, move_count, winner, win_type, board_size, is_online
      FROM games
      ORDER BY updated_at DESC`
   );
@@ -809,6 +811,7 @@ app.get('/api/games', async (_req, res) => {
       winner: row.winner,
       winType: row.win_type,
       boardSize: row.board_size,
+      isOnline: row.is_online,
     }))
   );
 });
@@ -842,6 +845,7 @@ app.post('/api/games', async (req, res) => {
     moveCount,
     winner,
     winType,
+    isOnline,
     boardSize,
     stateJson,
     treeJson,
@@ -853,8 +857,8 @@ app.post('/api/games', async (req, res) => {
   }
 
   await pool.query(
-    `INSERT INTO games (id, player1_name, player2_name, move_count, winner, win_type, board_size, state_json, tree_json)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+    `INSERT INTO games (id, player1_name, player2_name, move_count, winner, win_type, is_online, board_size, state_json, tree_json)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
      ON CONFLICT (id) DO UPDATE SET
        player1_name = EXCLUDED.player1_name,
        player2_name = EXCLUDED.player2_name,
@@ -862,6 +866,7 @@ app.post('/api/games', async (req, res) => {
        move_count = EXCLUDED.move_count,
        winner = EXCLUDED.winner,
        win_type = EXCLUDED.win_type,
+       is_online = EXCLUDED.is_online,
        board_size = EXCLUDED.board_size,
        state_json = EXCLUDED.state_json,
        tree_json = EXCLUDED.tree_json
@@ -873,6 +878,7 @@ app.post('/api/games', async (req, res) => {
       moveCount,
       winner,
       winType,
+      !!isOnline,
       boardSize,
       stateJson,
       treeJson,

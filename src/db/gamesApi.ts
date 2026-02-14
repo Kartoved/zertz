@@ -18,7 +18,13 @@ type SavedGameSummary = {
   winner: string | null;
   winType: string | null;
   boardSize: 37 | 48 | 61;
+  isOnline: boolean;
 };
+
+function inferIsOnline(id: string, isOnline?: boolean): boolean {
+  if (typeof isOnline === 'boolean') return isOnline;
+  return /^\d+$/.test(id) && id.length <= 10;
+}
 
 function serializeState(state: GameState): string {
   const obj = {
@@ -65,7 +71,8 @@ export async function saveGame(
   state: GameState,
   tree: GameNode,
   playerNames: { player1: string; player2: string },
-  winType: string | null
+  winType: string | null,
+  isOnline: boolean
 ): Promise<void> {
   const response = await fetch(`${API_BASE}/api/games`, {
     method: 'POST',
@@ -77,6 +84,7 @@ export async function saveGame(
       winner: state.winner,
       winType,
       boardSize: state.boardSize,
+      isOnline,
       stateJson: serializeState(state),
       treeJson: serializeTree(tree),
     }),
@@ -118,7 +126,11 @@ export async function listGames(): Promise<SavedGameSummary[]> {
   if (!response.ok) {
     throw new Error('Failed to list games');
   }
-  return safeJson<SavedGameSummary[]>(response);
+  const games = await safeJson<Array<Omit<SavedGameSummary, 'isOnline'> & { isOnline?: boolean }>>(response);
+  return games.map((game) => ({
+    ...game,
+    isOnline: inferIsOnline(game.id, game.isOnline),
+  }));
 }
 
 export async function deleteGame(id: string): Promise<void> {

@@ -14,8 +14,14 @@ interface SavedGame {
   winner: string | null;
   winType: string | null;
   boardSize: 37 | 48 | 61;
+  isOnline?: boolean;
   stateJson: string;
   treeJson: string;
+}
+
+function inferIsOnline(id: string, isOnline?: boolean): boolean {
+  if (typeof isOnline === 'boolean') return isOnline;
+  return /^\d+$/.test(id) && id.length <= 10;
 }
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
@@ -79,7 +85,8 @@ export async function saveGame(
   state: GameState,
   tree: GameNode,
   playerNames: { player1: string; player2: string },
-  winType: string | null
+  winType: string | null,
+  isOnline: boolean
 ): Promise<void> {
   const db = await getDB();
   
@@ -92,6 +99,7 @@ export async function saveGame(
     winner: state.winner,
     winType,
     boardSize: state.boardSize,
+    isOnline,
     stateJson: serializeState(state),
     treeJson: serializeTree(tree),
   };
@@ -126,6 +134,7 @@ export async function listGames(): Promise<Array<{
   winner: string | null;
   winType: string | null;
   boardSize: 37 | 48 | 61;
+  isOnline: boolean;
 }>> {
   const db = await getDB();
   const games = await db.getAllFromIndex(STORE_NAME, 'updatedAt') as SavedGame[];
@@ -138,6 +147,7 @@ export async function listGames(): Promise<Array<{
     winner: g.winner,
     winType: g.winType,
     boardSize: g.boardSize,
+    isOnline: inferIsOnline(g.id, g.isOnline),
   }));
 }
 

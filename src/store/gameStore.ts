@@ -35,7 +35,7 @@ interface GameStore {
   availableCaptureChains: CaptureMove[][];
   playerNames: { player1: string; player2: string };
   gameId: string;
-  savedGames: Array<{ id: string; playerNames: { player1: string; player2: string }; updatedAt: number; moveCount: number; winner: string | null; winType: string | null; boardSize: 37 | 48 | 61 }>;
+  savedGames: Array<{ id: string; playerNames: { player1: string; player2: string }; updatedAt: number; moveCount: number; winner: string | null; winType: string | null; boardSize: 37 | 48 | 61; isOnline: boolean }>;
   winType: string | null;
   isLoadedGame: boolean;
   
@@ -513,6 +513,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
   
   autoSave: async () => {
     const { state, gameTree, playerNames, gameId, winType } = get();
-    await saveGame(gameId, state, gameTree, playerNames, winType);
+    await saveGame(gameId, state, gameTree, playerNames, winType, false);
   },
 }));
