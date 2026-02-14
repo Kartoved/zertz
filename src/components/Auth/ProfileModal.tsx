@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
-import { toCountryEmoji } from '../../utils/country';
+import CountryBadge from '../UI/CountryBadge';
+import { normalizeCountryValue, toCountryEmoji } from '../../utils/country';
 
 const COUNTRIES = [
   { code: '🌍', name: 'Земля' },
@@ -56,7 +57,9 @@ interface ProfileModalProps {
 export default function ProfileModal({ onClose }: ProfileModalProps) {
   const { user, updateProfile, logout, isLoading } = useAuthStore();
   const [quote, setQuote] = useState(user?.quote || '');
-  const [country, setCountry] = useState(toCountryEmoji(user?.country || '🌍'));
+  const [country, setCountry] = useState(normalizeCountryValue(user?.country || '🌍'));
+  const [contactLink, setContactLink] = useState(user?.contactLink || '');
+  const [isEditingQuote, setIsEditingQuote] = useState(false);
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newPassword2, setNewPassword2] = useState('');
@@ -74,9 +77,20 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
     setLocalError('');
     setSuccessMsg('');
     try {
-      await updateProfile({ quote, country });
+      const trimmedContact = contactLink.trim();
+      if (trimmedContact) {
+        try {
+          new URL(trimmedContact);
+        } catch {
+          setLocalError('Поле "Для связи" должно содержать корректную ссылку (https://...)');
+          return;
+        }
+      }
+
+      await updateProfile({ quote, country, contactLink: trimmedContact });
       setSuccessMsg('Профиль обновлён');
       setTimeout(() => setSuccessMsg(''), 2000);
+      setIsEditingQuote(false);
     } catch (err: any) {
       setLocalError(err.message);
     }
@@ -144,7 +158,9 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
         <div className="p-4 overflow-y-auto flex-1 space-y-4">
           {/* User info */}
           <div className="text-center">
-            <div className="text-3xl mb-1">{country}</div>
+            <div className="text-3xl mb-1">
+              <CountryBadge country={country} size={30} />
+            </div>
             <div className="text-xl font-bold text-gray-900 dark:text-white">{user.username}</div>
             <div className="text-sm text-gray-500 dark:text-gray-400">Регистрация: {formattedDate}</div>
           </div>
@@ -180,20 +196,54 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
 
           {/* Quote */}
           <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                Цитата
+              </label>
+              <button
+                type="button"
+                onClick={() => setIsEditingQuote(!isEditingQuote)}
+                className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+              >
+                ✎
+              </button>
+            </div>
+
+            {isEditingQuote ? (
+              <>
+                <textarea
+                  value={quote}
+                  onChange={(e) => setQuote(e.target.value)}
+                  maxLength={200}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                    bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                    focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none"
+                  placeholder="Ваша цитата или девиз..."
+                />
+                <div className="text-xs text-gray-400 text-right">{quote.length}/200</div>
+              </>
+            ) : (
+              <blockquote className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 italic">
+                {quote.trim() ? `"${quote}"` : 'Цитата не задана'}
+              </blockquote>
+            )}
+          </div>
+
+          {/* Contact link */}
+          <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Цитата
+              Для связи
             </label>
-            <textarea
-              value={quote}
-              onChange={(e) => setQuote(e.target.value)}
-              maxLength={200}
-              rows={2}
+            <input
+              type="url"
+              value={contactLink}
+              onChange={(e) => setContactLink(e.target.value)}
+              placeholder="https://t.me/username"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
                 bg-white dark:bg-gray-700 text-gray-900 dark:text-white
-                focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none"
-              placeholder="Ваша цитата или девиз..."
+                focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
             />
-            <div className="text-xs text-gray-400 text-right">{quote.length}/200</div>
           </div>
 
           {/* Country */}
@@ -209,7 +259,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
                 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
             >
               {COUNTRIES.map((c) => (
-                <option key={c.code} value={toCountryEmoji(c.code)}>
+                <option key={c.code} value={c.code}>
                   {toCountryEmoji(c.code)} {c.name}
                 </option>
               ))}

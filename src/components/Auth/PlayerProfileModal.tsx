@@ -4,7 +4,7 @@ import { getPlayerProfile, followUser, unfollowUser, createChallenge, PlayerProf
 import { useAuthStore } from '../../store/authStore';
 import { createInitialState } from '../../game/GameEngine';
 import { GameNode } from '../../game/types';
-import { toCountryEmoji } from '../../utils/country';
+import CountryBadge from '../UI/CountryBadge';
 
 const BOARD_LABELS: Record<number, string> = {
   37: 'Любительское 37',
@@ -150,7 +150,8 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
         {/* Header */}
         <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-            {toCountryEmoji(profile.country)} {profile.username}
+            <CountryBadge country={profile.country} className="mr-2" />
+            {profile.username}
           </h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">✕</button>
         </div>
@@ -189,6 +190,19 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
           <div className="text-xs text-gray-500 dark:text-gray-400">
             Зарегистрирован: {formatDate(profile.createdAt)}
           </div>
+
+          {profile.contactLink && (
+            <div className="text-sm">
+              <a
+                href={profile.contactLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 dark:text-blue-400 hover:underline break-all"
+              >
+                Для связи: {profile.contactLink}
+              </a>
+            </div>
+          )}
 
           {/* Actions */}
           {!isMe && (

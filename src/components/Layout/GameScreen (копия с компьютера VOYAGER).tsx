@@ -18,7 +18,7 @@ const WIN_TYPE_LABELS: Record<string, string> = {
 
 export default function GameScreen() {
   const { state, playerNames, newGame } = useGameStore();
-  const { toggleDarkMode, isDarkMode, setScreen } = useUIStore();
+  const { toggleDarkMode, isDarkMode } = useUIStore();
   const [showRematchDialog, setShowRematchDialog] = useState(false);
   
   const isGameOver = state.phase === 'gameOver';
@@ -90,7 +90,7 @@ export default function GameScreen() {
                 Реванш
               </button>
               <button
-                onClick={() => setScreen('menu')}
+                onClick={() => useUIStore.getState().setScreen('menu')}
                 className="flex-1 py-2 px-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
               >
                 В меню

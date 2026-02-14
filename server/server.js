@@ -89,6 +89,7 @@ async function ensureSchema() {
       password_hash TEXT NOT NULL,
       quote TEXT NOT NULL DEFAULT '',
       country TEXT NOT NULL DEFAULT '🌍',
+      contact_link TEXT NOT NULL DEFAULT '',
       rating REAL NOT NULL DEFAULT 1500,
       rating_rd REAL NOT NULL DEFAULT 350,
       rating_vol REAL NOT NULL DEFAULT 0.06,
@@ -110,6 +111,7 @@ async function ensureSchema() {
       ALTER TABLE rooms ADD COLUMN IF NOT EXISTS rating2_before REAL;
       ALTER TABLE rooms ADD COLUMN IF NOT EXISTS rating1_after REAL;
       ALTER TABLE rooms ADD COLUMN IF NOT EXISTS rating2_after REAL;
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS contact_link TEXT NOT NULL DEFAULT '';
     EXCEPTION WHEN others THEN NULL;
     END $$;
   `);
@@ -281,7 +283,7 @@ app.post('/api/auth/register', async (req, res) => {
 
     const hash = await bcrypt.hash(password, 12);
     const result = await pool.query(
-      `INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username, quote, country, rating, rating_rd, wins, losses, best_streak, current_streak, created_at`,
+      `INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username, quote, country, contact_link, rating, rating_rd, wins, losses, best_streak, current_streak, created_at`,
       [trimmedName, hash]
     );
 
@@ -295,6 +297,7 @@ app.post('/api/auth/register', async (req, res) => {
         username: user.username,
         quote: user.quote,
         country: user.country,
+        contactLink: user.contact_link,
         rating: user.rating,
         ratingRd: user.rating_rd,
         wins: user.wins,
@@ -341,6 +344,7 @@ app.post('/api/auth/login', async (req, res) => {
         username: user.username,
         quote: user.quote,
         country: user.country,
+        contactLink: user.contact_link,
         rating: user.rating,
         ratingRd: user.rating_rd,
         wins: user.wins,
@@ -359,7 +363,7 @@ app.post('/api/auth/login', async (req, res) => {
 app.get('/api/auth/me', authRequired, async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, username, quote, country, rating, rating_rd, wins, losses, best_streak, current_streak, created_at FROM users WHERE id = $1',
+      'SELECT id, username, quote, country, contact_link, rating, rating_rd, wins, losses, best_streak, current_streak, created_at FROM users WHERE id = $1',
       [req.user.id]
     );
     if (result.rows.length === 0) {
@@ -372,6 +376,7 @@ app.get('/api/auth/me', authRequired, async (req, res) => {
       username: u.username,
       quote: u.quote,
       country: u.country,
+      contactLink: u.contact_link,
       rating: u.rating,
       ratingRd: u.rating_rd,
       wins: u.wins,
@@ -387,7 +392,7 @@ app.get('/api/auth/me', authRequired, async (req, res) => {
 });
 
 app.put('/api/auth/profile', authRequired, async (req, res) => {
-  const { quote, country, oldPassword, newPassword } = req.body;
+  const { quote, country, contactLink, oldPassword, newPassword } = req.body;
 
   try {
     if (newPassword !== undefined) {
@@ -419,9 +424,12 @@ app.put('/api/auth/profile', authRequired, async (req, res) => {
     if (country !== undefined) {
       await pool.query('UPDATE users SET country = $2 WHERE id = $1', [req.user.id, country.slice(0, 10)]);
     }
+    if (contactLink !== undefined) {
+      await pool.query('UPDATE users SET contact_link = $2 WHERE id = $1', [req.user.id, String(contactLink).slice(0, 300)]);
+    }
 
     const result = await pool.query(
-      'SELECT id, username, quote, country, rating, rating_rd, wins, losses, best_streak, current_streak, created_at FROM users WHERE id = $1',
+      'SELECT id, username, quote, country, contact_link, rating, rating_rd, wins, losses, best_streak, current_streak, created_at FROM users WHERE id = $1',
       [req.user.id]
     );
     const u = result.rows[0];
@@ -430,6 +438,7 @@ app.put('/api/auth/profile', authRequired, async (req, res) => {
       username: u.username,
       quote: u.quote,
       country: u.country,
+      contactLink: u.contact_link,
       rating: u.rating,
       ratingRd: u.rating_rd,
       wins: u.wins,
@@ -447,15 +456,24 @@ app.put('/api/auth/profile', authRequired, async (req, res) => {
 // ==================== PLAYERS API ====================
 
 app.get('/api/players', async (req, res) => {
-  const allowedSort = ['rating', 'wins', 'losses', 'username', 'created_at'];
+  const sortMap = {
+    rating: 'rating',
+    wins: 'wins',
+    losses: 'losses',
+    username: 'username',
+    created_at: 'created_at',
+    games: '(wins + losses)',
+    winrate: 'CASE WHEN (wins + losses) > 0 THEN wins::float / (wins + losses) ELSE 0 END',
+  };
   let sort = req.query.sort || 'rating';
-  if (!allowedSort.includes(sort)) sort = 'rating';
+  if (!Object.prototype.hasOwnProperty.call(sortMap, sort)) sort = 'rating';
   const order = req.query.order === 'asc' ? 'ASC' : 'DESC';
+  const sortExpr = sortMap[sort];
 
   try {
     const result = await pool.query(
       `SELECT id, username, country, rating, wins, losses, best_streak, created_at
-       FROM users ORDER BY ${sort} ${order}, id ASC`
+       FROM users ORDER BY ${sortExpr} ${order}, id ASC`
     );
     res.json(result.rows.map(u => ({
       id: u.id,
@@ -732,7 +750,7 @@ app.get('/api/players/:id', authOptional, async (req, res) => {
   const userId = parseInt(req.params.id, 10);
   try {
     const result = await pool.query(
-      'SELECT id, username, quote, country, rating, rating_rd, wins, losses, best_streak, current_streak, created_at FROM users WHERE id = $1',
+      'SELECT id, username, quote, country, contact_link, rating, rating_rd, wins, losses, best_streak, current_streak, created_at FROM users WHERE id = $1',
       [userId]
     );
     if (result.rows.length === 0) {
@@ -745,6 +763,7 @@ app.get('/api/players/:id', authOptional, async (req, res) => {
       username: u.username,
       quote: u.quote,
       country: u.country,
+      contactLink: u.contact_link,
       rating: Math.round(u.rating),
       ratingRd: u.rating_rd,
       wins: u.wins,

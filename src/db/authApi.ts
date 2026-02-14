@@ -5,6 +5,7 @@ export interface User {
   username: string;
   quote: string;
   country: string;
+  contactLink: string;
   rating: number;
   ratingRd: number;
   wins: number;
@@ -73,7 +74,7 @@ export async function getMe(token: string): Promise<User> {
 
 export async function updateProfile(
   token: string,
-  updates: { quote?: string; country?: string; oldPassword?: string; newPassword?: string }
+  updates: { quote?: string; country?: string; contactLink?: string; oldPassword?: string; newPassword?: string }
 ): Promise<User> {
   const response = await fetch(`${API_BASE}/api/auth/profile`, {
     method: 'PUT',
@@ -104,6 +105,7 @@ export interface PlayerProfile {
   username: string;
   quote: string;
   country: string;
+  contactLink: string;
   rating: number;
   ratingRd: number;
   wins: number;

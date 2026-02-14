@@ -70,6 +70,7 @@ interface RoomStore {
   handlePlacement: (ringId: string) => Promise<void>;
   handleRingRemoval: (ringId: string) => Promise<void>;
   handleCapture: (captures: CaptureMove[]) => Promise<void>;
+  undoLastMove: () => Promise<void>;
   setPlayerName: (player: 1 | 2, name: string) => Promise<void>;
   
   reset: () => void;
@@ -111,6 +112,34 @@ function addMoveToTree(
 
 // Guard: block polling while a move is being persisted to server
 let pendingMoveCount = 0;
+
+function rebuildStateFromNode(targetNode: GameNode, boardSize: 37 | 48 | 61): GameState {
+  const nextState = createInitialState(boardSize);
+  const moves: GameNode[] = [];
+
+  let node: GameNode | null = targetNode;
+  while (node && node.move) {
+    moves.unshift(node);
+    node = node.parent;
+  }
+
+  for (const moveNode of moves) {
+    if (moveNode.move?.type === 'placement') {
+      const { marbleColor, ringId, removedRingId } = moveNode.move.data;
+      placeMarble(nextState, ringId, marbleColor);
+      if (removedRingId) {
+        removeRing(nextState, removedRingId);
+      } else {
+        skipRingRemoval(nextState);
+      }
+    } else if (moveNode.move?.type === 'capture') {
+      const captures = [moveNode.move.data, ...(moveNode.move.data.chain || [])];
+      executeCapture(nextState, captures);
+    }
+  }
+
+  return nextState;
+}
 
 async function persistOnlineGame(
   roomId: number | null,
@@ -566,6 +595,42 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       await persistOnlineGame(roomId, newState, gameTree, playerNames, winType);
     } catch (err) {
       console.error('[roomStore.handleCapture] ERROR:', err);
+    } finally {
+      pendingMoveCount--;
+    }
+  },
+
+  undoLastMove: async () => {
+    const { roomId, currentNode, state, gameTree, playerNames, myPlayer } = get();
+    if (!roomId || !myPlayer || !currentNode.parent) return;
+
+    pendingMoveCount++;
+    try {
+      const parentNode = currentNode.parent;
+      const idx = parentNode.children.indexOf(currentNode);
+      if (idx >= 0) {
+        parentNode.children.splice(idx, 1);
+      }
+
+      const newState = rebuildStateFromNode(parentNode, state.boardSize);
+      const winner = newState.winner;
+      const winType = winner ? getWinType(newState, winner) : null;
+
+      set({
+        state: newState,
+        currentNode: parentNode,
+        selectedMarbleColor: null,
+        selectedRingId: null,
+        highlightedCaptures: [],
+        availableCaptureChains: [],
+      });
+
+      const winnerNum = winner === 'player1' ? 1 : winner === 'player2' ? 2 : null;
+      const currentPlayerNum = newState.currentPlayer === 'player1' ? 1 : 2;
+      await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, winnerNum, winType, myPlayer);
+      await persistOnlineGame(roomId, newState, gameTree, playerNames, winType);
+    } catch (err) {
+      console.error('[roomStore.undoLastMove] ERROR:', err);
     } finally {
       pendingMoveCount--;
     }

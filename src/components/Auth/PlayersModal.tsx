@@ -2,22 +2,22 @@ import { useState, useEffect } from 'react';
 import { getPlayers, getFollowing, getFollowIds, followUser, unfollowUser, PlayerInfo } from '../../db/authApi';
 import { useAuthStore } from '../../store/authStore';
 import PlayerProfileModal from './PlayerProfileModal';
-import { toCountryEmoji } from '../../utils/country';
+import CountryBadge from '../UI/CountryBadge';
 
 interface PlayersModalProps {
   onClose: () => void;
 }
 
-type SortKey = 'rating' | 'wins' | 'losses' | 'username' | 'created_at';
+type SortKey = 'rating' | 'wins' | 'losses' | 'username' | 'created_at' | 'games' | 'winrate';
 type Tab = 'all' | 'friends';
 
 const COLUMN_HEADERS: { key: SortKey | 'games' | 'winrate' | 'action'; label: string; sortKey?: SortKey }[] = [
   { key: 'username', label: 'Игрок', sortKey: 'username' },
   { key: 'rating', label: 'Рейтинг', sortKey: 'rating' },
-  { key: 'games', label: 'Игр' },
+  { key: 'games', label: 'Игр', sortKey: 'games' },
   { key: 'wins', label: 'Побед', sortKey: 'wins' },
   { key: 'losses', label: 'Пораж.', sortKey: 'losses' },
-  { key: 'winrate', label: '%' },
+  { key: 'winrate', label: '%', sortKey: 'winrate' },
   { key: 'created_at', label: 'Рег.', sortKey: 'created_at' },
   { key: 'action', label: '' },
 ];
@@ -104,6 +104,24 @@ export default function PlayersModal({ onClose }: PlayersModalProps) {
     ? players.filter(p => p.username.toLowerCase().includes(search.trim().toLowerCase()))
     : players;
 
+  const sorted = [...filtered].sort((a, b) => {
+    const direction = sortOrder === 'asc' ? 1 : -1;
+
+    if (sortKey === 'username') {
+      return a.username.localeCompare(b.username, 'ru') * direction;
+    }
+    if (sortKey === 'created_at') {
+      return (a.createdAt - b.createdAt) * direction;
+    }
+    if (sortKey === 'games') {
+      return (a.games - b.games) * direction;
+    }
+    if (sortKey === 'winrate') {
+      return (a.winrate - b.winrate) * direction;
+    }
+    return ((a[sortKey] as number) - (b[sortKey] as number)) * direction;
+  });
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-3xl w-full max-h-[80vh] overflow-hidden flex flex-col">
@@ -152,7 +170,7 @@ export default function PlayersModal({ onClose }: PlayersModalProps) {
         <div className="flex-1 overflow-auto">
           {isLoading ? (
             <div className="p-8 text-center text-gray-500 dark:text-gray-400">Загрузка...</div>
-          ) : filtered.length === 0 ? (
+          ) : sorted.length === 0 ? (
             <div className="p-8 text-center text-gray-500 dark:text-gray-400">
               {tab === 'friends' ? 'Нет подписок' : 'Нет игроков'}
             </div>
@@ -175,7 +193,7 @@ export default function PlayersModal({ onClose }: PlayersModalProps) {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((p, i) => (
+                {sorted.map((p, i) => (
                   <tr
                     key={p.id}
                     className="border-t border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-750"
@@ -186,7 +204,8 @@ export default function PlayersModal({ onClose }: PlayersModalProps) {
                         onClick={() => setSelectedPlayerId(p.id)}
                         className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
                       >
-                        {toCountryEmoji(p.country)} {p.username}
+                        <CountryBadge country={p.country} className="mr-2" />
+                        {p.username}
                       </button>
                     </td>
                     <td className="px-3 py-2 font-bold text-blue-600 dark:text-blue-400">{p.rating}</td>

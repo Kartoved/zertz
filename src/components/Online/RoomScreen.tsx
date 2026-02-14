@@ -15,6 +15,7 @@ export function RoomScreen() {
   const [showMobileChat, setShowMobileChat] = useState(false);
   const [chatCollapsed, setChatCollapsed] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
+  const [winnerModalDismissed, setWinnerModalDismissed] = useState(false);
 
   const {
     state,
@@ -36,6 +37,8 @@ export function RoomScreen() {
     selectedRingId,
     highlightedCaptures,
     availableCaptureChains,
+    undoLastMove,
+    currentNode,
     setPlayerName,
     reset,
     rated,
@@ -61,6 +64,12 @@ export function RoomScreen() {
     return () => clearInterval(interval);
   }, [pollRoom, pollMessages]);
 
+  useEffect(() => {
+    if (!state.winner) {
+      setWinnerModalDismissed(false);
+    }
+  }, [state.winner]);
+
   const copyLink = () => {
     const url = window.location.href;
     navigator.clipboard.writeText(url);
@@ -79,15 +88,13 @@ export function RoomScreen() {
   };
 
   const getPhaseText = () => {
-    if (state.winner) {
-      const winnerName = state.winner === 'player1' ? playerNames.player1 : playerNames.player2;
-      return `🏆 ${winnerName} победил!`;
-    }
     if (state.phase === 'placement') return 'Размести шарик';
     if (state.phase === 'ringRemoval') return 'Удали кольцо';
     if (state.phase === 'capture') return 'Захвати шарик';
     return '';
   };
+
+  const winnerName = state.winner === 'player1' ? playerNames.player1 : playerNames.player2;
 
   const validRemovableRings = state.phase === 'ringRemoval' 
     ? getValidRemovableRings(state.rings) 
@@ -154,7 +161,7 @@ export function RoomScreen() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col">
+    <div className="h-screen bg-gray-100 dark:bg-gray-900 flex flex-col overflow-hidden">
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 shadow-sm p-3 md:p-4">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
@@ -188,7 +195,7 @@ export function RoomScreen() {
       </header>
 
       {/* Main content */}
-      <div className="flex-1 flex flex-col lg:flex-row gap-4 p-2 md:p-4 max-w-7xl mx-auto w-full">
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 p-2 md:p-4 max-w-7xl mx-auto w-full">
         {/* Left panel - Players */}
         <div className="lg:w-64 flex lg:flex-col gap-2 lg:gap-4">
           {/* Player 1 */}
@@ -291,6 +298,14 @@ export function RoomScreen() {
             <div className="font-medium text-gray-800 dark:text-gray-200">
               {getPhaseText()}
             </div>
+            <button
+              type="button"
+              onClick={() => void undoLastMove()}
+              disabled={!myPlayer || !currentNode.parent || !!state.winner}
+              className="mt-3 w-full px-3 py-1.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              ↶ Вернуть ход назад
+            </button>
           </div>
 
           {/* Marble selector */}
@@ -311,7 +326,7 @@ export function RoomScreen() {
         </div>
 
         {/* Center - Board */}
-        <div className="flex-1 flex items-center justify-center min-h-[300px] md:min-h-[400px]">
+        <div className="flex-1 min-h-0 flex items-center justify-center min-h-[300px] md:min-h-[400px]">
           <HexBoard
             state={state}
             onRingClick={handleRingClick}
@@ -322,7 +337,7 @@ export function RoomScreen() {
         </div>
 
         {/* Right panel - Chat (desktop, collapsible) */}
-        <div className={`hidden lg:flex flex-col transition-all duration-300 ${
+        <div className={`hidden lg:flex min-h-0 flex-col transition-all duration-300 ${
           chatCollapsed ? 'lg:w-12' : 'lg:w-80'
         }`}>
           <button
@@ -334,7 +349,7 @@ export function RoomScreen() {
             {chatCollapsed ? '💬' : '→'}
           </button>
           {!chatCollapsed && (
-            <div className="flex-1 h-[500px]">
+            <div className="flex-1 min-h-0 h-[500px] max-h-full overflow-hidden">
               <ChatPanel />
             </div>
           )}
@@ -366,6 +381,23 @@ export function RoomScreen() {
           playerId={selectedPlayerId}
           onClose={() => setSelectedPlayerId(null)}
         />
+      )}
+
+      {state.winner && !winnerModalDismissed && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-6 text-center">
+            <div className="text-3xl font-bold text-green-700 dark:text-green-300 mb-2">
+              🏆 {winnerName} победил!
+            </div>
+            <div className="text-gray-600 dark:text-gray-300 mb-6">Партия завершена</div>
+            <button
+              onClick={() => setWinnerModalDismissed(true)}
+              className="px-5 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold transition-colors"
+            >
+              Закрыть
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

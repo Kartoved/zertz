@@ -106,7 +106,7 @@ export default function MainMenu() {
           className="w-full py-4 px-6 bg-blue-500 hover:bg-blue-600 text-white font-semibold 
             rounded-xl shadow-lg hover:shadow-xl transition-all transform hover:scale-105"
         >
-          Новая игра
+          Играть локально
         </button>
         
         <button

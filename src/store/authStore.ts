@@ -14,7 +14,7 @@ interface AuthStore {
   register: (username: string, password: string) => Promise<void>;
   logout: () => void;
   fetchMe: () => Promise<void>;
-  updateProfile: (updates: { quote?: string; country?: string; oldPassword?: string; newPassword?: string }) => Promise<void>;
+  updateProfile: (updates: { quote?: string; country?: string; contactLink?: string; oldPassword?: string; newPassword?: string }) => Promise<void>;
   clearError: () => void;
 }
 
