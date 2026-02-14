@@ -17,13 +17,24 @@ export function RoomScreen() {
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
-  const [showMobileChat, setShowMobileChat] = useState(false);
   const [showMobileHeaderMenu, setShowMobileHeaderMenu] = useState(false);
-  const [mobileTab, setMobileTab] = useState<'board' | 'players'>('board');
+  const [mobileTab, setMobileTab] = useState<'game' | 'chat'>('game');
   const [chatCollapsed, setChatCollapsed] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [winnerModalDismissed, setWinnerModalDismissed] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
+
+  const navTabs: Array<{ id: string; label: string; authOnly?: boolean }> = [
+    { id: 'playLocal', label: t.playLocal },
+    { id: 'loadGame', label: t.loadGame },
+    { id: 'rules', label: t.rules },
+    { id: 'players', label: t.players },
+    { id: 'challenges', label: t.challenges, authOnly: true },
+  ];
+  const topExtraTabs: Array<{ id: 'tasks' | 'community'; label: string }> = [
+    { id: 'tasks', label: t.tasks },
+    { id: 'community', label: t.community },
+  ];
 
   const {
     state,
@@ -143,6 +154,15 @@ export function RoomScreen() {
     }
   };
 
+  const handleMobileMenuAction = (tabId: string) => {
+    setShowMobileHeaderMenu(false);
+    if (tabId === 'rules') {
+      setShowRulesModal(true);
+      return;
+    }
+    navigate('/');
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
@@ -208,7 +228,7 @@ export function RoomScreen() {
               {copied ? t.copied : `🔗 ${t.copyRoomLink}`}
             </button>
             <button
-              onClick={() => setShowMobileChat(!showMobileChat)}
+              onClick={() => setChatCollapsed((prev) => !prev)}
               className="px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg"
             >
               💬
@@ -220,6 +240,27 @@ export function RoomScreen() {
       {showMobileHeaderMenu && (
         <div className="md:hidden px-3 pb-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
           <div className="space-y-2">
+            {navTabs
+              .filter((tab) => !tab.authOnly || user)
+              .map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => handleMobileMenuAction(tab.id)}
+                  className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700"
+                >
+                  {tab.label}
+                </button>
+              ))}
+            {topExtraTabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 border border-dashed border-gray-300 dark:border-gray-600"
+              >
+                {tab.label}
+              </button>
+            ))}
             <OnlineMoveHistory />
             <div className="flex flex-wrap gap-2">
               <button
@@ -240,7 +281,7 @@ export function RoomScreen() {
               <button
                 onClick={() => {
                   setShowMobileHeaderMenu(false);
-                  setShowMobileChat(true);
+                  setMobileTab('chat');
                 }}
                 className="px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg"
               >
@@ -254,7 +295,7 @@ export function RoomScreen() {
       {/* Main content */}
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 p-2 md:p-4 max-w-7xl mx-auto w-full pb-16 lg:pb-4">
         {/* Left panel - Players */}
-        <div className={`lg:w-64 lg:flex lg:flex-col gap-2 lg:gap-4 ${mobileTab !== 'players' ? 'hidden lg:flex' : 'flex flex-col'}`}>
+        <div className={`lg:w-64 lg:flex lg:flex-col gap-2 lg:gap-4 ${mobileTab === 'chat' ? 'hidden lg:flex' : 'flex flex-col'}`}>
           {/* Player 1 */}
           <div className={`flex-1 p-3 rounded-lg ${
             state.currentPlayer === 'player1' && !state.winner
@@ -360,14 +401,23 @@ export function RoomScreen() {
           </div>
 
           <div className="p-3 bg-white dark:bg-gray-800 rounded-lg">
-            <button
-              type="button"
-              onClick={() => void undoLastMove()}
-              disabled={!myPlayer || !currentNode.parent || !!state.winner || !isMyTurn()}
-              className="w-full px-3 py-1.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              ↶ {t.undoMove}
-            </button>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => void undoLastMove()}
+                disabled={!myPlayer || !currentNode.parent || !!state.winner || !isMyTurn()}
+                className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                ↶ {t.undoMove}
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate('/')}
+                className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-red-500 text-white hover:bg-red-600"
+              >
+                🏳️ {t.surrender}
+              </button>
+            </div>
           </div>
 
           {/* Marble selector */}
@@ -388,7 +438,7 @@ export function RoomScreen() {
         </div>
 
         {/* Center - Board */}
-        <div className={`flex-1 min-h-0 items-center justify-center min-h-[320px] md:min-h-[400px] ${mobileTab !== 'board' ? 'hidden lg:flex' : 'flex'}`}>
+        <div className={`flex-1 min-h-0 items-center justify-center min-h-[320px] md:min-h-[400px] ${mobileTab === 'chat' ? 'hidden lg:flex' : 'flex'}`}>
           <HexBoard
             state={state}
             onRingClick={handleRingClick}
@@ -396,6 +446,12 @@ export function RoomScreen() {
             highlightedCaptures={highlightedCaptures}
             validRemovableRings={validRemovableRings}
           />
+        </div>
+
+        <div className={`lg:hidden ${mobileTab === 'chat' ? 'flex-1 min-h-0' : 'hidden'}`}>
+          <div className="h-full min-h-[320px] bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+            <ChatPanel />
+          </div>
         </div>
 
         {/* Right panel - Chat (desktop, collapsible) */}
@@ -419,58 +475,31 @@ export function RoomScreen() {
       </div>
 
       <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 px-3 pb-3">
-        <div className="grid grid-cols-3 bg-white dark:bg-gray-800 rounded-xl p-1 shadow-lg border border-gray-200 dark:border-gray-700">
+        <div className="grid grid-cols-2 bg-white dark:bg-gray-800 rounded-xl p-1 shadow-lg border border-gray-200 dark:border-gray-700">
           <button
             type="button"
-            onClick={() => setMobileTab('board')}
+            onClick={() => setMobileTab('game')}
             className={`py-2 text-sm font-semibold rounded-lg transition-colors ${
-              mobileTab === 'board'
+              mobileTab === 'game'
                 ? 'bg-indigo-500 text-white'
                 : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}
           >
-            {t.tabBoard}
+            {t.tabPlay}
           </button>
           <button
             type="button"
-            onClick={() => setMobileTab('players')}
+            onClick={() => setMobileTab('chat')}
             className={`py-2 text-sm font-semibold rounded-lg transition-colors ${
-              mobileTab === 'players'
+              mobileTab === 'chat'
                 ? 'bg-indigo-500 text-white'
                 : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}
-          >
-            {t.tabPlayers}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowMobileChat(true)}
-            className="py-2 text-sm font-semibold rounded-lg text-white bg-blue-500 hover:bg-blue-600 transition-colors"
           >
             {t.chat}
           </button>
         </div>
       </div>
-
-      {/* Mobile chat overlay */}
-      {showMobileChat && (
-        <div className="fixed inset-0 bg-black/50 z-50 lg:hidden" onClick={() => setShowMobileChat(false)}>
-          <div 
-            className="absolute bottom-0 left-0 right-0 h-[70vh] bg-white dark:bg-gray-800 rounded-t-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="h-full flex flex-col">
-              <div className="flex justify-between items-center p-3 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="font-semibold">{t.chat}</h3>
-                <button onClick={() => setShowMobileChat(false)} className="text-2xl">×</button>
-              </div>
-              <div className="flex-1 overflow-hidden">
-                <ChatPanel />
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {selectedPlayerId && (
         <PlayerProfileModal

@@ -5,7 +5,7 @@ import { useI18n } from '../../i18n';
 export default function ControlPanel() {
   const { t } = useI18n();
   const { undo, currentNode } = useGameStore();
-  const { setScreen, openRules } = useUIStore();
+  const { setScreen } = useUIStore();
   
   return (
     <div className="flex flex-wrap gap-2 justify-center">
@@ -21,18 +21,9 @@ export default function ControlPanel() {
       
       <button
         onClick={() => setScreen('menu')}
-        className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 
-          dark:hover:bg-gray-600 transition-colors text-gray-800 dark:text-gray-200"
+        className="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg transition-colors text-white"
       >
-        ≡ {t.menu}
-      </button>
-
-      <button
-        onClick={openRules}
-        className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 
-          dark:hover:bg-gray-600 transition-colors text-gray-800 dark:text-gray-200"
-      >
-        📘 {t.rules}
+        🏳️ {t.surrender}
       </button>
     </div>
   );

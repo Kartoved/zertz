@@ -228,6 +228,7 @@ type Dict = {
   tabBoard: string;
   tabControls: string;
   tabPlayers: string;
+  surrender: string;
 };
 
 export const I18N: Record<Language, Dict> = {
@@ -453,6 +454,7 @@ export const I18N: Record<Language, Dict> = {
     tabBoard: 'Доска',
     tabControls: 'Панель',
     tabPlayers: 'Игроки',
+    surrender: 'Сдаться',
   },
   en: {
     appSubtitle: 'Abstract strategy game',
@@ -676,6 +678,7 @@ export const I18N: Record<Language, Dict> = {
     tabBoard: 'Board',
     tabControls: 'Controls',
     tabPlayers: 'Players',
+    surrender: 'Resign',
   },
   eo: {
     appSubtitle: 'Abstrakta strategia ludo',
@@ -899,6 +902,7 @@ export const I18N: Record<Language, Dict> = {
     tabBoard: 'Tabulo',
     tabControls: 'Panelo',
     tabPlayers: 'Ludantoj',
+    surrender: 'Rezigni',
   },
 };
 

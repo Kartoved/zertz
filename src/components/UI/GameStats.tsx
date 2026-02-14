@@ -3,7 +3,11 @@ import { useGameStore } from '../../store/gameStore';
 import { WIN_CONDITIONS } from '../../game/types';
 import { useI18n } from '../../i18n';
 
-export default function GameStats() {
+interface GameStatsProps {
+  compact?: boolean;
+}
+
+export default function GameStats({ compact = false }: GameStatsProps) {
   const { t } = useI18n();
   const { state, playerNames, setPlayerNames } = useGameStore();
   const [editingPlayer, setEditingPlayer] = useState<'player1' | 'player2' | null>(null);
@@ -28,22 +32,24 @@ export default function GameStats() {
   
   const renderCaptures = (player: 'player1' | 'player2') => {
     const caps = state.captures[player];
+    const marbleClass = compact ? 'w-3 h-3' : 'w-4 h-4';
+    const textClass = compact ? 'text-xs' : '';
     return (
       <div className="flex gap-2 items-center">
-        <span className="flex items-center gap-1">
-          <div className="w-4 h-4 rounded-full bg-white border border-gray-300" />
+        <span className={`flex items-center gap-1 ${textClass}`}>
+          <div className={`${marbleClass} rounded-full bg-white border border-gray-300`} />
           <span className={caps.white >= WIN_CONDITIONS.white ? 'text-green-500 font-bold' : ''}>
             {caps.white}
           </span>
         </span>
-        <span className="flex items-center gap-1">
-          <div className="w-4 h-4 rounded-full bg-gray-400" />
+        <span className={`flex items-center gap-1 ${textClass}`}>
+          <div className={`${marbleClass} rounded-full bg-gray-400`} />
           <span className={caps.gray >= WIN_CONDITIONS.gray ? 'text-green-500 font-bold' : ''}>
             {caps.gray}
           </span>
         </span>
-        <span className="flex items-center gap-1">
-          <div className="w-4 h-4 rounded-full bg-gray-700" />
+        <span className={`flex items-center gap-1 ${textClass}`}>
+          <div className={`${marbleClass} rounded-full bg-gray-700`} />
           <span className={caps.black >= WIN_CONDITIONS.black ? 'text-green-500 font-bold' : ''}>
             {caps.black}
           </span>
@@ -51,22 +57,32 @@ export default function GameStats() {
       </div>
     );
   };
-  
+
+  const containerClass = compact
+    ? 'flex flex-col gap-2 p-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm'
+    : 'flex flex-col gap-4 p-4 bg-white dark:bg-gray-800 rounded-xl shadow-md';
+
+  const cardClass = (active: boolean) => {
+    const base = compact ? 'flex justify-between items-center p-2 rounded-lg' : 'flex justify-between items-center p-3 rounded-lg';
+    const activeClass = 'bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-500';
+    const idleClass = 'bg-gray-50 dark:bg-gray-700';
+    return `${base} ${active ? activeClass : idleClass}`;
+  };
+
+  const nameClass = compact ? 'text-sm font-semibold text-gray-900 dark:text-white' : 'font-semibold text-gray-900 dark:text-white';
+  const captionClass = compact ? 'text-[11px] text-gray-500 dark:text-gray-400' : 'text-sm text-gray-500 dark:text-gray-400';
+
   return (
-    <div className="flex flex-col gap-4 p-4 bg-white dark:bg-gray-800 rounded-xl shadow-md">
-      <div className={`flex justify-between items-center p-3 rounded-lg ${
-        state.currentPlayer === 'player1' 
-          ? 'bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-500' 
-          : 'bg-gray-50 dark:bg-gray-700'
-      }`}>
+    <div className={containerClass}>
+      <div className={cardClass(state.currentPlayer === 'player1')}>
         <div>
-          <div className="font-semibold text-gray-900 dark:text-white" onDoubleClick={() => startEdit('player1')}>
+          <div className={nameClass} onDoubleClick={() => startEdit('player1')}>
             {editingPlayer === 'player1' ? (
               <input
                 value={draftName}
                 onChange={(e) => setDraftName(e.target.value)}
                 onBlur={commitName}
-                onKeyDown={(e) => {
+                onKeyDown={(e) => { 
                   if (e.key === 'Enter') {
                     commitName();
                   }
@@ -78,18 +94,14 @@ export default function GameStats() {
               playerNames.player1
             )}
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">{t.capturedMarbles}</div>
+          <div className={captionClass}>{t.capturedMarbles}</div>
         </div>
         {renderCaptures('player1')}
       </div>
       
-      <div className={`flex justify-between items-center p-3 rounded-lg ${
-        state.currentPlayer === 'player2' 
-          ? 'bg-blue-50 dark:bg-blue-900/30 ring-2 ring-blue-500' 
-          : 'bg-gray-50 dark:bg-gray-700'
-      }`}>
+      <div className={cardClass(state.currentPlayer === 'player2')}>
         <div>
-          <div className="font-semibold text-gray-900 dark:text-white" onDoubleClick={() => startEdit('player2')}>
+          <div className={nameClass} onDoubleClick={() => startEdit('player2')}>
             {editingPlayer === 'player2' ? (
               <input
                 value={draftName}
@@ -107,16 +119,17 @@ export default function GameStats() {
               playerNames.player2
             )}
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">{t.capturedMarbles}</div>
+          <div className={captionClass}>{t.capturedMarbles}</div>
         </div>
         {renderCaptures('player2')}
       </div>
       
-      
-      <div className="text-center text-sm text-gray-600 dark:text-gray-400">
-        {t.move} #{state.moveNumber} • {state.currentPlayer === 'player1' ? playerNames.player1 : playerNames.player2}
-        {state.phase === 'ringRemoval' && ` • ${t.removeRing}`}
-      </div>
+      {!compact && (
+        <div className="text-center text-sm text-gray-600 dark:text-gray-400">
+          {t.move} #{state.moveNumber} • {state.currentPlayer === 'player1' ? playerNames.player1 : playerNames.player2}
+          {state.phase === 'ringRemoval' && ` • ${t.removeRing}`}
+        </div>
+      )}
     </div>
   );
 }

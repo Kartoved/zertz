@@ -6,6 +6,7 @@ import ControlPanel from '../UI/ControlPanel';
 import MoveHistory from '../UI/MoveHistory';
 import { useGameStore } from '../../store/gameStore';
 import { useUIStore } from '../../store/uiStore';
+import { useAuthStore } from '../../store/authStore';
 import { getWinType } from '../../game/GameEngine';
 import { getWinTypeLabel, useI18n } from '../../i18n';
 
@@ -13,9 +14,30 @@ export default function GameScreen() {
   const { t } = useI18n();
   const { state, playerNames, newGame } = useGameStore();
   const { toggleDarkMode, isDarkMode, setScreen } = useUIStore();
+  const { user } = useAuthStore();
   const [showRematchDialog, setShowRematchDialog] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
-  const [mobileTab, setMobileTab] = useState<'board' | 'controls'>('board');
+
+  const navTabs: Array<{ id: string; label: string; authOnly?: boolean }> = [
+    { id: 'playLocal', label: t.playLocal },
+    { id: 'loadGame', label: t.loadGame },
+    { id: 'rules', label: t.rules },
+    { id: 'players', label: t.players },
+    { id: 'challenges', label: t.challenges, authOnly: true },
+  ];
+  const topExtraTabs: Array<{ id: 'tasks' | 'community'; label: string }> = [
+    { id: 'tasks', label: t.tasks },
+    { id: 'community', label: t.community },
+  ];
+
+  const handleMobileMenuAction = (tabId: string) => {
+    setShowMobileMenu(false);
+    if (tabId === 'rules') {
+      setScreen('rules');
+      return;
+    }
+    setScreen('menu');
+  };
   
   const isGameOver = state.phase === 'gameOver';
   const winType = state.winner ? getWinType(state, state.winner) : null;
@@ -48,47 +70,65 @@ export default function GameScreen() {
       </header>
 
       {showMobileMenu && (
-        <div className="md:hidden px-4 pb-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
-          <MoveHistory />
+        <div className="md:hidden px-4 pb-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 space-y-2">
+          {navTabs
+            .filter((tab) => !tab.authOnly || user)
+            .map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => handleMobileMenuAction(tab.id)}
+                className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700"
+              >
+                {tab.label}
+              </button>
+            ))}
+          {topExtraTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 border border-dashed border-gray-300 dark:border-gray-600"
+            >
+              {tab.label}
+            </button>
+          ))}
+          <div className="pt-1">
+            <MoveHistory />
+          </div>
         </div>
       )}
-
-      <div className="md:hidden px-3 pt-3">
-        <div className="grid grid-cols-2 bg-white dark:bg-gray-800 rounded-xl p-1 shadow-sm border border-gray-200 dark:border-gray-700">
-          <button
-            type="button"
-            onClick={() => setMobileTab('board')}
-            className={`py-2 text-sm font-semibold rounded-lg transition-colors ${
-              mobileTab === 'board'
-                ? 'bg-indigo-500 text-white'
-                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-            }`}
-          >
-            {t.tabBoard}
-          </button>
-          <button
-            type="button"
-            onClick={() => setMobileTab('controls')}
-            className={`py-2 text-sm font-semibold rounded-lg transition-colors ${
-              mobileTab === 'controls'
-                ? 'bg-indigo-500 text-white'
-                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-            }`}
-          >
-            {t.tabControls}
-          </button>
-        </div>
-      </div>
       
       <main className="flex-1 flex flex-col lg:flex-row gap-4 p-4 max-w-7xl mx-auto w-full">
-        <div className={`flex-1 flex flex-col items-center justify-center ${mobileTab !== 'board' ? 'hidden md:flex' : ''}`}>
+        <div className="md:hidden space-y-3">
+          <GameStats compact />
+
+          {!isGameOver && (
+            <div className="p-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm">
+              <MarbleSelector />
+            </div>
+          )}
+
+          <div className="p-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm">
+            <ControlPanel />
+          </div>
+
+          {state.phase === 'ringRemoval' && (
+            <div className="p-3 bg-yellow-100 dark:bg-yellow-900 rounded-xl">
+              <div className="text-yellow-800 dark:text-yellow-200 font-medium text-sm">
+                ⚠️ {t.removeRing}
+              </div>
+              <div className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
+                {t.freeRingLead}
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="flex-1 flex flex-col items-center justify-center">
           <HexBoard />
         </div>
         
-        <aside className={`lg:w-80 flex flex-col gap-4 ${mobileTab !== 'controls' ? 'hidden md:flex' : ''}`}>
-          <div className="md:hidden p-3 bg-white dark:bg-gray-800 rounded-xl shadow-md">
-            <MoveHistory />
-          </div>
+        <aside className="hidden md:flex lg:w-80 flex-col gap-4">
           <GameStats />
           
           {!isGameOver && (
