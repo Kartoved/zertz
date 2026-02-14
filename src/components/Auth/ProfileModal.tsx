@@ -1,52 +1,9 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
 import CountryBadge from '../UI/CountryBadge';
 import { normalizeCountryValue } from '../../utils/country';
-
-const COUNTRIES = [
-  { code: '🌍', name: 'Земля' },
-  { code: '🟢', name: 'Эсперантия' },
-  { code: 'RU', name: 'Россия' },
-  { code: 'UA', name: 'Украина' },
-  { code: 'BY', name: 'Беларусь' },
-  { code: 'KZ', name: 'Казахстан' },
-  { code: 'UZ', name: 'Узбекистан' },
-  { code: 'GE', name: 'Грузия' },
-  { code: 'AM', name: 'Армения' },
-  { code: 'AZ', name: 'Азербайджан' },
-  { code: 'MD', name: 'Молдова' },
-  { code: 'US', name: 'США' },
-  { code: 'GB', name: 'Великобритания' },
-  { code: 'DE', name: 'Германия' },
-  { code: 'FR', name: 'Франция' },
-  { code: 'ES', name: 'Испания' },
-  { code: 'IT', name: 'Италия' },
-  { code: 'PL', name: 'Польша' },
-  { code: 'NL', name: 'Нидерланды' },
-  { code: 'BE', name: 'Бельгия' },
-  { code: 'CZ', name: 'Чехия' },
-  { code: 'AT', name: 'Австрия' },
-  { code: 'CH', name: 'Швейцария' },
-  { code: 'SE', name: 'Швеция' },
-  { code: 'NO', name: 'Норвегия' },
-  { code: 'FI', name: 'Финляндия' },
-  { code: 'DK', name: 'Дания' },
-  { code: 'PT', name: 'Португалия' },
-  { code: 'GR', name: 'Греция' },
-  { code: 'TR', name: 'Турция' },
-  { code: 'JP', name: 'Япония' },
-  { code: 'KR', name: 'Южная Корея' },
-  { code: 'CN', name: 'Китай' },
-  { code: 'IN', name: 'Индия' },
-  { code: 'BR', name: 'Бразилия' },
-  { code: 'AR', name: 'Аргентина' },
-  { code: 'MX', name: 'Мексика' },
-  { code: 'CA', name: 'Канада' },
-  { code: 'AU', name: 'Австралия' },
-  { code: 'IL', name: 'Израиль' },
-  { code: 'EG', name: 'Египет' },
-  { code: 'ZA', name: 'ЮАР' },
-];
+import { useI18n } from '../../i18n';
+import { getCountryOptions } from '../../utils/countries';
 
 const SPECIAL_CHARS = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/;
 
@@ -55,6 +12,7 @@ interface ProfileModalProps {
 }
 
 export default function ProfileModal({ onClose }: ProfileModalProps) {
+  const { t, language, locale } = useI18n();
   const { user, updateProfile, logout, isLoading } = useAuthStore();
   const [quote, setQuote] = useState(user?.quote || '');
   const [country, setCountry] = useState(normalizeCountryValue(user?.country || '🌍'));
@@ -68,6 +26,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
   const [showPasswordText, setShowPasswordText] = useState(false);
   const [localError, setLocalError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const countries = useMemo(() => getCountryOptions(language), [language]);
 
   if (!user) return null;
 
@@ -83,13 +42,13 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
         try {
           new URL(trimmedContact);
         } catch {
-          setLocalError('Поле "Для связи" должно содержать корректную ссылку (https://...)');
+          setLocalError(t.contactInvalid);
           return;
         }
       }
 
       await updateProfile({ quote, country, contactLink: trimmedContact });
-      setSuccessMsg('Профиль обновлён');
+      setSuccessMsg(t.profileUpdated);
       setTimeout(() => setSuccessMsg(''), 2000);
       setIsEditingQuote(false);
     } catch (err: any) {
@@ -101,19 +60,19 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
     setLocalError('');
     setSuccessMsg('');
     if (!oldPassword || !newPassword || !newPassword2) {
-      setLocalError('Заполните все поля пароля');
+      setLocalError(t.fillAllPasswordFields);
       return;
     }
     if (newPassword.length < 8) {
-      setLocalError('Новый пароль должен быть не менее 8 символов');
+      setLocalError(t.newPasswordLengthError);
       return;
     }
     if (!SPECIAL_CHARS.test(newPassword)) {
-      setLocalError('Новый пароль должен содержать хотя бы один спецсимвол');
+      setLocalError(t.newPasswordCharError);
       return;
     }
     if (newPassword !== newPassword2) {
-      setLocalError('Новые пароли не совпадают');
+      setLocalError(t.newPasswordsMismatch);
       return;
     }
     try {
@@ -122,7 +81,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
       setNewPassword('');
       setNewPassword2('');
       setShowPasswordSection(false);
-      setSuccessMsg('Пароль изменён');
+      setSuccessMsg(t.passwordChanged);
       setTimeout(() => setSuccessMsg(''), 2000);
     } catch (err: any) {
       setLocalError(err.message);
@@ -135,7 +94,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
   };
 
   const regDate = new Date(user.createdAt);
-  const formattedDate = regDate.toLocaleDateString('ru-RU', {
+  const formattedDate = regDate.toLocaleDateString(locale, {
     day: 'numeric',
     month: 'long',
     year: 'numeric',
@@ -146,7 +105,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Профиль</h2>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">{t.profileTitle}</h2>
           <button
             onClick={onClose}
             className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
@@ -163,18 +122,18 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
               <CountryBadge country={country} size={30} />
             </div>
             <div className="text-xl font-bold text-gray-900 dark:text-white">{user.username}</div>
-            <div className="text-sm text-gray-500 dark:text-gray-400">Регистрация: {formattedDate}</div>
+            <div className="text-sm text-gray-500 dark:text-gray-400">{t.registrationDate}: {formattedDate}</div>
           </div>
 
           {/* Stats */}
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 text-center">
               <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{Math.round(user.rating)}</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Рейтинг</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">{t.rating}</div>
             </div>
             <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 text-center">
               <div className="text-2xl font-bold text-gray-900 dark:text-white">{games}</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Игр</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">{t.games}</div>
             </div>
             <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 text-center">
               <div className="text-lg font-bold">
@@ -182,24 +141,24 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
                 <span className="text-gray-400 mx-1">/</span>
                 <span className="text-red-500">{user.losses}</span>
               </div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Побед / Поражений</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">{t.winsLosses}</div>
             </div>
             <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 text-center">
               <div className="text-lg font-bold text-gray-900 dark:text-white">{winrate}%</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">Винрейт</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400">{t.winrate}</div>
             </div>
           </div>
 
           <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 text-center">
             <div className="text-lg font-bold text-orange-500">{user.bestStreak}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">Лучшая серия побед</div>
+            <div className="text-xs text-gray-500 dark:text-gray-400">{t.bestStreak}</div>
           </div>
 
           {/* Quote */}
           <div>
             <div className="flex items-center justify-between mb-1">
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                Цитата
+                {t.quote}
               </label>
               <button
                 type="button"
@@ -220,13 +179,13 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
                     bg-white dark:bg-gray-700 text-gray-900 dark:text-white
                     focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none resize-none"
-                  placeholder="Ваша цитата или девиз..."
+                  placeholder={t.quotePlaceholder}
                 />
                 <div className="text-xs text-gray-400 text-right">{quote.length}/200</div>
               </>
             ) : (
               <blockquote className="w-full px-3 py-2 border border-gray-200 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 italic">
-                {quote.trim() ? `"${quote}"` : 'Цитата не задана'}
+                {quote.trim() ? `"${quote}"` : t.quoteNotSet}
               </blockquote>
             )}
           </div>
@@ -234,13 +193,13 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
           {/* Contact link */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Для связи
+              {t.contact}
             </label>
             <input
               type="url"
               value={contactLink}
               onChange={(e) => setContactLink(e.target.value)}
-              placeholder="https://t.me/username"
+              placeholder={t.contactPlaceholder}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
                 bg-white dark:bg-gray-700 text-gray-900 dark:text-white
                 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
@@ -250,7 +209,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
           {/* Country */}
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Страна
+              {t.country}
             </label>
             <div className="relative">
               <button
@@ -263,14 +222,14 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
               >
                 <span className="flex items-center gap-2">
                   <CountryBadge country={country} size={20} />
-                  {COUNTRIES.find((c) => c.code === country)?.name || 'Выберите страну'}
+                  {countries.find((c) => c.code === country)?.name || t.chooseCountry}
                 </span>
                 <span className="text-gray-500">{isCountryDropdownOpen ? '▴' : '▾'}</span>
               </button>
 
               {isCountryDropdownOpen && (
                 <div className="absolute z-50 mt-1 w-full max-h-64 overflow-y-auto rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 shadow-lg">
-                  {COUNTRIES.map((c) => (
+                  {countries.map((c) => (
                     <button
                       key={c.code}
                       type="button"
@@ -295,7 +254,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
             className="w-full py-2 bg-blue-500 hover:bg-blue-600 text-white font-semibold 
               rounded-lg transition-colors disabled:opacity-50"
           >
-            Сохранить профиль
+            {t.saveProfile}
           </button>
 
           {/* Password change */}
@@ -304,7 +263,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
               onClick={() => setShowPasswordSection(!showPasswordSection)}
               className="text-sm text-blue-500 hover:text-blue-600 dark:text-blue-400"
             >
-              {showPasswordSection ? '▾ Скрыть смену пароля' : '▸ Сменить пароль'}
+              {showPasswordSection ? t.hidePasswordChange : t.showPasswordChange}
             </button>
 
             {showPasswordSection && (
@@ -313,7 +272,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
                   type={showPasswordText ? 'text' : 'password'}
                   value={oldPassword}
                   onChange={(e) => setOldPassword(e.target.value)}
-                  placeholder="Текущий пароль"
+                  placeholder={t.currentPassword}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
                     bg-white dark:bg-gray-700 text-gray-900 dark:text-white
                     focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
@@ -322,7 +281,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
                   type={showPasswordText ? 'text' : 'password'}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Новый пароль (мин. 8, со спецсимволом)"
+                  placeholder={t.newPasswordPlaceholder}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
                     bg-white dark:bg-gray-700 text-gray-900 dark:text-white
                     focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
@@ -331,7 +290,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
                   type={showPasswordText ? 'text' : 'password'}
                   value={newPassword2}
                   onChange={(e) => setNewPassword2(e.target.value)}
-                  placeholder="Подтвердите новый пароль"
+                  placeholder={t.confirmNewPassword}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
                     bg-white dark:bg-gray-700 text-gray-900 dark:text-white
                     focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
@@ -343,7 +302,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
                     onChange={(e) => setShowPasswordText(e.target.checked)}
                     className="rounded"
                   />
-                  Показать пароли
+                  {t.showPasswords}
                 </label>
                 <button
                   onClick={handleChangePassword}
@@ -351,7 +310,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
                   className="w-full py-2 bg-orange-500 hover:bg-orange-600 text-white font-semibold 
                     rounded-lg transition-colors disabled:opacity-50"
                 >
-                  Сменить пароль
+                  {t.changePassword}
                 </button>
               </div>
             )}
@@ -375,7 +334,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
             className="w-full py-2 bg-red-500 hover:bg-red-600 text-white font-semibold 
               rounded-lg transition-colors"
           >
-            Выйти из аккаунта
+            {t.logout}
           </button>
         </div>
       </div>

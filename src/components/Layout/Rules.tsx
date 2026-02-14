@@ -1,6 +1,9 @@
 import { useUIStore } from '../../store/uiStore';
+import { useI18n } from '../../i18n';
+import RulesContent from '../UI/RulesContent';
 
 export default function Rules() {
+  const { t } = useI18n();
   const { setScreen, previousScreen } = useUIStore();
   
   return (
@@ -12,95 +15,14 @@ export default function Rules() {
             hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors
             text-gray-800 dark:text-white"
         >
-          ← Назад
+          ← {t.back}
         </button>
         
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-6">
-          Правила игры ZERTZ
+          {t.gameRulesTitle}
         </h1>
-        
-        <div className="space-y-6 text-gray-700 dark:text-gray-300">
-          <section>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              Цель игры
-            </h2>
-            <p>Первым захватить:</p>
-            <ul className="list-disc list-inside ml-4 mt-2">
-              <li>4 белых шарика, ИЛИ</li>
-              <li>5 серых шариков, ИЛИ</li>
-              <li>6 чёрных шариков, ИЛИ</li>
-              <li>3 шарика каждого цвета</li>
-            </ul>
-          </section>
-          
-          <section>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              Ход игры
-            </h2>
-            <p className="mb-2">На каждом ходу игрок выполняет ОДНО из двух действий:</p>
-            
-            <div className="bg-white dark:bg-gray-800 p-4 rounded-lg mb-3">
-              <h3 className="font-semibold mb-2">1. Размещение + удаление кольца</h3>
-              <ol className="list-decimal list-inside space-y-1">
-                <li>Выберите шарик любого цвета из резерва</li>
-                <li>Поставьте его на любое пустое кольцо</li>
-                <li>Удалите одно «свободное» кольцо с края доски, если это возможно</li>
-              </ol>
-            </div>
-            
-            <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
-              <h3 className="font-semibold mb-2">2. Взятие (обязательно!)</h3>
-              <p>Если можете взять — ОБЯЗАНЫ взять!</p>
-              <ul className="list-disc list-inside mt-2 space-y-1">
-                <li>Прыгните через соседний шарик на пустое кольцо за ним</li>
-                <li>Цвет не имеет значения</li>
-                <li>Цепочки взятий - продолжайте захватывать шарики пока это возможно</li>
-              </ul>
-            </div>
-          </section>
 
-          <section>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              Запас шариков
-            </h2>
-            <p>
-              В начале игры в <strong>общем запасе</strong> у игроков 10 чёрных шариков,
-              8 серых и 6 белых. Если шарики в общем запасе закончились, игроки выставляют
-              уже захваченные ими шарики.
-            </p>
-          </section>
-          
-          <section>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              Резерв
-            </h2>
-            <p>
-              Резерв - это место, где хранятся шарики, которые еще не были использованы в игре.
-              Игроки могут брать шарики из резерва и использовать их в своей игре.
-            </p>
-          </section>
-          
-          <section>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              Свободное кольцо
-            </h2>
-            <p>Кольцо можно удалить если:</p>
-            <ul className="list-disc list-inside ml-4 mt-2">
-              <li>На нём нет шарика</li>
-              <li>У него ≥2 свободных соседних стороны</li>
-            </ul>
-          </section>
-          
-          <section>
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-              Изоляция
-            </h2>
-            <p>
-              Если группа колец отделяется от основной доски и все кольца заняты — 
-              все шарики в группе автоматически захватываются текущим игроком!
-            </p>
-          </section>
-        </div>
+        <RulesContent />
       </div>
     </div>
   );

@@ -1,7 +1,9 @@
 import { useGameStore } from '../../store/gameStore';
 import { useUIStore } from '../../store/uiStore';
+import { useI18n } from '../../i18n';
 
 export default function ControlPanel() {
+  const { t } = useI18n();
   const { undo, currentNode } = useGameStore();
   const { setScreen, openRules } = useUIStore();
   
@@ -14,7 +16,7 @@ export default function ControlPanel() {
           dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed
           transition-colors text-gray-800 dark:text-gray-200"
       >
-        ↶ Отменить
+        ↶ {t.undo}
       </button>
       
       <button
@@ -22,7 +24,7 @@ export default function ControlPanel() {
         className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 
           dark:hover:bg-gray-600 transition-colors text-gray-800 dark:text-gray-200"
       >
-        ≡ Меню
+        ≡ {t.menu}
       </button>
 
       <button
@@ -30,7 +32,7 @@ export default function ControlPanel() {
         className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 
           dark:hover:bg-gray-600 transition-colors text-gray-800 dark:text-gray-200"
       >
-        📘 Правила
+        📘 {t.rules}
       </button>
     </div>
   );

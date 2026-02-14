@@ -24,6 +24,14 @@ import { getValidRemovableRings } from '../game/Board';
 import { saveGame, loadGame, listGames } from '../db/gamesStorage';
 import { playPlaceSound, playRemoveRingSound, playCaptureSound, playWinSound, playUndoSound } from '../utils/sounds';
 import { useAuthStore } from './authStore';
+import { getI18nFromStorage } from '../i18n';
+
+function getDefaultPlayerNames() {
+  const { language } = getI18nFromStorage();
+  if (language === 'ru') return { player1: 'Игрок 1', player2: 'Игрок 2' };
+  if (language === 'eo') return { player1: 'Ludanto 1', player2: 'Ludanto 2' };
+  return { player1: 'Player 1', player2: 'Player 2' };
+}
 
 interface GameStore {
   state: GameState;
@@ -119,6 +127,10 @@ function isDescendant(root: GameNode, targetId: string): boolean {
 }
 
 export const useGameStore = create<GameStore>((set, get) => ({
+  ...(() => {
+    const defaults = getDefaultPlayerNames();
+    return { playerNames: defaults };
+  })(),
   state: createInitialState(),
   gameTree: createRootNode(),
   currentNode: createRootNode(),
@@ -126,7 +138,6 @@ export const useGameStore = create<GameStore>((set, get) => ({
   selectedRingId: null,
   highlightedCaptures: [],
   availableCaptureChains: [],
-  playerNames: { player1: 'Игрок 1', player2: 'Игрок 2' },
   gameId: formatGameId(Date.now()),
   savedGames: [],
   winType: null,
@@ -136,7 +147,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const rootNode = createRootNode();
     const newGameId = formatGameId(Date.now());
     const authUser = useAuthStore.getState().user;
-    const player1Name = authUser ? authUser.username : 'Игрок 1';
+    const defaults = getDefaultPlayerNames();
+    const player1Name = authUser ? authUser.username : defaults.player1;
     set({
       state: createInitialState(boardSize),
       gameTree: rootNode,
@@ -145,7 +157,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       selectedRingId: null,
       highlightedCaptures: [],
       availableCaptureChains: [],
-      playerNames: { player1: player1Name, player2: 'Игрок 2' },
+      playerNames: { player1: player1Name, player2: defaults.player2 },
       gameId: newGameId,
       winType: null,
       isLoadedGame: false,

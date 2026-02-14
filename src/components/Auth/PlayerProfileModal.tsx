@@ -5,12 +5,7 @@ import { useAuthStore } from '../../store/authStore';
 import { createInitialState } from '../../game/GameEngine';
 import { GameNode } from '../../game/types';
 import CountryBadge from '../UI/CountryBadge';
-
-const BOARD_LABELS: Record<number, string> = {
-  37: 'Любительское 37',
-  48: 'Турнирное 48',
-  61: 'Турнирное 61',
-};
+import { useI18n } from '../../i18n';
 
 interface PlayerProfileModalProps {
   playerId: number;
@@ -44,6 +39,7 @@ function serializeTree(node: GameNode): string {
 
 export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileModalProps) {
   const navigate = useNavigate();
+  const { t, locale } = useI18n();
   const { user } = useAuthStore();
   const [profile, setProfile] = useState<PlayerProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -64,7 +60,7 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
       const data = await getPlayerProfile(playerId);
       setProfile(data);
     } catch {
-      setToast('Ошибка загрузки профиля');
+      setToast(t.roomLoadingError);
     }
     setIsLoading(false);
   };
@@ -80,11 +76,11 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
       if (profile.isFollowing) {
         await unfollowUser(profile.id);
         setProfile({ ...profile, isFollowing: false });
-        showToast('Отписка оформлена');
+        showToast(t.unfollowed);
       } else {
         await followUser(profile.id);
         setProfile({ ...profile, isFollowing: true });
-        showToast('Подписка оформлена');
+        showToast(t.followed);
       }
     } catch (err: any) {
       showToast(err.message);
@@ -106,7 +102,7 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
         serializeState(initialState),
         serializeTree(rootNode)
       );
-      showToast('Вызов отправлен!');
+      showToast(t.challengeSent);
       setShowChallenge(false);
       // Navigate to the room
       onClose();
@@ -118,7 +114,7 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
   };
 
   const formatDate = (ts: number) => {
-    return new Date(ts).toLocaleDateString('ru-RU', {
+    return new Date(ts).toLocaleDateString(locale, {
       day: '2-digit', month: '2-digit', year: 'numeric',
     });
   };
@@ -126,7 +122,7 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
   if (isLoading) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[60]">
-        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-8">Загрузка...</div>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-8">{t.loading}</div>
       </div>
     );
   }
@@ -135,8 +131,8 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-[60]">
         <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl p-8">
-          <p>Игрок не найден</p>
-          <button onClick={onClose} className="mt-4 px-4 py-2 bg-gray-200 rounded-lg">Закрыть</button>
+          <p>{t.playerNotFound}</p>
+          <button onClick={onClose} className="mt-4 px-4 py-2 bg-gray-200 rounded-lg">{t.close}</button>
         </div>
       </div>
     );
@@ -165,15 +161,15 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
           {/* Stats grid */}
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-              <div className="text-gray-500 dark:text-gray-400">Рейтинг</div>
+              <div className="text-gray-500 dark:text-gray-400">{t.rating}</div>
               <div className="text-xl font-bold text-blue-600 dark:text-blue-400">{profile.rating}</div>
             </div>
             <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-              <div className="text-gray-500 dark:text-gray-400">Игр</div>
+              <div className="text-gray-500 dark:text-gray-400">{t.games}</div>
               <div className="text-xl font-bold text-gray-900 dark:text-white">{profile.games}</div>
             </div>
             <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-              <div className="text-gray-500 dark:text-gray-400">Победы / Поражения</div>
+              <div className="text-gray-500 dark:text-gray-400">{t.winsLosses}</div>
               <div className="font-bold">
                 <span className="text-green-600">{profile.wins}</span>
                 {' / '}
@@ -182,13 +178,13 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
               </div>
             </div>
             <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
-              <div className="text-gray-500 dark:text-gray-400">Лучшая серия</div>
+              <div className="text-gray-500 dark:text-gray-400">{t.bestStreak}</div>
               <div className="text-xl font-bold text-orange-500">{profile.bestStreak}</div>
             </div>
           </div>
 
           <div className="text-xs text-gray-500 dark:text-gray-400">
-            Зарегистрирован: {formatDate(profile.createdAt)}
+            {t.registered}: {formatDate(profile.createdAt)}
           </div>
 
           {profile.contactLink && (
@@ -199,7 +195,7 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
                 rel="noopener noreferrer"
                 className="text-blue-600 dark:text-blue-400 hover:underline break-all"
               >
-                Для связи: {profile.contactLink}
+                {t.contact}: {profile.contactLink}
               </a>
             </div>
           )}
@@ -216,7 +212,7 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
                       : 'bg-blue-500 hover:bg-blue-600 text-white'
                   }`}
                 >
-                  {profile.isFollowing ? 'Отписаться' : 'Подписаться'}
+                  {profile.isFollowing ? t.unfollow : t.follow}
                 </button>
               )}
               {user && (
@@ -224,7 +220,7 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
                   onClick={() => setShowChallenge(!showChallenge)}
                   className="flex-1 py-2 px-4 bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-medium transition-colors"
                 >
-                  Вызвать на игру
+                  {t.challengeToGame}
                 </button>
               )}
             </div>
@@ -233,7 +229,7 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
           {/* Challenge settings */}
           {showChallenge && (
             <div className="border dark:border-gray-700 rounded-lg p-3 space-y-3">
-              <div className="text-sm font-medium text-gray-700 dark:text-gray-300">Настройки вызова</div>
+              <div className="text-sm font-medium text-gray-700 dark:text-gray-300">{t.challengeSettings}</div>
 
               {/* Board size */}
               <div className="flex gap-2">
@@ -247,7 +243,7 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
                         : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200'
                     }`}
                   >
-                    {BOARD_LABELS[size]}
+                    {size === 37 ? t.board37 : size === 48 ? t.board48 : t.board61}
                   </button>
                 ))}
               </div>
@@ -264,14 +260,14 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
                         : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200'
                     }`}
                   >
-                    {p === 1 ? '1-й' : p === 2 ? '2-й' : 'Случайно'}
+                    {p === 1 ? t.firstShort : p === 2 ? t.secondShort : t.random}
                   </button>
                 ))}
               </div>
 
               {/* Rated toggle */}
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-700 dark:text-gray-300">Рейтинговая</span>
+                <span className="text-sm text-gray-700 dark:text-gray-300">{t.ratedGame}</span>
                 <button
                   type="button"
                   onClick={() => setChallengeRated(!challengeRated)}
@@ -290,7 +286,7 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
                 disabled={challengeLoading}
                 className="w-full py-2 bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
               >
-                {challengeLoading ? 'Отправка...' : 'Отправить вызов'}
+                {challengeLoading ? t.sending : t.sendChallenge}
               </button>
             </div>
           )}

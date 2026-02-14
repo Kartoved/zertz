@@ -7,16 +7,10 @@ import MoveHistory from '../UI/MoveHistory';
 import { useGameStore } from '../../store/gameStore';
 import { useUIStore } from '../../store/uiStore';
 import { getWinType } from '../../game/GameEngine';
-
-const WIN_TYPE_LABELS: Record<string, string> = {
-  white: 'Победа по белым шарикам!',
-  gray: 'Победа по серым шарикам!',
-  black: 'Победа по чёрным шарикам!',
-  mixed: 'Победа по разным шарикам!',
-  unknown: 'Победа!',
-};
+import { getWinTypeLabel, useI18n } from '../../i18n';
 
 export default function GameScreen() {
+  const { t } = useI18n();
   const { state, playerNames, newGame } = useGameStore();
   const { toggleDarkMode, isDarkMode, setScreen } = useUIStore();
   const [showRematchDialog, setShowRematchDialog] = useState(false);
@@ -62,10 +56,10 @@ export default function GameScreen() {
           {state.phase === 'ringRemoval' && (
             <div className="p-4 bg-yellow-100 dark:bg-yellow-900 rounded-xl">
               <div className="text-yellow-800 dark:text-yellow-200 font-medium">
-                ⚠️ Выберите кольцо для удаления
+                ⚠️ {t.removeRing}
               </div>
               <div className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                Зелёным подсвечены доступные кольца
+                {t.freeRingLead}
               </div>
             </div>
           )}
@@ -76,10 +70,10 @@ export default function GameScreen() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-6 text-center">
             <div className="text-3xl font-bold text-green-700 dark:text-green-300 mb-2">
-              🎉 {winnerName} победил!
+              🎉 {winnerName}!
             </div>
             <div className="text-base text-gray-700 dark:text-gray-300 mb-6">
-              {winType ? WIN_TYPE_LABELS[winType] : 'Победа!'}
+              {winType ? getWinTypeLabel(t, winType) : t.winUnknown}
             </div>
 
             <div className="flex gap-2">
@@ -87,13 +81,13 @@ export default function GameScreen() {
                 onClick={() => setShowRematchDialog(true)}
                 className="flex-1 py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold transition-colors"
               >
-                Реванш
+                {t.rematch}
               </button>
               <button
                 onClick={() => setScreen('menu')}
                 className="flex-1 py-2 px-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
               >
-                В меню
+                {t.backToMenu}
               </button>
             </div>
           </div>
@@ -104,7 +98,7 @@ export default function GameScreen() {
         <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
             <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Реванш: выберите поле</h2>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">{t.rematchChooseBoard}</h2>
               <button
                 onClick={() => setShowRematchDialog(false)}
                 className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
@@ -122,7 +116,7 @@ export default function GameScreen() {
                   }}
                   className="w-full p-3 text-left bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"
                 >
-                  {boardSize === 37 ? 'Любительское 37 колец' : boardSize === 48 ? 'Турнирное 48 колец' : 'Турнирное 61 кольцо'}
+                  {boardSize === 37 ? t.board37 : boardSize === 48 ? t.board48 : t.board61}
                 </button>
               ))}
             </div>

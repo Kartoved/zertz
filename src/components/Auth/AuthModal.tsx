@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuthStore } from '../../store/authStore';
+import { useI18n } from '../../i18n';
 
 const SPECIAL_CHARS = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/;
 
@@ -8,6 +9,7 @@ interface AuthModalProps {
 }
 
 export default function AuthModal({ onClose }: AuthModalProps) {
+  const { t } = useI18n();
   const [tab, setTab] = useState<'login' | 'register'>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -20,7 +22,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
   const handleLogin = async () => {
     setLocalError('');
     if (!username.trim() || !password) {
-      setLocalError('Заполните все поля');
+      setLocalError(t.fillAllFields);
       return;
     }
     try {
@@ -34,23 +36,23 @@ export default function AuthModal({ onClose }: AuthModalProps) {
   const handleRegister = async () => {
     setLocalError('');
     if (!username.trim() || !password || !password2) {
-      setLocalError('Заполните все поля');
+      setLocalError(t.fillAllFields);
       return;
     }
     if (username.trim().length < 2 || username.trim().length > 24) {
-      setLocalError('Ник должен быть от 2 до 24 символов');
+      setLocalError(t.nicknameRangeError);
       return;
     }
     if (password.length < 8) {
-      setLocalError('Пароль должен быть не менее 8 символов');
+      setLocalError(t.passwordLengthError);
       return;
     }
     if (!SPECIAL_CHARS.test(password)) {
-      setLocalError('Пароль должен содержать хотя бы один спецсимвол (!@#$%^&*...)');
+      setLocalError(t.passwordCharError);
       return;
     }
     if (password !== password2) {
-      setLocalError('Пароли не совпадают');
+      setLocalError(t.passwordsMismatch);
       return;
     }
     try {
@@ -80,7 +82,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
-            Войти
+            {t.login}
           </button>
           <button
             onClick={() => { setTab('register'); setLocalError(''); }}
@@ -90,7 +92,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
             }`}
           >
-            Зарегистрироваться
+            {t.register}
           </button>
           <button
             onClick={onClose}
@@ -104,7 +106,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Ник
+              {t.nickname}
             </label>
             <input
               type="text"
@@ -115,13 +117,13 @@ export default function AuthModal({ onClose }: AuthModalProps) {
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg 
                 bg-white dark:bg-gray-700 text-gray-900 dark:text-white
                 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-              placeholder="Ваш ник"
+              placeholder={t.yourNickname}
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Пароль
+              {t.password}
             </label>
             <div className="relative">
               <input
@@ -131,7 +133,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
                 className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg 
                   bg-white dark:bg-gray-700 text-gray-900 dark:text-white
                   focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                placeholder="Минимум 8 символов, включая спецсимвол"
+                placeholder={t.passwordHint}
               />
               <button
                 type="button"
@@ -147,7 +149,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
           {tab === 'register' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                Подтвердите пароль
+                {t.confirmPassword}
               </label>
               <div className="relative">
                 <input
@@ -157,7 +159,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
                   className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-lg 
                     bg-white dark:bg-gray-700 text-gray-900 dark:text-white
                     focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                  placeholder="Повторите пароль"
+                  placeholder={t.repeatPassword}
                 />
               </div>
             </div>
@@ -175,7 +177,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
             className="w-full py-3 bg-blue-500 hover:bg-blue-600 text-white font-semibold 
               rounded-lg transition-colors disabled:opacity-50"
           >
-            {isLoading ? 'Загрузка...' : tab === 'login' ? 'Войти' : 'Зарегистрироваться'}
+            {isLoading ? t.loading : tab === 'login' ? t.login : t.register}
           </button>
         </form>
       </div>

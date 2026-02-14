@@ -1,6 +1,7 @@
 import { useEffect, useCallback } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { GameNode } from '../../game/types';
+import { useI18n } from '../../i18n';
 
 interface MoveElementProps {
   node: GameNode;
@@ -8,9 +9,10 @@ interface MoveElementProps {
   onNavigate: (node: GameNode) => void;
   onDelete: (node: GameNode) => void;
   canDelete: boolean;
+  deleteConfirmText: string;
 }
 
-function MoveElement({ node, isCurrentMove, onNavigate, onDelete, canDelete }: MoveElementProps) {
+function MoveElement({ node, isCurrentMove, onNavigate, onDelete, canDelete, deleteConfirmText }: MoveElementProps) {
   // Number format: "1." for both players, no ellipsis
   const moveNum = `${node.moveNumber}. `;
   
@@ -20,7 +22,7 @@ function MoveElement({ node, isCurrentMove, onNavigate, onDelete, canDelete }: M
       onContextMenu={(e) => {
         e.preventDefault();
         if (!canDelete) return;
-        if (window.confirm('Удалить ходы, начиная с этого?')) {
+        if (window.confirm(deleteConfirmText)) {
           onDelete(node);
         }
       }}
@@ -41,7 +43,8 @@ function renderMoveTree(
   currentNodeId: string,
   onNavigate: (node: GameNode) => void,
   onDelete: (node: GameNode) => void,
-  canDeleteNode: (node: GameNode) => boolean
+  canDeleteNode: (node: GameNode) => boolean,
+  deleteConfirmText: string
 ): JSX.Element[] {
   // We treat node.children[0] as the main line, and node.children[1..] as variations.
   // Rendering rule: show the main move first, then sibling variations in parentheses,
@@ -60,6 +63,7 @@ function renderMoveTree(
       onNavigate={onNavigate}
       onDelete={onDelete}
       canDelete={canDeleteNode(mainChild)}
+      deleteConfirmText={deleteConfirmText}
     />
   );
 
@@ -77,21 +81,23 @@ function renderMoveTree(
         onNavigate={onNavigate}
         onDelete={onDelete}
         canDelete={canDeleteNode(variation)}
+        deleteConfirmText={deleteConfirmText}
       />
     );
-    elements.push(...renderMoveTree(variation, currentNodeId, onNavigate, onDelete, canDeleteNode));
+    elements.push(...renderMoveTree(variation, currentNodeId, onNavigate, onDelete, canDeleteNode, deleteConfirmText));
     elements.push(
       <span key={`var-close-${variation.id}`} className="text-gray-500">)</span>
     );
   }
 
   // Continue main line
-  elements.push(...renderMoveTree(mainChild, currentNodeId, onNavigate, onDelete, canDeleteNode));
+  elements.push(...renderMoveTree(mainChild, currentNodeId, onNavigate, onDelete, canDeleteNode, deleteConfirmText));
 
   return elements;
 }
 
 export default function MoveHistory() {
+  const { t } = useI18n();
   const { gameTree, currentNode, navigateToNode, deleteBranchFrom, isLoadedGame } = useGameStore();
   
   const navigatePrev = useCallback(() => {
@@ -131,13 +137,13 @@ export default function MoveHistory() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [navigatePrev, navigateNext]);
   
-  const moves = renderMoveTree(gameTree, currentNode.id, navigateToNode, handleDelete, canDeleteNode);
+  const moves = renderMoveTree(gameTree, currentNode.id, navigateToNode, handleDelete, canDeleteNode, t.deleteMovesConfirm);
   const isAtStart = currentNode.id === 'root';
   
   if (moves.length === 0) {
     return (
       <div className="p-2 text-gray-500 dark:text-gray-400 text-sm">
-        Ходов пока нет
+        {t.noMovesYet}
       </div>
     );
   }
@@ -148,7 +154,7 @@ export default function MoveHistory() {
         onClick={() => navigateToNode(gameTree)}
         className={`cursor-pointer px-1 rounded transition-colors select-none ${isAtStart ? 'bg-blue-500 text-white' : 'hover:bg-gray-200 dark:hover:bg-gray-700'}`}
       >
-        0. start
+        {`0. ${t.moveStart}`}
       </span>
       {moves}
     </div>

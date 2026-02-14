@@ -4,6 +4,7 @@ import { useUIStore, Language } from '../../store/uiStore';
 import { useGameStore } from '../../store/gameStore';
 import { useRoomStore } from '../../store/roomStore';
 import { useAuthStore } from '../../store/authStore';
+import { getWinTypeLabel, useI18n } from '../../i18n';
 import AuthModal from '../Auth/AuthModal';
 import ProfileModal from '../Auth/ProfileModal';
 import PlayersModal from '../Auth/PlayersModal';
@@ -15,215 +16,16 @@ function formatDate(timestamp: number): string {
   return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 }
 
-const APP_VERSION = '1.0.1';
-
-const LANG_LABELS: Record<Language, string> = {
-  ru: 'RU',
-  en: 'EN',
-  eo: 'EO',
-};
-
-const I18N: Record<Language, {
-  subtitle: string;
-  profile: string;
-  loginRegister: string;
-  playLocal: string;
-  loadGame: string;
-  rules: string;
-  playOnline: string;
-  players: string;
-  challenges: string;
-  tabCurrent: string;
-  tabCompleted: string;
-  filterAll: string;
-  filterLocal: string;
-  filterOnline: string;
-  noGames: string;
-  localLabel: string;
-  onlineLabel: string;
-  moves: string;
-  board: string;
-  inProgress: string;
-  boardDialogTitle: string;
-  board37: string;
-  board48: string;
-  board61: string;
-  onlineTitleBoard: string;
-  onlineTitlePlayer: string;
-  onlineTitleLink: string;
-  onlineBoardPrompt: string;
-  playerPrompt: string;
-  playerFirst: string;
-  playerFirstHint: string;
-  playerSecond: string;
-  playerSecondHint: string;
-  playerRandom: string;
-  playerRandomHint: string;
-  ratedGame: string;
-  ratedHint: string;
-  back: string;
-  createGame: string;
-  creating: string;
-  createRoomError: string;
-  gameCreatedHint: string;
-  gameLink: string;
-  copyLink: string;
-  copied: string;
-  goToGame: string;
-  winTypeLabels: Record<string, string>;
-}> = {
-  ru: {
-    subtitle: 'Абстрактная стратегическая игра',
-    profile: 'Профиль',
-    loginRegister: 'Войти / Зарегистрироваться',
-    playLocal: 'Играть локально',
-    loadGame: 'Загрузить игру',
-    rules: 'Правила',
-    playOnline: 'Сыграть онлайн',
-    players: 'Игроки',
-    challenges: 'Вызовы',
-    tabCurrent: 'Текущие',
-    tabCompleted: 'Завершённые',
-    filterAll: 'Все',
-    filterLocal: 'Локальные',
-    filterOnline: 'Онлайн',
-    noGames: 'Нет игр',
-    localLabel: 'локальная',
-    onlineLabel: 'онлайн',
-    moves: 'Ходов',
-    board: 'Поле',
-    inProgress: 'В процессе',
-    boardDialogTitle: 'Выберите поле',
-    board37: 'Любительское 37 колец',
-    board48: 'Турнирное 48 колец',
-    board61: 'Турнирное 61 кольцо',
-    onlineTitleBoard: 'Выберите размер поля',
-    onlineTitlePlayer: 'Выберите игрока',
-    onlineTitleLink: 'Ссылка для приглашения',
-    onlineBoardPrompt: 'Выберите размер поля для онлайн-игры.',
-    playerPrompt: 'Каким игроком вы хотите играть?',
-    playerFirst: 'Первый игрок',
-    playerFirstHint: 'Ходите первым',
-    playerSecond: 'Второй игрок',
-    playerSecondHint: 'Ходите вторым',
-    playerRandom: 'Случайно',
-    playerRandomHint: 'Случайный выбор',
-    ratedGame: 'Рейтинговая игра',
-    ratedHint: 'Влияет на рейтинг Глико',
-    back: 'Назад',
-    createGame: 'Создать игру',
-    creating: 'Создание...',
-    createRoomError: 'Не удалось создать комнату. Проверьте подключение к серверу.',
-    gameCreatedHint: 'Игра создана! Отправьте ссылку другу для подключения.',
-    gameLink: 'Ссылка на игру:',
-    copyLink: 'Копировать ссылку',
-    copied: '✓ Скопировано!',
-    goToGame: 'Перейти к игре',
-    winTypeLabels: { white: 'по белым', gray: 'по серым', black: 'по чёрным', mixed: 'по разным', unknown: 'победа' },
-  },
-  en: {
-    subtitle: 'Abstract strategy game',
-    profile: 'Profile',
-    loginRegister: 'Login / Register',
-    playLocal: 'Play Local',
-    loadGame: 'Load Game',
-    rules: 'Rules',
-    playOnline: 'Play Online',
-    players: 'Players',
-    challenges: 'Challenges',
-    tabCurrent: 'Current',
-    tabCompleted: 'Completed',
-    filterAll: 'All',
-    filterLocal: 'Local',
-    filterOnline: 'Online',
-    noGames: 'No games',
-    localLabel: 'local',
-    onlineLabel: 'online',
-    moves: 'Moves',
-    board: 'Board',
-    inProgress: 'In progress',
-    boardDialogTitle: 'Choose board',
-    board37: 'Amateur 37 rings',
-    board48: 'Tournament 48 rings',
-    board61: 'Tournament 61 rings',
-    onlineTitleBoard: 'Choose board size',
-    onlineTitlePlayer: 'Choose player',
-    onlineTitleLink: 'Invite link',
-    onlineBoardPrompt: 'Choose board size for online game.',
-    playerPrompt: 'Which player do you want to play as?',
-    playerFirst: 'First player',
-    playerFirstHint: 'Move first',
-    playerSecond: 'Second player',
-    playerSecondHint: 'Move second',
-    playerRandom: 'Random',
-    playerRandomHint: 'Random choice',
-    ratedGame: 'Rated game',
-    ratedHint: 'Affects Glicko rating',
-    back: 'Back',
-    createGame: 'Create game',
-    creating: 'Creating...',
-    createRoomError: 'Failed to create room. Check server connection.',
-    gameCreatedHint: 'Game created! Send the link to your friend.',
-    gameLink: 'Game link:',
-    copyLink: 'Copy link',
-    copied: '✓ Copied!',
-    goToGame: 'Go to game',
-    winTypeLabels: { white: 'by white', gray: 'by gray', black: 'by black', mixed: 'by mixed', unknown: 'win' },
-  },
-  eo: {
-    subtitle: 'Abstrakta strategia ludo',
-    profile: 'Profilo',
-    loginRegister: 'Ensaluti / Registriĝi',
-    playLocal: 'Ludi loke',
-    loadGame: 'Ŝargi ludon',
-    rules: 'Reguloj',
-    playOnline: 'Ludi rete',
-    players: 'Ludantoj',
-    challenges: 'Defioj',
-    tabCurrent: 'Aktivaj',
-    tabCompleted: 'Finitaj',
-    filterAll: 'Ĉiuj',
-    filterLocal: 'Lokaj',
-    filterOnline: 'Retaj',
-    noGames: 'Neniuj ludoj',
-    localLabel: 'loka',
-    onlineLabel: 'reta',
-    moves: 'Movoj',
-    board: 'Tabulo',
-    inProgress: 'Daŭras',
-    boardDialogTitle: 'Elektu tabulon',
-    board37: 'Amatora 37 ringoj',
-    board48: 'Turnira 48 ringoj',
-    board61: 'Turnira 61 ringoj',
-    onlineTitleBoard: 'Elektu grandecon de tabulo',
-    onlineTitlePlayer: 'Elektu ludanton',
-    onlineTitleLink: 'Invita ligilo',
-    onlineBoardPrompt: 'Elektu tabulgrandecon por reta ludo.',
-    playerPrompt: 'Kiel kiu ludanto vi volas ludi?',
-    playerFirst: 'Unua ludanto',
-    playerFirstHint: 'Movu unue',
-    playerSecond: 'Dua ludanto',
-    playerSecondHint: 'Movu due',
-    playerRandom: 'Hazarde',
-    playerRandomHint: 'Hazarda elekto',
-    ratedGame: 'Taksata ludo',
-    ratedHint: 'Influas Glicko-takson',
-    back: 'Reen',
-    createGame: 'Krei ludon',
-    creating: 'Kreado...',
-    createRoomError: 'Ne eblis krei ĉambron. Kontrolu servilan konekton.',
-    gameCreatedHint: 'Ludo kreita! Sendu ligilon al amiko.',
-    gameLink: 'Luda ligilo:',
-    copyLink: 'Kopii ligilon',
-    copied: '✓ Kopiite!',
-    goToGame: 'Iri al ludo',
-    winTypeLabels: { white: 'per blankaj', gray: 'per grizaj', black: 'per nigraj', mixed: 'per miksitaj', unknown: 'venko' },
-  },
-};
+const LANGUAGE_BUTTONS: Array<{ code: Language; icon: string; label: string }> = [
+  { code: 'en', icon: '🇬🇧', label: 'English' },
+  { code: 'ru', icon: '🇷🇺', label: 'Russian' },
+  { code: 'eo', icon: '🟢', label: 'Esperanto' },
+];
 
 export default function MainMenu() {
   const navigate = useNavigate();
-  const { setScreen, toggleDarkMode, isDarkMode, language, cycleLanguage } = useUIStore();
+  const { setScreen, toggleDarkMode, isDarkMode, language, setLanguage } = useUIStore();
+  const { t } = useI18n();
   const { newGame, savedGames, refreshSavedGames, loadSavedGame } = useGameStore();
   const { createRoom, isLoading: isCreatingRoom } = useRoomStore();
   const [showLoadDialog, setShowLoadDialog] = useState(false);
@@ -241,8 +43,8 @@ export default function MainMenu() {
   const [loadTab, setLoadTab] = useState<'current' | 'completed'>('current');
   const [loadFilter, setLoadFilter] = useState<'all' | 'local' | 'online'>('all');
   const [showChallengesModal, setShowChallengesModal] = useState(false);
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const { user } = useAuthStore();
-  const t = I18N[language];
   const boardLabels: Record<number, string> = { 37: t.board37, 48: t.board48, 61: t.board61 };
   
   useEffect(() => {
@@ -272,7 +74,7 @@ export default function MainMenu() {
           ZERTZ
         </h1>
         <p className="text-xl text-gray-600 dark:text-gray-400">
-          {t.subtitle}
+          {t.appSubtitle}
         </p>
       </div>
       
@@ -345,16 +147,48 @@ export default function MainMenu() {
             {t.challenges}
           </button>
         )}
+
+        <button
+          type="button"
+          className="w-full py-3 px-6 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-xl border border-dashed border-gray-300 dark:border-gray-600"
+        >
+          {t.tasks}
+        </button>
+
+        <button
+          type="button"
+          className="w-full py-3 px-6 bg-gray-100 dark:bg-gray-700 text-gray-500 dark:text-gray-400 rounded-xl border border-dashed border-gray-300 dark:border-gray-600"
+        >
+          {t.community}
+        </button>
       </div>
       
-      <div className="mt-12 flex items-center gap-3">
+      <div className="mt-12 flex items-center gap-3 relative">
         <button
-          onClick={cycleLanguage}
+          onClick={() => setShowLanguageDropdown((prev) => !prev)}
           className="px-3 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors text-sm font-semibold text-gray-800 dark:text-white"
-          title={`${t.rules}: ${LANG_LABELS[language]}`}
+          title="Language"
         >
-          {LANG_LABELS[language]}
+          {LANGUAGE_BUTTONS.find((b) => b.code === language)?.icon ?? '🌐'}
         </button>
+        {showLanguageDropdown && (
+          <div className="absolute top-12 left-0 z-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2 flex gap-2">
+            {LANGUAGE_BUTTONS.map((btn) => (
+              <button
+                key={btn.code}
+                type="button"
+                onClick={() => {
+                  setLanguage(btn.code);
+                  setShowLanguageDropdown(false);
+                }}
+                className={`px-2 py-1 rounded-md text-sm transition-colors ${language === btn.code ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+                title={btn.label}
+              >
+                {btn.icon}
+              </button>
+            ))}
+          </div>
+        )}
         <button
           onClick={toggleDarkMode}
           className="p-3 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 
@@ -364,8 +198,9 @@ export default function MainMenu() {
         </button>
       </div>
       
-      <div className="mt-8 text-sm text-gray-500 dark:text-gray-500">
-        v{APP_VERSION}
+      <div className="mt-8 text-sm text-gray-500 dark:text-gray-500 text-center">
+        <div>{t.versionFooter}</div>
+        <div>{t.developedBy}</div>
       </div>
       
       {showLoadDialog && (() => {
@@ -398,7 +233,7 @@ export default function MainMenu() {
                       : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
                   }`}
                 >
-                  {t.tabCurrent} ({currentGames.length})
+                  {t.loadCurrent} ({currentGames.length})
                 </button>
                 <button
                   onClick={() => setLoadTab('completed')}
@@ -408,7 +243,7 @@ export default function MainMenu() {
                       : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
                   }`}
                 >
-                  {t.tabCompleted} ({completedGames.length})
+                  {t.loadCompleted} ({completedGames.length})
                 </button>
               </div>
               {/* Filters */}
@@ -458,7 +293,7 @@ export default function MainMenu() {
                             </div>
                             {game.winType && (
                               <div className="text-sm text-gray-500 dark:text-gray-400">
-                                {t.winTypeLabels[game.winType] ?? game.winType}
+                                {getWinTypeLabel(t, game.winType)}
                               </div>
                             )}
                           </div>
@@ -487,7 +322,7 @@ export default function MainMenu() {
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
             <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">{t.boardDialogTitle}</h2>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">{t.chooseBoard}</h2>
               <button
                 onClick={() => setShowBoardDialog(false)}
                 className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
@@ -527,9 +362,9 @@ export default function MainMenu() {
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
             <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                {onlineStep === 'board' && t.onlineTitleBoard}
-                {onlineStep === 'player' && t.onlineTitlePlayer}
-                {onlineStep === 'link' && t.onlineTitleLink}
+                {onlineStep === 'board' && t.chooseBoardOnline}
+                {onlineStep === 'player' && t.choosePlayer}
+                {onlineStep === 'link' && t.inviteLinkTitle}
               </h2>
               <button
                 onClick={() => {

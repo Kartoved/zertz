@@ -1,6 +1,7 @@
 import { useCallback, useEffect } from 'react';
 import { GameNode } from '../../game/types';
 import { useRoomStore } from '../../store/roomStore';
+import { useI18n } from '../../i18n';
 
 interface MoveElementProps {
   node: GameNode;
@@ -69,6 +70,7 @@ function renderMoveTree(node: GameNode, currentNodeId: string, onNavigate: (node
 }
 
 export default function OnlineMoveHistory() {
+  const { t } = useI18n();
   const { gameTree, currentNode, navigateToNode } = useRoomStore();
 
   const navigatePrev = useCallback(() => {
@@ -100,7 +102,7 @@ export default function OnlineMoveHistory() {
   const isAtStart = currentNode.id === 'root';
 
   if (moves.length === 0) {
-    return <div className="p-1 text-xs text-gray-500 dark:text-gray-400">Ходов пока нет</div>;
+    return <div className="p-1 text-xs text-gray-500 dark:text-gray-400">{t.noMovesYet}</div>;
   }
 
   return (
@@ -109,7 +111,7 @@ export default function OnlineMoveHistory() {
         onClick={() => navigateToNode(gameTree)}
         className={`cursor-pointer px-1 rounded transition-colors select-none ${isAtStart ? 'bg-blue-500 text-white' : 'hover:bg-gray-200 dark:hover:bg-gray-700'}`}
       >
-        0. start
+        {`0. ${t.moveStart}`}
       </span>
       {moves}
     </div>

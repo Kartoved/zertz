@@ -19,6 +19,14 @@ import { ChatMessage, RatingDelta } from '../db/roomsApi';
 import * as gamesStorage from '../db/gamesStorage';
 import { playPlaceSound, playRemoveRingSound, playCaptureSound, playWinSound } from '../utils/sounds';
 import { useAuthStore } from './authStore';
+import { getI18nFromStorage } from '../i18n';
+
+function getDefaultPlayerNames() {
+  const { language } = getI18nFromStorage();
+  if (language === 'ru') return { player1: 'Игрок 1', player2: 'Игрок 2' };
+  if (language === 'eo') return { player1: 'Ludanto 1', player2: 'Ludanto 2' };
+  return { player1: 'Player 1', player2: 'Player 2' };
+}
 
 function findDeepestMainLine(node: GameNode): GameNode {
   if (node.children.length === 0) return node;
@@ -155,6 +163,10 @@ async function persistOnlineGame(
 
 const _initialRoot = createRootNode();
 export const useRoomStore = create<RoomStore>((set, get) => ({
+  ...(() => {
+    const defaults = getDefaultPlayerNames();
+    return { playerNames: defaults };
+  })(),
   roomId: null,
   myPlayer: null,
   creatorPlayer: null,
@@ -167,7 +179,6 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   state: createInitialState(37),
   gameTree: _initialRoot,
   currentNode: _initialRoot,
-  playerNames: { player1: 'Игрок 1', player2: 'Игрок 2' },
 
   selectedMarbleColor: null,
   selectedRingId: null,
@@ -191,7 +202,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       const roomId = await roomsApi.createRoom(boardSize, initialState, rootNode, creatorPlayer, rated);
       
       const authUser = useAuthStore.getState().user;
-      const names = { player1: 'Игрок 1', player2: 'Игрок 2' };
+      const names = { ...getDefaultPlayerNames() };
       if (authUser) {
         if (creatorPlayer === 1) names.player1 = authUser.username;
         else names.player2 = authUser.username;
@@ -224,7 +235,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
       return roomId;
     } catch (err) {
-      set({ error: 'Не удалось создать комнату', isLoading: false });
+      set({ error: getI18nFromStorage().t.createRoomError, isLoading: false });
       throw err;
     }
   },
@@ -234,7 +245,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     try {
       const room = await roomsApi.getRoom(roomId);
       if (!room) {
-        set({ error: 'Комната не найдена', isLoading: false });
+        set({ error: 'Room not found', isLoading: false });
         return false;
       }
 
@@ -306,7 +317,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
       return true;
     } catch (err) {
-      set({ error: 'Не удалось присоединиться к комнате', isLoading: false });
+      set({ error: 'Failed to join room', isLoading: false });
       return false;
     }
   },
@@ -680,7 +691,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       state: createInitialState(37),
       gameTree: rootNode,
       currentNode: rootNode,
-      playerNames: { player1: 'Игрок 1', player2: 'Игрок 2' },
+      playerNames: getDefaultPlayerNames(),
       selectedMarbleColor: null,
       selectedRingId: null,
       highlightedCaptures: [],

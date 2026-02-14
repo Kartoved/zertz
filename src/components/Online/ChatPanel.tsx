@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRoomStore } from '../../store/roomStore';
+import { useI18n } from '../../i18n';
 
 export function ChatPanel() {
+  const { t, locale } = useI18n();
   const { messages, playerNames, myPlayer, sendMessage } = useRoomStore();
   const [text, setText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -26,24 +28,24 @@ export function ChatPanel() {
 
   const formatTime = (timestamp: number) => {
     const d = new Date(timestamp);
-    return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
   };
 
   const formatDate = (timestamp: number) => {
     const d = new Date(timestamp);
-    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+    return d.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
   };
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-800 rounded-lg shadow-md">
       <div className="p-3 border-b border-gray-200 dark:border-gray-700">
-        <h3 className="font-semibold text-gray-800 dark:text-gray-200">Чат</h3>
+        <h3 className="font-semibold text-gray-800 dark:text-gray-200">{t.chat}</h3>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-2 min-h-0">
         {messages.length === 0 ? (
           <p className="text-gray-400 text-sm text-center py-4">
-            Пока нет сообщений
+            {t.noMessagesYet}
           </p>
         ) : (
           messages.map((msg) => {
@@ -86,7 +88,7 @@ export function ChatPanel() {
             value={text}
             onChange={(e) => setText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Сообщение..."
+            placeholder={t.messagePlaceholder}
             className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg 
                        bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200
                        focus:outline-none focus:ring-2 focus:ring-blue-500"

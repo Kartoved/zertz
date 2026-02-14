@@ -3,6 +3,7 @@ import { getPlayers, getFollowing, getFollowIds, followUser, unfollowUser, Playe
 import { useAuthStore } from '../../store/authStore';
 import PlayerProfileModal from './PlayerProfileModal';
 import CountryBadge from '../UI/CountryBadge';
+import { useI18n } from '../../i18n';
 
 interface PlayersModalProps {
   onClose: () => void;
@@ -11,18 +12,8 @@ interface PlayersModalProps {
 type SortKey = 'rating' | 'wins' | 'losses' | 'username' | 'created_at' | 'games' | 'winrate';
 type Tab = 'all' | 'friends';
 
-const COLUMN_HEADERS: { key: SortKey | 'games' | 'winrate' | 'action'; label: string; sortKey?: SortKey }[] = [
-  { key: 'username', label: 'Игрок', sortKey: 'username' },
-  { key: 'rating', label: 'Рейтинг', sortKey: 'rating' },
-  { key: 'games', label: 'Игр', sortKey: 'games' },
-  { key: 'wins', label: 'Побед', sortKey: 'wins' },
-  { key: 'losses', label: 'Пораж.', sortKey: 'losses' },
-  { key: 'winrate', label: '%', sortKey: 'winrate' },
-  { key: 'created_at', label: 'Рег.', sortKey: 'created_at' },
-  { key: 'action', label: '' },
-];
-
 export default function PlayersModal({ onClose }: PlayersModalProps) {
+  const { t, locale } = useI18n();
   const { user } = useAuthStore();
   const [tab, setTab] = useState<Tab>('all');
   const [allPlayers, setAllPlayers] = useState<PlayerInfo[]>([]);
@@ -74,7 +65,7 @@ export default function PlayersModal({ onClose }: PlayersModalProps) {
   };
 
   const formatDate = (ts: number) => {
-    return new Date(ts).toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric' });
+    return new Date(ts).toLocaleDateString(locale, { day: '2-digit', month: '2-digit', year: 'numeric' });
   };
 
   const showToast = (msg: string) => {
@@ -88,11 +79,11 @@ export default function PlayersModal({ onClose }: PlayersModalProps) {
         await unfollowUser(playerId);
         setFollowIds(prev => { const n = new Set(prev); n.delete(playerId); return n; });
         setFriends(prev => prev.filter(p => p.id !== playerId));
-        showToast('Отписка оформлена');
+        showToast(t.unfollowed);
       } else {
         await followUser(playerId);
         setFollowIds(prev => new Set(prev).add(playerId));
-        showToast('Подписка оформлена');
+        showToast(t.followed);
       }
     } catch (err: any) {
       showToast(err.message);
@@ -108,7 +99,7 @@ export default function PlayersModal({ onClose }: PlayersModalProps) {
     const direction = sortOrder === 'asc' ? 1 : -1;
 
     if (sortKey === 'username') {
-      return a.username.localeCompare(b.username, 'ru') * direction;
+      return a.username.localeCompare(b.username, locale) * direction;
     }
     if (sortKey === 'created_at') {
       return (a.createdAt - b.createdAt) * direction;
@@ -128,7 +119,7 @@ export default function PlayersModal({ onClose }: PlayersModalProps) {
         {/* Header */}
         <div className="p-4 border-b dark:border-gray-700">
           <div className="flex justify-between items-center mb-3">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">Игроки</h2>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">{t.players}</h2>
             <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">✕</button>
           </div>
 
@@ -140,7 +131,7 @@ export default function PlayersModal({ onClose }: PlayersModalProps) {
                 tab === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
               }`}
             >
-              Все игроки
+              {t.allPlayers}
             </button>
             {user && (
               <button
@@ -149,7 +140,7 @@ export default function PlayersModal({ onClose }: PlayersModalProps) {
                   tab === 'friends' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
                 }`}
               >
-                Друзья
+                {t.friends}
               </button>
             )}
           </div>
@@ -159,7 +150,7 @@ export default function PlayersModal({ onClose }: PlayersModalProps) {
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Поиск по нику..."
+            placeholder={t.searchByNickname}
             className="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg
               bg-white dark:bg-gray-700 text-gray-900 dark:text-white
               focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
@@ -169,17 +160,26 @@ export default function PlayersModal({ onClose }: PlayersModalProps) {
         {/* Table */}
         <div className="flex-1 overflow-auto">
           {isLoading ? (
-            <div className="p-8 text-center text-gray-500 dark:text-gray-400">Загрузка...</div>
+            <div className="p-8 text-center text-gray-500 dark:text-gray-400">{t.loading}</div>
           ) : sorted.length === 0 ? (
             <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-              {tab === 'friends' ? 'Нет подписок' : 'Нет игроков'}
+              {tab === 'friends' ? t.noFriends : t.noPlayers}
             </div>
           ) : (
             <table className="w-full text-sm">
               <thead className="bg-gray-50 dark:bg-gray-700 sticky top-0">
                 <tr>
                   <th className="px-3 py-2 text-left text-gray-600 dark:text-gray-300 font-medium">#</th>
-                  {COLUMN_HEADERS.map((col) => (
+                  {[
+                    { key: 'username', label: t.player, sortKey: 'username' as SortKey },
+                    { key: 'rating', label: t.rating, sortKey: 'rating' as SortKey },
+                    { key: 'games', label: t.games, sortKey: 'games' as SortKey },
+                    { key: 'wins', label: t.winsShort, sortKey: 'wins' as SortKey },
+                    { key: 'losses', label: t.lossesShort, sortKey: 'losses' as SortKey },
+                    { key: 'winrate', label: '%', sortKey: 'winrate' as SortKey },
+                    { key: 'created_at', label: t.regShort, sortKey: 'created_at' as SortKey },
+                    { key: 'action', label: '' },
+                  ].map((col) => (
                     <th
                       key={col.key}
                       className={`px-3 py-2 text-left text-gray-600 dark:text-gray-300 font-medium ${

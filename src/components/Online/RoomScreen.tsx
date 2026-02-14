@@ -10,16 +10,10 @@ import { getWinType } from '../../game/GameEngine';
 import PlayerProfileModal from '../Auth/PlayerProfileModal';
 import RulesContent from '../UI/RulesContent';
 import OnlineMoveHistory from '../UI/OnlineMoveHistory';
-
-const WIN_TYPE_LABELS: Record<string, string> = {
-  white: 'Победа по белым шарикам',
-  gray: 'Победа по серым шарикам',
-  black: 'Победа по чёрным шарикам',
-  mixed: 'Победа по 3 шарикам каждого цвета',
-  unknown: 'Победа',
-};
+import { getWinTypeLabel, useI18n } from '../../i18n';
 
 export function RoomScreen() {
+  const { t } = useI18n();
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
@@ -96,9 +90,9 @@ export function RoomScreen() {
   };
 
   const getPhaseText = () => {
-    if (state.phase === 'placement') return 'Размести шарик';
-    if (state.phase === 'ringRemoval') return 'Удали кольцо';
-    if (state.phase === 'capture') return 'Захвати шарик';
+    if (state.phase === 'placement') return t.phasePlacement;
+    if (state.phase === 'ringRemoval') return t.phaseRingRemoval;
+    if (state.phase === 'capture') return t.phaseCapture;
     return '';
   };
 
@@ -150,7 +144,7 @@ export function RoomScreen() {
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 dark:bg-gray-900">
-        <div className="text-xl text-gray-600 dark:text-gray-400">Загрузка...</div>
+        <div className="text-xl text-gray-600 dark:text-gray-400">{t.loading}</div>
       </div>
     );
   }
@@ -163,7 +157,7 @@ export function RoomScreen() {
           onClick={() => navigate('/')}
           className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
         >
-          На главную
+          {t.backToMenu}
         </button>
       </div>
     );
@@ -179,7 +173,7 @@ export function RoomScreen() {
               onClick={() => navigate('/')}
               className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
             >
-              ← Меню
+              ← {t.roomMenu}
             </button>
             <h1 className="text-lg md:text-xl font-bold text-gray-800 dark:text-gray-200">
               ZÈRTZ Online
@@ -195,13 +189,13 @@ export function RoomScreen() {
               onClick={() => setShowRulesModal(true)}
               className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
             >
-              📘 Правила
+              📘 {t.roomRules}
             </button>
             <button
               onClick={copyLink}
               className="px-3 py-1.5 text-sm bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
             >
-              {copied ? '✓ Скопировано!' : '🔗 Скопировать ссылку'}
+              {copied ? t.copied : `🔗 ${t.copyRoomLink}`}
             </button>
             <button
               onClick={() => setShowMobileChat(!showMobileChat)}
@@ -224,7 +218,7 @@ export function RoomScreen() {
               : 'bg-white dark:bg-gray-800'
           }`}>
             <div className="flex items-center gap-2 mb-1">
-              {myPlayer === 1 && <span className="text-xs bg-green-500 text-white px-1.5 py-0.5 rounded">Вы</span>}
+              {myPlayer === 1 && <span className="text-xs bg-green-500 text-white px-1.5 py-0.5 rounded">{t.you}</span>}
               {isAuthed ? (
                 <button
                   type="button"
@@ -263,7 +257,7 @@ export function RoomScreen() {
             </div>
             {state.currentPlayer === 'player1' && !state.winner && (
               <div className="mt-2 text-sm font-medium text-blue-700 dark:text-blue-200">
-                <div>{myPlayer === 1 ? 'Ваш ход' : 'Ход соперника'}</div>
+                <div>{myPlayer === 1 ? t.yourTurn : t.opponentTurn}</div>
                 <div className="text-xs text-blue-600/90 dark:text-blue-300/90">{getPhaseText()}</div>
               </div>
             )}
@@ -276,7 +270,7 @@ export function RoomScreen() {
               : 'bg-white dark:bg-gray-800'
           }`}>
             <div className="flex items-center gap-2 mb-1">
-              {myPlayer === 2 && <span className="text-xs bg-green-500 text-white px-1.5 py-0.5 rounded">Вы</span>}
+              {myPlayer === 2 && <span className="text-xs bg-green-500 text-white px-1.5 py-0.5 rounded">{t.you}</span>}
               {isAuthed ? (
                 <button
                   type="button"
@@ -315,7 +309,7 @@ export function RoomScreen() {
             </div>
             {state.currentPlayer === 'player2' && !state.winner && (
               <div className="mt-2 text-sm font-medium text-blue-700 dark:text-blue-200">
-                <div>{myPlayer === 2 ? 'Ваш ход' : 'Ход соперника'}</div>
+                <div>{myPlayer === 2 ? t.yourTurn : t.opponentTurn}</div>
                 <div className="text-xs text-blue-600/90 dark:text-blue-300/90">{getPhaseText()}</div>
               </div>
             )}
@@ -328,14 +322,14 @@ export function RoomScreen() {
               disabled={!myPlayer || !currentNode.parent || !!state.winner || !isMyTurn()}
               className="w-full px-3 py-1.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              ↶ Вернуть ход назад
+              ↶ {t.undoMove}
             </button>
           </div>
 
           {/* Marble selector */}
           {state.phase === 'placement' && !state.winner && (
             <div className="p-3 bg-white dark:bg-gray-800 rounded-lg">
-              <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">Выбери шарик:</div>
+              <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">{t.chooseMarbleShort}</div>
               <MarbleSelector
                 reserve={state.reserve}
                 selectedColor={selectedMarbleColor}
@@ -368,7 +362,7 @@ export function RoomScreen() {
             onClick={() => setChatCollapsed(!chatCollapsed)}
             className="mb-2 p-2 bg-white dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 
                        flex items-center justify-center transition-colors"
-            title={chatCollapsed ? 'Развернуть чат' : 'Свернуть чат'}
+            title={chatCollapsed ? t.expandChat : t.collapseChat}
           >
             {chatCollapsed ? '💬' : '→'}
           </button>
@@ -389,7 +383,7 @@ export function RoomScreen() {
           >
             <div className="h-full flex flex-col">
               <div className="flex justify-between items-center p-3 border-b border-gray-200 dark:border-gray-700">
-                <h3 className="font-semibold">Чат</h3>
+                <h3 className="font-semibold">{t.chat}</h3>
                 <button onClick={() => setShowMobileChat(false)} className="text-2xl">×</button>
               </div>
               <div className="flex-1 overflow-hidden">
@@ -411,17 +405,17 @@ export function RoomScreen() {
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-6 text-center">
             <div className="text-3xl font-bold text-green-700 dark:text-green-300 mb-2">
-              🏆 {winnerName} победил!
+              🏆 {winnerName}
             </div>
-            <div className="text-gray-600 dark:text-gray-300 mb-1">Партия завершена</div>
+            <div className="text-gray-600 dark:text-gray-300 mb-1">{t.gameOver}</div>
             <div className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-              {winnerWinType ? WIN_TYPE_LABELS[winnerWinType] ?? WIN_TYPE_LABELS.unknown : WIN_TYPE_LABELS.unknown}
+              {getWinTypeLabel(t, winnerWinType)}
             </div>
             <button
               onClick={() => setWinnerModalDismissed(true)}
               className="px-5 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold transition-colors"
             >
-              Закрыть
+              {t.close}
             </button>
           </div>
         </div>
@@ -434,7 +428,7 @@ export function RoomScreen() {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Правила игры ZERTZ</h2>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">{t.gameRulesTitle}</h2>
               <button
                 onClick={() => setShowRulesModal(false)}
                 className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"

@@ -107,11 +107,10 @@ export default function GameStats() {
               playerNames.player2
             )}
           </div>
-          <div className="text-sm text-gray-500 dark:text-gray-400">{t.capturedMarbles}</div>
+          <div className="text-sm text-gray-500 dark:text-gray-400">Захваченные шарики:</div>
         </div>
         {renderCaptures('player2')}
       </div>
-      
       
       <div className="text-center text-sm text-gray-600 dark:text-gray-400">
         {t.move} #{state.moveNumber} • {state.currentPlayer === 'player1' ? playerNames.player1 : playerNames.player2}

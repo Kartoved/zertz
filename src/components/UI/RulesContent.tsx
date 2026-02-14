@@ -1,88 +1,93 @@
+import { useI18n } from '../../i18n';
+
 interface RulesContentProps {
   className?: string;
 }
 
 export default function RulesContent({ className }: RulesContentProps) {
+  const { t } = useI18n();
+
   return (
     <div className={className ?? 'space-y-6 text-gray-700 dark:text-gray-300'}>
       <section>
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-          Цель игры
+          {t.goalTitle}
         </h2>
-        <p>Первым захватить:</p>
+        <p>{t.goalLead}</p>
         <ul className="list-disc list-inside ml-4 mt-2">
-          <li>4 белых шарика, ИЛИ</li>
-          <li>5 серых шариков, ИЛИ</li>
-          <li>6 чёрных шариков, ИЛИ</li>
-          <li>3 шарика каждого цвета</li>
+          <li>{t.goal1}</li>
+          <li>{t.goal2}</li>
+          <li>{t.goal3}</li>
+          <li>{t.goal4}</li>
         </ul>
       </section>
 
       <section>
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-          Ход игры
+          {t.flowTitle}
         </h2>
-        <p className="mb-2">На каждом ходу игрок выполняет ОДНО из двух действий:</p>
+        <p className="mb-2">{t.flowLead}</p>
 
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg mb-3">
-          <h3 className="font-semibold mb-2">1. Размещение + удаление кольца</h3>
+          <h3 className="font-semibold mb-2">{t.flowPlacementTitle}</h3>
           <ol className="list-decimal list-inside space-y-1">
-            <li>Выберите шарик любого цвета из резерва</li>
-            <li>Поставьте его на любое пустое кольцо</li>
-            <li>Удалите одно «свободное» кольцо с края доски, если это возможно</li>
+            <li>{t.flowPlace1}</li>
+            <li>{t.flowPlace2}</li>
+            <li>{t.flowPlace3}</li>
           </ol>
         </div>
 
         <div className="bg-white dark:bg-gray-800 p-4 rounded-lg">
-          <h3 className="font-semibold mb-2">2. Взятие (обязательно!)</h3>
-          <p>Если можете взять — ОБЯЗАНЫ взять!</p>
+          <h3 className="font-semibold mb-2">{t.flowCaptureTitle}</h3>
+          <p>{t.flowCaptureLead}</p>
           <ul className="list-disc list-inside mt-2 space-y-1">
-            <li>Прыгните через соседний шарик на пустое кольцо за ним</li>
-            <li>Цвет не имеет значения</li>
-            <li>Цепочки взятий - продолжайте захватывать шарики пока это возможно</li>
+            <li>{t.flowCapture1}</li>
+            <li>{t.flowCapture2}</li>
+            <li>{t.flowCapture3}</li>
           </ul>
         </div>
       </section>
 
       <section>
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-          Запас шариков
+          {t.reserveTitle}
         </h2>
         <p>
-          В начале игры в <strong>общем запасе</strong> у игроков 10 чёрных шариков,
-          8 серых и 6 белых. Если шарики в общем запасе закончились, игроки выставляют
-          уже захваченные ими шарики.
+          {t.reserveText1} <strong>{t.reserveText2}</strong>:
+          {' '}{t.reserveCounts}
         </p>
       </section>
 
       <section>
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-          Резерв
+          {t.reserveSectionTitle}
         </h2>
         <p>
-          Резерв - это место, где хранятся шарики, которые еще не были использованы в игре.
-          Игроки могут брать шарики из резерва и использовать их в своей игре.
+          {t.reserveSectionText1}
+          {' '}
+          {t.reserveSectionText2}
         </p>
       </section>
 
       <section>
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-          Свободное кольцо
+          {t.freeRingTitle}
         </h2>
-        <p>Кольцо можно удалить если:</p>
+        <p>{t.freeRingLead}</p>
         <ul className="list-disc list-inside ml-4 mt-2">
-          <li>На нём нет шарика</li>
-          <li>У него ≥2 свободных соседних стороны</li>
+          <li>{t.freeRing1}</li>
+          <li>{t.freeRing2}</li>
         </ul>
       </section>
 
       <section>
         <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-          Изоляция
+          {t.isolationTitle}
         </h2>
         <p>
-          Если группа колец отделяется от основной доски и все кольца заняты —
-          все шарики в группе автоматически захватываются текущим игроком!
+          {t.isolationText1}
+          {' '}
+          {t.isolationText2}
         </p>
       </section>
     </div>

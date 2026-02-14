@@ -8,7 +8,7 @@ const LANGUAGE_KEY = 'zertz_language';
 function getInitialLanguage(): Language {
   const saved = localStorage.getItem(LANGUAGE_KEY);
   if (saved === 'en' || saved === 'eo' || saved === 'ru') return saved;
-  return 'ru';
+  return 'en';
 }
 
 interface UIStore {
