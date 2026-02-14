@@ -205,6 +205,20 @@ type Dict = {
   isolationTitle: string;
   isolationText1: string;
   isolationText2: string;
+  blitz: string;
+  blitzDesc: string;
+  rapid: string;
+  rapidDesc: string;
+  correspondence: string;
+  correspondenceDesc: string;
+  comingSoon: string;
+  globalChat: string;
+  guest: string;
+  settings: string;
+  playCorrespondence: string;
+  selectTimeControl: string;
+  darkMode: string;
+  lightMode: string;
 };
 
 export const I18N: Record<Language, Dict> = {
@@ -407,6 +421,20 @@ export const I18N: Record<Language, Dict> = {
     isolationTitle: 'Изоляция',
     isolationText1: 'Если группа колец отделяется от основной доски и все кольца заняты —',
     isolationText2: 'все шарики в группе автоматически захватываются текущим игроком!',
+    blitz: 'Блиц',
+    blitzDesc: 'Быстрая игра, ограниченное время',
+    rapid: 'Рапид',
+    rapidDesc: 'Умеренный контроль времени',
+    correspondence: 'Заочная',
+    correspondenceDesc: 'Без ограничения по времени',
+    comingSoon: 'Скоро',
+    globalChat: 'Общий чат',
+    guest: 'Гость',
+    settings: 'Настройки',
+    playCorrespondence: 'Играть заочно',
+    selectTimeControl: 'Выберите контроль времени',
+    darkMode: 'Тёмная тема',
+    lightMode: 'Светлая тема',
   },
   en: {
     appSubtitle: 'Abstract strategy game',
@@ -607,6 +635,20 @@ export const I18N: Record<Language, Dict> = {
     isolationTitle: 'Isolation',
     isolationText1: 'If a ring group separates from the main board and all rings are occupied —',
     isolationText2: 'all marbles in that group are captured by the current player!',
+    blitz: 'Blitz',
+    blitzDesc: 'Fast game, limited time',
+    rapid: 'Rapid',
+    rapidDesc: 'Moderate time control',
+    correspondence: 'Correspondence',
+    correspondenceDesc: 'No time limit',
+    comingSoon: 'Coming soon',
+    globalChat: 'Global Chat',
+    guest: 'Guest',
+    settings: 'Settings',
+    playCorrespondence: 'Play correspondence',
+    selectTimeControl: 'Select time control',
+    darkMode: 'Dark mode',
+    lightMode: 'Light mode',
   },
   eo: {
     appSubtitle: 'Abstrakta strategia ludo',
@@ -807,6 +849,20 @@ export const I18N: Record<Language, Dict> = {
     isolationTitle: 'Izoliĝo',
     isolationText1: 'Se grupo de ringoj apartiĝas de la ĉefa tabulo kaj ĉiuj ringoj estas okupitaj —',
     isolationText2: 'ĉiuj globetoj en tiu grupo estas kaptitaj de la nuna ludanto!',
+    blitz: 'Blico',
+    blitzDesc: 'Rapida ludo, limigita tempo',
+    rapid: 'Rapida',
+    rapidDesc: 'Modera tempkontrolo',
+    correspondence: 'Koresponda',
+    correspondenceDesc: 'Sen templimo',
+    comingSoon: 'Baldaŭ',
+    globalChat: 'Ĝenerala babilejo',
+    guest: 'Gasto',
+    settings: 'Agordoj',
+    playCorrespondence: 'Ludi koresponde',
+    selectTimeControl: 'Elektu tempkontrolon',
+    darkMode: 'Malhela temo',
+    lightMode: 'Hela temo',
   },
 };
 
