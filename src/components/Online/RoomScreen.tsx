@@ -340,9 +340,9 @@ export function RoomScreen() {
       )}
 
       {/* Main content */}
-      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-3 md:gap-4 p-2 md:p-4 max-w-7xl mx-auto w-full pb-20 lg:pb-4 overflow-y-auto">
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-3 md:gap-4 p-2 md:p-4 max-w-7xl mx-auto w-full pb-28 sm:pb-24 lg:pb-4 overflow-y-auto">
         {/* Left panel - Players */}
-        <div className={`lg:w-64 lg:flex lg:flex-col gap-2 lg:gap-4 ${mobileTab === 'chat' ? 'hidden lg:flex' : 'grid grid-cols-2 lg:grid-cols-1'} min-w-0`}>
+        <div className={`lg:w-64 lg:flex lg:flex-col gap-2 lg:gap-4 ${mobileTab === 'chat' ? 'hidden lg:flex' : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1'} min-w-0`}>
           {/* Player 1 */}
           <div className={`p-2 lg:p-3 rounded-lg ${
             state.currentPlayer === 'player1' && !state.winner
@@ -467,7 +467,7 @@ export function RoomScreen() {
 
           {/* Marble selector */}
           {!state.winner && (
-            <div className="p-3 bg-white dark:bg-gray-800 rounded-lg col-span-2 lg:col-span-1">
+            <div className="p-3 bg-white dark:bg-gray-800 rounded-lg col-span-1 sm:col-span-2 lg:col-span-1">
               {state.phase === 'placement' && (
                 <>
                   <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">{t.chooseMarbleShort}</div>
@@ -506,7 +506,7 @@ export function RoomScreen() {
         </div>
 
         {/* Center - Board */}
-        <div className={`flex-1 min-h-0 items-center justify-center min-h-[280px] sm:min-h-[340px] md:min-h-[400px] ${mobileTab === 'chat' ? 'hidden lg:flex' : 'flex'}`}>
+        <div className={`flex-1 min-h-0 items-center justify-center min-h-[240px] sm:min-h-[320px] md:min-h-[400px] overflow-hidden ${mobileTab === 'chat' ? 'hidden lg:flex' : 'flex'}`}>
           <HexBoard
             state={state}
             onRingClick={handleRingClick}
@@ -542,7 +542,7 @@ export function RoomScreen() {
         </div>
       </div>
 
-      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 px-3 pb-3">
+      <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
         <div className="grid grid-cols-2 bg-white dark:bg-gray-800 rounded-xl p-1 shadow-lg border border-gray-200 dark:border-gray-700">
           <button
             type="button"

@@ -300,6 +300,25 @@ export default function MainMenu() {
               {t.selectTimeControl}
             </h2>
 
+            <div className="mb-4">
+              <button
+                type="button"
+                disabled={!user}
+                onClick={() => {
+                  if (!user) {
+                    setShowAuthModal(true);
+                    return;
+                  }
+                  setInviteMode('timedInvite');
+                  setOnlineStep('board');
+                  setShowOnlineDialog(true);
+                }}
+                className="w-full py-2.5 px-4 rounded-xl font-semibold transition-colors bg-indigo-500 hover:bg-indigo-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Вызвать по ссылке
+              </button>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {TIME_CONTROLS.map((tc) => {
                 const label = t[tc.id as keyof typeof t] as string;
@@ -336,25 +355,6 @@ export default function MainMenu() {
                   </button>
                 );
               })}
-            </div>
-
-            <div className="mt-5 border-t border-gray-200 dark:border-gray-700 pt-4">
-              <button
-                type="button"
-                disabled={!user}
-                onClick={() => {
-                  if (!user) {
-                    setShowAuthModal(true);
-                    return;
-                  }
-                  setInviteMode('timedInvite');
-                  setOnlineStep('board');
-                  setShowOnlineDialog(true);
-                }}
-                className="w-full py-2.5 px-4 rounded-xl font-semibold transition-colors bg-indigo-500 hover:bg-indigo-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Вызвать по ссылке
-              </button>
             </div>
 
           </div>
