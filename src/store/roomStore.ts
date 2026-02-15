@@ -15,7 +15,7 @@ import {
 } from '../game/GameEngine';
 import { getValidRemovableRings } from '../game/Board';
 import * as roomsApi from '../db/roomsApi';
-import { ChatMessage, RatingDelta } from '../db/roomsApi';
+import { ChatMessage, FischerTimeControl, RatingDelta } from '../db/roomsApi';
 import * as gamesStorage from '../db/gamesStorage';
 import { playPlaceSound, playRemoveRingSound, playCaptureSound, playWinSound } from '../utils/sounds';
 import { useAuthStore } from './authStore';
@@ -43,6 +43,7 @@ interface RoomStore {
   isLoading: boolean;
   error: string | null;
   lastUpdated: number;
+  winType: string | null;
 
   // Game state
   state: GameState;
@@ -62,12 +63,24 @@ interface RoomStore {
   user2Rating: number | null;
   ratingDelta: RatingDelta | null;
 
+  // Time control (online timed invite)
+  timeControlBaseMs: number | null;
+  timeControlIncrementMs: number | null;
+  clockP1Ms: number | null;
+  clockP2Ms: number | null;
+  clockRunningSince: number | null;
+
   // Chat
   messages: ChatMessage[];
   lastMessageId: number;
 
   // Actions
-  createRoom: (boardSize: 37 | 48 | 61, creatorPlayer?: 1 | 2, rated?: boolean) => Promise<number>;
+  createRoom: (
+    boardSize: 37 | 48 | 61,
+    creatorPlayer?: 1 | 2,
+    rated?: boolean,
+    timeControl?: FischerTimeControl | null
+  ) => Promise<number>;
   joinRoom: (roomId: number | string) => Promise<boolean>;
   pollRoom: () => Promise<void>;
   pollMessages: () => Promise<void>;
@@ -150,6 +163,16 @@ function rebuildStateFromNode(targetNode: GameNode, boardSize: 37 | 48 | 61): Ga
   return nextState;
 }
 
+function syncWinnerFromRoom(state: GameState, winnerNum: number | null): GameState {
+  if (winnerNum == null) return state;
+  const winnerPlayer: Player = winnerNum === 1 ? 'player1' : 'player2';
+  if (state.winner === winnerPlayer) return state;
+  const patched = cloneState(state);
+  patched.winner = winnerPlayer;
+  patched.phase = 'gameOver';
+  return patched;
+}
+
 async function persistOnlineGame(
   roomId: number | null,
   state: GameState,
@@ -175,6 +198,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   isLoading: false,
   error: null,
   lastUpdated: 0,
+  winType: null,
 
   state: createInitialState(37),
   gameTree: _initialRoot,
@@ -189,17 +213,22 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   user1Rating: null,
   user2Rating: null,
   ratingDelta: null,
+  timeControlBaseMs: null,
+  timeControlIncrementMs: null,
+  clockP1Ms: null,
+  clockP2Ms: null,
+  clockRunningSince: null,
 
   messages: [],
   lastMessageId: 0,
 
-  createRoom: async (boardSize, creatorPlayer = 1, rated = false) => {
+  createRoom: async (boardSize, creatorPlayer = 1, rated = false, timeControl = null) => {
     set({ isLoading: true, error: null });
     try {
       const initialState = createInitialState(boardSize);
       const rootNode = createRootNode();
 
-      const roomId = await roomsApi.createRoom(boardSize, initialState, rootNode, creatorPlayer, rated);
+      const roomId = await roomsApi.createRoom(boardSize, initialState, rootNode, creatorPlayer, rated, timeControl);
       
       const authUser = useAuthStore.getState().user;
       const names = { ...getDefaultPlayerNames() };
@@ -221,6 +250,12 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         playerNames: names,
         isLoading: false,
         lastUpdated: Date.now(),
+        winType: null,
+        timeControlBaseMs: timeControl?.baseMs ?? null,
+        timeControlIncrementMs: timeControl?.incrementMs ?? null,
+        clockP1Ms: timeControl?.baseMs ?? null,
+        clockP2Ms: timeControl?.baseMs ?? null,
+        clockRunningSince: timeControl ? Date.now() : null,
         messages: [],
         lastMessageId: 0,
       });
@@ -288,25 +323,33 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         } catch { /* ignore join errors */ }
       }
 
+      const syncedState = syncWinnerFromRoom(room.state, room.winner);
+
       set({
         roomId: numericRoomId,
         myPlayer,
         creatorPlayer: room.creatorPlayer,
         user1Id: myPlayer === 1 && authUser ? authUser.id : room.user1Id,
         user2Id: myPlayer === 2 && authUser ? authUser.id : room.user2Id,
-        state: room.state,
+        state: syncedState,
         gameTree: room.tree,
         currentNode: findDeepestMainLine(room.tree),
         playerNames: names,
         isLoading: false,
         lastUpdated: room.updatedAt,
+        winType: room.winType,
         rated: room.rated,
         user1Rating: room.user1Rating,
         user2Rating: room.user2Rating,
         ratingDelta: room.ratingDelta,
+        timeControlBaseMs: room.timeControlBaseMs,
+        timeControlIncrementMs: room.timeControlIncrementMs,
+        clockP1Ms: room.clockP1Ms,
+        clockP2Ms: room.clockP2Ms,
+        clockRunningSince: room.clockRunningSince,
       });
 
-      await persistOnlineGame(numericRoomId, room.state, room.tree, names, room.winType);
+      await persistOnlineGame(numericRoomId, syncedState, room.tree, names, room.winType);
 
       // Load chat messages
       const messages = await roomsApi.getChatMessages(roomId);
@@ -333,14 +376,17 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       // Re-read lastUpdated after fetch to avoid stale comparison
       const { lastUpdated } = get();
       if (room.updatedAt > lastUpdated) {
+        const syncedState = syncWinnerFromRoom(room.state, room.winner);
+
         set({
-          state: room.state,
+          state: syncedState,
           gameTree: room.tree,
           currentNode: findDeepestMainLine(room.tree),
           playerNames: room.playerNames,
           user1Id: room.user1Id,
           user2Id: room.user2Id,
           lastUpdated: room.updatedAt,
+          winType: room.winType,
           selectedMarbleColor: null,
           selectedRingId: null,
           highlightedCaptures: [],
@@ -348,8 +394,13 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
           user1Rating: room.user1Rating,
           user2Rating: room.user2Rating,
           ratingDelta: room.ratingDelta || get().ratingDelta,
+          timeControlBaseMs: room.timeControlBaseMs,
+          timeControlIncrementMs: room.timeControlIncrementMs,
+          clockP1Ms: room.clockP1Ms,
+          clockP2Ms: room.clockP2Ms,
+          clockRunningSince: room.clockRunningSince,
         });
-        await persistOnlineGame(roomId, room.state, room.tree, room.playerNames, room.winType);
+        await persistOnlineGame(roomId, syncedState, room.tree, room.playerNames, room.winType);
       }
     } catch {
       // Ignore polling errors
@@ -469,6 +520,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
           currentNode: newNode,
           selectedMarbleColor: null,
           selectedRingId: null,
+          winType,
         });
 
         const winnerNum = winner === 'player1' ? 1 : winner === 'player2' ? 2 : null;
@@ -485,6 +537,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
           currentNode: newNode,
           selectedMarbleColor: null,
           selectedRingId: null,
+          winType: null,
         });
 
         const currentPlayerNum = state.currentPlayer === 'player1' ? 1 : 2;
@@ -537,6 +590,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       set({
         state: newState,
         selectedRingId: null,
+        winType,
       });
 
       const winnerNum = winner === 'player1' ? 1 : winner === 'player2' ? 2 : null;
@@ -598,6 +652,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         selectedRingId: null,
         highlightedCaptures: [],
         availableCaptureChains: [],
+        winType,
       });
 
       const winnerNum = winner === 'player1' ? 1 : winner === 'player2' ? 2 : null;
@@ -637,6 +692,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         selectedRingId: null,
         highlightedCaptures: [],
         availableCaptureChains: [],
+        winType,
       });
 
       const winnerNum = winner === 'player1' ? 1 : winner === 'player2' ? 2 : null;
@@ -696,10 +752,16 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       selectedRingId: null,
       highlightedCaptures: [],
       availableCaptureChains: [],
+      winType: null,
       rated: false,
       user1Rating: null,
       user2Rating: null,
       ratingDelta: null,
+      timeControlBaseMs: null,
+      timeControlIncrementMs: null,
+      clockP1Ms: null,
+      clockP2Ms: null,
+      clockRunningSince: null,
       messages: [],
       lastMessageId: 0,
     });

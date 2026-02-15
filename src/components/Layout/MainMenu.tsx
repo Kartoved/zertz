@@ -12,6 +12,15 @@ import ChallengesModal from '../Auth/ChallengesModal';
 import PlayerProfileCard from '../UI/PlayerProfileCard';
 import GlobalChat from '../UI/GlobalChat';
 
+type InviteMode = 'classic' | 'timedInvite';
+type TimePresetId = '3+2' | '10+0' | '15+10';
+
+const FISCHER_PRESETS: Array<{ id: TimePresetId; baseMs: number; incrementMs: number }> = [
+  { id: '3+2', baseMs: 3 * 60 * 1000, incrementMs: 2 * 1000 },
+  { id: '10+0', baseMs: 10 * 60 * 1000, incrementMs: 0 },
+  { id: '15+10', baseMs: 15 * 60 * 1000, incrementMs: 10 * 1000 },
+];
+
 function formatDate(timestamp: number): string {
   const d = new Date(timestamp);
   const pad = (n: number) => n.toString().padStart(2, '0');
@@ -41,9 +50,11 @@ export default function MainMenu() {
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [showBoardDialog, setShowBoardDialog] = useState(false);
   const [showOnlineDialog, setShowOnlineDialog] = useState(false);
-  const [onlineStep, setOnlineStep] = useState<'board' | 'player' | 'link'>('board');
+  const [onlineStep, setOnlineStep] = useState<'board' | 'time' | 'player' | 'link'>('board');
+  const [inviteMode, setInviteMode] = useState<InviteMode>('classic');
   const [selectedBoardSize, setSelectedBoardSize] = useState<37 | 48 | 61>(37);
   const [selectedPlayer, setSelectedPlayer] = useState<1 | 2 | 'random'>(1);
+  const [selectedPreset, setSelectedPreset] = useState<TimePresetId>('3+2');
   const [createdRoomId, setCreatedRoomId] = useState<number | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -299,6 +310,8 @@ export default function MainMenu() {
                     disabled={!tc.enabled}
                     onClick={() => {
                       if (tc.id === 'correspondence') {
+                        setInviteMode('classic');
+                        setOnlineStep('board');
                         setShowOnlineDialog(true);
                       }
                     }}
@@ -323,6 +336,25 @@ export default function MainMenu() {
                   </button>
                 );
               })}
+            </div>
+
+            <div className="mt-5 border-t border-gray-200 dark:border-gray-700 pt-4">
+              <button
+                type="button"
+                disabled={!user}
+                onClick={() => {
+                  if (!user) {
+                    setShowAuthModal(true);
+                    return;
+                  }
+                  setInviteMode('timedInvite');
+                  setOnlineStep('board');
+                  setShowOnlineDialog(true);
+                }}
+                className="w-full py-2.5 px-4 rounded-xl font-semibold transition-colors bg-indigo-500 hover:bg-indigo-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Вызвать по ссылке
+              </button>
             </div>
 
           </div>
@@ -504,12 +536,14 @@ export default function MainMenu() {
             <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                 {onlineStep === 'board' && t.chooseBoardOnline}
+                {onlineStep === 'time' && t.selectTimeControl}
                 {onlineStep === 'player' && t.choosePlayer}
                 {onlineStep === 'link' && t.inviteLinkTitle}
               </h2>
               <button
                 onClick={() => {
                   setShowOnlineDialog(false);
+                  setInviteMode('classic');
                   setOnlineStep('board');
                   setCreatedRoomId(null);
                   setLinkCopied(false);
@@ -531,7 +565,7 @@ export default function MainMenu() {
                         key={size}
                         onClick={() => {
                           setSelectedBoardSize(size);
-                          setOnlineStep('player');
+                          setOnlineStep(inviteMode === 'timedInvite' ? 'time' : 'player');
                         }}
                         className={`w-full p-3 text-left rounded-lg transition-colors ${
                           selectedBoardSize === size
@@ -542,6 +576,46 @@ export default function MainMenu() {
                         {boardLabels[size]}
                       </button>
                     ))}
+                  </div>
+                </>
+              )}
+
+              {onlineStep === 'time' && (
+                <>
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    {t.selectTimeControl}
+                  </p>
+                  <div className="space-y-3">
+                    {FISCHER_PRESETS.map((preset) => (
+                      <button
+                        key={preset.id}
+                        onClick={() => setSelectedPreset(preset.id)}
+                        className={`w-full p-3 text-left rounded-lg transition-colors ${
+                          selectedPreset === preset.id
+                            ? 'bg-purple-100 dark:bg-purple-900 border-2 border-purple-500'
+                            : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        }`}
+                      >
+                        <div className="font-medium">{preset.id}</div>
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="flex gap-2 mt-4">
+                    <button
+                      onClick={() => setOnlineStep('board')}
+                      className="flex-1 py-2 px-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white 
+                        rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                    >
+                      {t.back}
+                    </button>
+                    <button
+                      onClick={() => setOnlineStep('player')}
+                      className="flex-1 py-2 px-4 bg-purple-500 hover:bg-purple-600 text-white font-semibold 
+                        rounded-lg transition-colors"
+                    >
+                      Далее
+                    </button>
                   </div>
                 </>
               )}
@@ -610,7 +684,7 @@ export default function MainMenu() {
 
                   <div className="flex gap-2 mt-4">
                     <button
-                      onClick={() => setOnlineStep('board')}
+                      onClick={() => setOnlineStep(inviteMode === 'timedInvite' ? 'time' : 'board')}
                       className="flex-1 py-2 px-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white 
                         rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
                     >
@@ -623,7 +697,15 @@ export default function MainMenu() {
                           const player = selectedPlayer === 'random' 
                             ? (Math.random() < 0.5 ? 1 : 2) 
                             : selectedPlayer;
-                          const roomId = await createRoom(selectedBoardSize, player, isRated);
+                          const preset = FISCHER_PRESETS.find((p) => p.id === selectedPreset) || FISCHER_PRESETS[0];
+                          const roomId = await createRoom(
+                            selectedBoardSize,
+                            player,
+                            isRated,
+                            inviteMode === 'timedInvite'
+                              ? { baseMs: preset.baseMs, incrementMs: preset.incrementMs }
+                              : null
+                          );
                           setCreatedRoomId(roomId);
                           setOnlineStep('link');
                         } catch {
@@ -670,6 +752,7 @@ export default function MainMenu() {
                     <button
                       onClick={() => {
                         setShowOnlineDialog(false);
+                        setInviteMode('classic');
                         setOnlineStep('board');
                         navigate(`/room/${createdRoomId}`);
                       }}

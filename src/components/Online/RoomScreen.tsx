@@ -24,6 +24,7 @@ export function RoomScreen() {
   const [winnerModalDismissed, setWinnerModalDismissed] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showSurrenderConfirm, setShowSurrenderConfirm] = useState(false);
+  const [clockNowMs, setClockNowMs] = useState(() => Date.now());
 
   const navTabs: Array<{ id: string; label: string; authOnly?: boolean }> = [
     { id: 'playLocal', label: t.playLocal },
@@ -65,6 +66,11 @@ export function RoomScreen() {
     user1Rating,
     user2Rating,
     ratingDelta,
+    winType,
+    timeControlBaseMs,
+    clockP1Ms,
+    clockP2Ms,
+    clockRunningSince,
   } = useRoomStore();
   const { user } = useAuthStore();
   const isAuthed = !!user;
@@ -90,6 +96,14 @@ export function RoomScreen() {
     }
   }, [state.winner]);
 
+  const isTimedGame = timeControlBaseMs != null;
+
+  useEffect(() => {
+    if (!isTimedGame || state.winner) return;
+    const timer = setInterval(() => setClockNowMs(Date.now()), 250);
+    return () => clearInterval(timer);
+  }, [isTimedGame, state.winner]);
+
   const copyLink = () => {
     const url = window.location.href;
     navigator.clipboard.writeText(url);
@@ -111,7 +125,39 @@ export function RoomScreen() {
   };
 
   const winnerName = state.winner === 'player1' ? playerNames.player1 : playerNames.player2;
-  const winnerWinType = state.winner ? getWinType(state, state.winner) : null;
+  const winnerWinType = state.winner ? (winType || getWinType(state, state.winner)) : null;
+
+  const LOW_TIME_THRESHOLD_MS = 20 * 1000;
+
+  const formatClock = (ms: number) => {
+    const safeMs = Math.max(0, ms);
+    const totalSeconds = Math.floor(safeMs / 1000);
+    const seconds = totalSeconds % 60;
+    const totalMinutes = Math.floor(totalSeconds / 60);
+    const minutes = totalMinutes % 60;
+    const hours = Math.floor(totalMinutes / 60);
+    if (hours > 0) {
+      return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    }
+    return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+  };
+
+  const getDisplayClockMs = (player: 'player1' | 'player2'): number | null => {
+    if (!isTimedGame || timeControlBaseMs == null) return null;
+    const base = player === 'player1'
+      ? (clockP1Ms ?? timeControlBaseMs)
+      : (clockP2Ms ?? timeControlBaseMs);
+
+    if (state.winner || !clockRunningSince || state.currentPlayer !== player) {
+      return Math.max(0, base);
+    }
+
+    const elapsed = Math.max(0, clockNowMs - clockRunningSince);
+    return Math.max(0, base - elapsed);
+  };
+
+  const p1ClockMs = getDisplayClockMs('player1');
+  const p2ClockMs = getDisplayClockMs('player2');
 
   const validRemovableRings = state.phase === 'ringRemoval' 
     ? getValidRemovableRings(state.rings) 
@@ -328,6 +374,15 @@ export function RoomScreen() {
                 <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">{user1Rating}</span>
               )}
             </div>
+            {p1ClockMs != null && (
+              <div className={`mb-1 text-lg font-mono font-bold ${
+                p1ClockMs <= LOW_TIME_THRESHOLD_MS
+                  ? 'text-red-600 dark:text-red-400'
+                  : 'text-gray-900 dark:text-gray-100'
+              }`}>
+                {formatClock(p1ClockMs)}
+              </div>
+            )}
             {ratingDelta && state.winner && rated && (
               <div className="text-xs mb-1">
                 <span className="text-gray-500">{ratingDelta.player1.before} → {ratingDelta.player1.after}</span>
@@ -380,6 +435,15 @@ export function RoomScreen() {
                 <span className="text-xs text-blue-600 dark:text-blue-400 font-medium">{user2Rating}</span>
               )}
             </div>
+            {p2ClockMs != null && (
+              <div className={`mb-1 text-lg font-mono font-bold ${
+                p2ClockMs <= LOW_TIME_THRESHOLD_MS
+                  ? 'text-red-600 dark:text-red-400'
+                  : 'text-gray-900 dark:text-gray-100'
+              }`}>
+                {formatClock(p2ClockMs)}
+              </div>
+            )}
             {ratingDelta && state.winner && rated && (
               <div className="text-xs mb-1">
                 <span className="text-gray-500">{ratingDelta.player2.before} → {ratingDelta.player2.after}</span>

@@ -127,6 +127,12 @@ async function ensureSchema() {
       ALTER TABLE rooms ADD COLUMN IF NOT EXISTS rating2_before REAL;
       ALTER TABLE rooms ADD COLUMN IF NOT EXISTS rating1_after REAL;
       ALTER TABLE rooms ADD COLUMN IF NOT EXISTS rating2_after REAL;
+      ALTER TABLE rooms ADD COLUMN IF NOT EXISTS time_control_base_ms BIGINT;
+      ALTER TABLE rooms ADD COLUMN IF NOT EXISTS time_control_increment_ms BIGINT;
+      ALTER TABLE rooms ADD COLUMN IF NOT EXISTS clock_p1_ms BIGINT;
+      ALTER TABLE rooms ADD COLUMN IF NOT EXISTS clock_p2_ms BIGINT;
+      ALTER TABLE rooms ADD COLUMN IF NOT EXISTS clock_running_since TIMESTAMP;
+      ALTER TABLE rooms ADD COLUMN IF NOT EXISTS time_forfeit_player INTEGER;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS contact_link TEXT NOT NULL DEFAULT '';
       ALTER TABLE games ADD COLUMN IF NOT EXISTS is_online BOOLEAN NOT NULL DEFAULT false;
     EXCEPTION WHEN others THEN NULL;
@@ -913,7 +919,15 @@ app.delete('/api/games/:id', async (req, res) => {
 
 // Create a new room
 app.post('/api/rooms', authOptional, async (req, res) => {
-  const { boardSize = 37, creatorPlayer = 1, stateJson, treeJson, rated = false } = req.body;
+  const {
+    boardSize = 37,
+    creatorPlayer = 1,
+    stateJson,
+    treeJson,
+    rated = false,
+    timeControlBaseMs = null,
+    timeControlIncrementMs = null,
+  } = req.body;
   
   if (!stateJson || !treeJson) {
     res.status(400).json({ error: 'Missing state or tree' });
@@ -922,13 +936,52 @@ app.post('/api/rooms', authOptional, async (req, res) => {
 
   const userId = req.user ? req.user.id : null;
   const userCol = creatorPlayer === 1 ? 'user1_id' : 'user2_id';
+  const isTimed = Number.isFinite(timeControlBaseMs) && Number.isFinite(timeControlIncrementMs);
+
+  if (isTimed && !userId) {
+    res.status(401).json({ error: 'Timed invite rooms require authentication' });
+    return;
+  }
+
+  if (isTimed && (timeControlBaseMs <= 0 || timeControlIncrementMs < 0)) {
+    res.status(400).json({ error: 'Invalid time control values' });
+    return;
+  }
 
   try {
+    const clockBase = isTimed ? Number(timeControlBaseMs) : null;
+    const clockInc = isTimed ? Number(timeControlIncrementMs) : null;
+    const now = isTimed ? new Date() : null;
+
     const result = await pool.query(
-      `INSERT INTO rooms (board_size, creator_player, state_json, tree_json, rated, ${userCol})
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO rooms (
+         board_size,
+         creator_player,
+         state_json,
+         tree_json,
+         rated,
+         ${userCol},
+         time_control_base_ms,
+         time_control_increment_ms,
+         clock_p1_ms,
+         clock_p2_ms,
+         clock_running_since
+       )
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
        RETURNING id`,
-      [boardSize, creatorPlayer, stateJson, treeJson, rated && !!userId, userId]
+      [
+        boardSize,
+        creatorPlayer,
+        stateJson,
+        treeJson,
+        rated && !!userId,
+        userId,
+        clockBase,
+        clockInc,
+        clockBase,
+        clockBase,
+        now,
+      ]
     );
     
     res.json({ id: result.rows[0].id });
@@ -949,7 +1002,50 @@ app.get('/api/rooms/:id', async (req, res) => {
       return;
     }
     
-    const row = result.rows[0];
+    let row = result.rows[0];
+
+    const canTimeoutByRead =
+      row.winner == null &&
+      row.time_control_base_ms != null &&
+      row.time_control_increment_ms != null &&
+      row.clock_running_since != null;
+
+    if (canTimeoutByRead) {
+      const nowMs = Date.now();
+      const startedMs = new Date(row.clock_running_since).getTime();
+      const elapsedMs = Math.max(0, nowMs - startedMs);
+      const baseMs = Number(row.time_control_base_ms);
+      const p1Ms = row.clock_p1_ms == null ? baseMs : Number(row.clock_p1_ms);
+      const p2Ms = row.clock_p2_ms == null ? baseMs : Number(row.clock_p2_ms);
+      const movingPlayer = row.current_player === 1 ? 1 : 2;
+      const remaining = movingPlayer === 1 ? p1Ms - elapsedMs : p2Ms - elapsedMs;
+
+      if (remaining <= 0) {
+        const winner = movingPlayer === 1 ? 2 : 1;
+        const timeoutResult = await pool.query(
+          `UPDATE rooms
+             SET winner = $2,
+                 win_type = 'time',
+                 current_player = $3,
+                 clock_p1_ms = $4,
+                 clock_p2_ms = $5,
+                 clock_running_since = NULL,
+                 updated_at = NOW()
+           WHERE id = $1
+           RETURNING *`,
+          [
+            id,
+            winner,
+            winner,
+            movingPlayer === 1 ? 0 : p1Ms,
+            movingPlayer === 2 ? 0 : p2Ms,
+          ]
+        );
+        if (timeoutResult.rows.length > 0) {
+          row = timeoutResult.rows[0];
+        }
+      }
+    }
 
     // Fetch user ratings if users are associated
     let user1Rating = null;
@@ -986,6 +1082,11 @@ app.get('/api/rooms/:id', async (req, res) => {
       user1Rating,
       user2Rating,
       ratingDelta,
+      timeControlBaseMs: row.time_control_base_ms,
+      timeControlIncrementMs: row.time_control_increment_ms,
+      clockP1Ms: row.clock_p1_ms,
+      clockP2Ms: row.clock_p2_ms,
+      clockRunningSince: row.clock_running_since ? row.clock_running_since.getTime() : null,
     });
   } catch (err) {
     console.error('Error getting room:', err);
@@ -998,31 +1099,110 @@ app.put('/api/rooms/:id/state', authOptional, async (req, res) => {
   const { id } = req.params;
   const { stateJson, treeJson, currentPlayer, winner, winType, playerIndex } = req.body;
 
+  const roomCheck = await pool.query(
+    `SELECT
+      current_player,
+      winner,
+      user1_id,
+      user2_id,
+      time_control_base_ms,
+      time_control_increment_ms,
+      clock_p1_ms,
+      clock_p2_ms,
+      clock_running_since
+     FROM rooms
+     WHERE id = $1`,
+    [id]
+  );
+
+  if (roomCheck.rows.length === 0) {
+    res.status(404).json({ error: 'Room not found' });
+    return;
+  }
+
+  const room = roomCheck.rows[0];
+
+  if (room.winner) {
+    res.status(400).json({ error: 'Игра уже завершена' });
+    return;
+  }
+
   // Turn enforcement: validate the submitting player matches the room's current_player
   if (playerIndex) {
     try {
-      const roomCheck = await pool.query('SELECT current_player, winner, user1_id, user2_id FROM rooms WHERE id = $1', [id]);
-      if (roomCheck.rows.length > 0) {
-        const room = roomCheck.rows[0];
-        const authUserId = req.user ? req.user.id : null;
-        const seatUserId = playerIndex === 1 ? room.user1_id : room.user2_id;
+      const authUserId = req.user ? req.user.id : null;
+      const seatUserId = playerIndex === 1 ? room.user1_id : room.user2_id;
 
-        if (room.winner) {
-          res.status(400).json({ error: 'Игра уже завершена' });
-          return;
-        }
-        if (!authUserId || !seatUserId || Number(authUserId) !== Number(seatUserId)) {
-          res.status(403).json({ error: 'Нельзя ходить за другого игрока' });
-          return;
-        }
-        if (room.current_player !== playerIndex) {
-          res.status(403).json({ error: 'Не ваш ход' });
-          return;
-        }
+      if (!authUserId || !seatUserId || Number(authUserId) !== Number(seatUserId)) {
+        res.status(403).json({ error: 'Нельзя ходить за другого игрока' });
+        return;
+      }
+      if (room.current_player !== playerIndex) {
+        res.status(403).json({ error: 'Не ваш ход' });
+        return;
       }
     } catch (err) {
       console.error('Turn check error:', err);
     }
+  }
+
+  let nextWinner = winner;
+  let nextWinType = winType;
+  let nextCurrentPlayer = currentPlayer;
+  let nextClockP1 = room.clock_p1_ms;
+  let nextClockP2 = room.clock_p2_ms;
+  let nextClockRunningSince = room.clock_running_since ? new Date() : null;
+
+  const isTimedGame =
+    room.time_control_base_ms != null &&
+    room.time_control_increment_ms != null &&
+    room.clock_running_since != null;
+
+  if (isTimedGame) {
+    const nowMs = Date.now();
+    const startedMs = new Date(room.clock_running_since).getTime();
+    const elapsedMs = Math.max(0, nowMs - startedMs);
+    const movingPlayer = room.current_player === 1 ? 1 : 2;
+    const baseMs = Number(room.time_control_base_ms);
+    const incrementMs = Number(room.time_control_increment_ms);
+    const p1Before = room.clock_p1_ms == null ? baseMs : Number(room.clock_p1_ms);
+    const p2Before = room.clock_p2_ms == null ? baseMs : Number(room.clock_p2_ms);
+
+    if (movingPlayer === 1) {
+      const afterSpent = p1Before - elapsedMs;
+      if (afterSpent <= 0) {
+        nextClockP1 = 0;
+        nextClockP2 = p2Before;
+        nextWinner = 2;
+        nextWinType = 'time';
+        nextCurrentPlayer = 2;
+        nextClockRunningSince = null;
+      } else {
+        nextClockP1 = afterSpent + incrementMs;
+        nextClockP2 = p2Before;
+      }
+    } else {
+      const afterSpent = p2Before - elapsedMs;
+      if (afterSpent <= 0) {
+        nextClockP1 = p1Before;
+        nextClockP2 = 0;
+        nextWinner = 1;
+        nextWinType = 'time';
+        nextCurrentPlayer = 1;
+        nextClockRunningSince = null;
+      } else {
+        nextClockP1 = p1Before;
+        nextClockP2 = afterSpent + incrementMs;
+      }
+    }
+
+    if (!nextWinner) {
+      nextClockRunningSince = new Date();
+    }
+  }
+
+  if (nextWinner) {
+    nextClockRunningSince = null;
   }
   
   await pool.query(
@@ -1032,15 +1212,28 @@ app.put('/api/rooms/:id/state', authOptional, async (req, res) => {
        current_player = $4,
        winner = $5,
        win_type = $6,
+       clock_p1_ms = $7,
+       clock_p2_ms = $8,
+       clock_running_since = $9,
        updated_at = NOW()
      WHERE id = $1`,
-    [id, stateJson, treeJson, currentPlayer, winner, winType]
+    [
+      id,
+      stateJson,
+      treeJson,
+      nextCurrentPlayer,
+      nextWinner,
+      nextWinType,
+      nextClockP1,
+      nextClockP2,
+      nextClockRunningSince,
+    ]
   );
 
   let ratingDelta = null;
 
   // Glicko-2 rating update for rated games when winner is determined
-  if (winner) {
+  if (nextWinner) {
     try {
       const roomRow = await pool.query('SELECT rated, user1_id, user2_id FROM rooms WHERE id = $1', [id]);
       const room = roomRow.rows[0];
@@ -1051,8 +1244,8 @@ app.put('/api/rooms/:id/state', authOptional, async (req, res) => {
         const u2 = u2Row.rows[0];
 
         if (u1 && u2) {
-          const score1 = winner === 1 ? 1 : 0;
-          const score2 = winner === 2 ? 1 : 0;
+          const score1 = nextWinner === 1 ? 1 : 0;
+          const score2 = nextWinner === 2 ? 1 : 0;
 
           const new1 = glicko2Update(u1.rating, u1.rating_rd, u1.rating_vol, u2.rating, u2.rating_rd, score1);
           const new2 = glicko2Update(u2.rating, u2.rating_rd, u2.rating_vol, u1.rating, u1.rating_rd, score2);
@@ -1064,7 +1257,7 @@ app.put('/api/rooms/:id/state', authOptional, async (req, res) => {
           );
 
           // Update player 1
-          const streak1 = winner === 1 ? u1.current_streak + 1 : 0;
+          const streak1 = nextWinner === 1 ? u1.current_streak + 1 : 0;
           const best1 = Math.max(u1.best_streak, streak1);
           await pool.query(
             `UPDATE users SET rating=$2, rating_rd=$3, rating_vol=$4, wins=wins+$5, losses=losses+$6, current_streak=$7, best_streak=$8 WHERE id=$1`,
@@ -1072,7 +1265,7 @@ app.put('/api/rooms/:id/state', authOptional, async (req, res) => {
           );
 
           // Update player 2
-          const streak2 = winner === 2 ? u2.current_streak + 1 : 0;
+          const streak2 = nextWinner === 2 ? u2.current_streak + 1 : 0;
           const best2 = Math.max(u2.best_streak, streak2);
           await pool.query(
             `UPDATE users SET rating=$2, rating_rd=$3, rating_vol=$4, wins=wins+$5, losses=losses+$6, current_streak=$7, best_streak=$8 WHERE id=$1`,

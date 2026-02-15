@@ -7,6 +7,11 @@ export interface RatingDelta {
   player2: { before: number; after: number; delta: number };
 }
 
+export interface FischerTimeControl {
+  baseMs: number;
+  incrementMs: number;
+}
+
 export interface RoomData {
   id: number;
   boardSize: 37 | 48 | 61;
@@ -25,6 +30,11 @@ export interface RoomData {
   user1Rating: number | null;
   user2Rating: number | null;
   ratingDelta: RatingDelta | null;
+  timeControlBaseMs: number | null;
+  timeControlIncrementMs: number | null;
+  clockP1Ms: number | null;
+  clockP2Ms: number | null;
+  clockRunningSince: number | null;
 }
 
 export interface ChatMessage {
@@ -74,7 +84,8 @@ export async function createRoom(
   state: GameState,
   tree: GameNode,
   creatorPlayer: 1 | 2 = 1,
-  rated: boolean = false
+  rated: boolean = false,
+  timeControl?: FischerTimeControl | null
 ): Promise<number> {
   const token = localStorage.getItem('zertz_auth_token');
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -89,6 +100,8 @@ export async function createRoom(
       stateJson: serializeState(state),
       treeJson: serializeTree(tree),
       rated,
+      timeControlBaseMs: timeControl?.baseMs ?? null,
+      timeControlIncrementMs: timeControl?.incrementMs ?? null,
     }),
   });
 
@@ -116,6 +129,11 @@ export async function getRoom(id: number | string): Promise<{
   user1Rating: number | null;
   user2Rating: number | null;
   ratingDelta: RatingDelta | null;
+  timeControlBaseMs: number | null;
+  timeControlIncrementMs: number | null;
+  clockP1Ms: number | null;
+  clockP2Ms: number | null;
+  clockRunningSince: number | null;
 } | null> {
   const response = await fetch(`${API_BASE}/api/rooms/${id}`);
   
@@ -144,6 +162,11 @@ export async function getRoom(id: number | string): Promise<{
     user1Rating: data.user1Rating,
     user2Rating: data.user2Rating,
     ratingDelta: data.ratingDelta,
+    timeControlBaseMs: data.timeControlBaseMs,
+    timeControlIncrementMs: data.timeControlIncrementMs,
+    clockP1Ms: data.clockP1Ms,
+    clockP2Ms: data.clockP2Ms,
+    clockRunningSince: data.clockRunningSince,
   };
 }
 

@@ -170,6 +170,7 @@ type Dict = {
   winByGray: string;
   winByBlack: string;
   winByMixed: string;
+  winByTime: string;
   winUnknown: string;
   phasePlacement: string;
   phaseRingRemoval: string;
@@ -400,6 +401,7 @@ export const I18N: Record<Language, Dict> = {
     winByGray: 'Победа по серым шарикам!',
     winByBlack: 'Победа по чёрным шарикам!',
     winByMixed: 'Победа по разным шарикам!',
+    winByTime: 'Победа по времени!',
     winUnknown: 'Победа!',
     phasePlacement: 'Размести шарик',
     phaseRingRemoval: 'Удали кольцо',
@@ -628,6 +630,7 @@ export const I18N: Record<Language, Dict> = {
     winByGray: 'Win by gray marbles!',
     winByBlack: 'Win by black marbles!',
     winByMixed: 'Win by mixed marbles!',
+    winByTime: 'Win on time!',
     winUnknown: 'Win!',
     phasePlacement: 'Place a marble',
     phaseRingRemoval: 'Remove a ring',
@@ -856,6 +859,7 @@ export const I18N: Record<Language, Dict> = {
     winByGray: 'Venko per grizaj globetoj!',
     winByBlack: 'Venko per nigraj globetoj!',
     winByMixed: 'Venko per miksitaj globetoj!',
+    winByTime: 'Venko laŭ tempo!',
     winUnknown: 'Venko!',
     phasePlacement: 'Metu globeton',
     phaseRingRemoval: 'Forigu ringon',
@@ -946,5 +950,6 @@ export function getWinTypeLabel(t: Dict, winType: string | null | undefined): st
   if (winType === 'gray') return t.winByGray;
   if (winType === 'black') return t.winByBlack;
   if (winType === 'mixed') return t.winByMixed;
+  if (winType === 'time') return t.winByTime;
   return t.winUnknown;
 }
