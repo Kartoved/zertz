@@ -285,7 +285,7 @@ export default function MainMenu() {
       </div>
 
       {/* ═══════ MAIN CONTENT: 3 columns ═══════ */}
-      <main className="flex-1 flex flex-col lg:flex-row gap-4 p-3 md:p-4 overflow-visible lg:overflow-hidden max-w-[1400px] mx-auto w-full">
+      <main className="flex-1 flex flex-col lg:flex-row gap-4 p-3 md:p-4 overflow-visible lg:overflow-y-auto max-w-[1400px] mx-auto w-full">
         {/* LEFT: Player profile card */}
         <aside className="hidden lg:flex w-full lg:w-72 flex-shrink-0 flex-col order-2 lg:order-1">
           <PlayerProfileCard
@@ -295,12 +295,12 @@ export default function MainMenu() {
 
         {/* CENTER: Time control modes */}
         <section className={`flex-1 flex flex-col min-w-0 order-1 lg:order-2 ${mobileMainTab !== 'play' ? 'hidden lg:flex' : ''}`}>
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 flex-1 flex flex-col">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 flex-1 flex flex-col overflow-y-auto">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-6">
               {t.selectTimeControl}
             </h2>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {TIME_CONTROLS.map((tc) => {
                 const label = t[tc.id as keyof typeof t] as string;
                 const desc = t[`${tc.id}Desc` as keyof typeof t] as string;

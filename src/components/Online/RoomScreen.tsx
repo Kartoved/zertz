@@ -233,7 +233,7 @@ export function RoomScreen() {
   }
 
   return (
-    <div className="h-screen bg-gray-100 dark:bg-gray-900 flex flex-col overflow-hidden">
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col overflow-x-hidden">
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 shadow-sm p-3 md:p-4">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
@@ -340,9 +340,9 @@ export function RoomScreen() {
       )}
 
       {/* Main content */}
-      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 p-2 md:p-4 max-w-7xl mx-auto w-full pb-16 lg:pb-4">
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-3 md:gap-4 p-2 md:p-4 max-w-7xl mx-auto w-full pb-20 lg:pb-4 overflow-y-auto">
         {/* Left panel - Players */}
-        <div className={`lg:w-64 lg:flex lg:flex-col gap-2 lg:gap-4 ${mobileTab === 'chat' ? 'hidden lg:flex' : 'grid grid-cols-2 lg:grid-cols-1'}`}>
+        <div className={`lg:w-64 lg:flex lg:flex-col gap-2 lg:gap-4 ${mobileTab === 'chat' ? 'hidden lg:flex' : 'grid grid-cols-2 lg:grid-cols-1'} min-w-0`}>
           {/* Player 1 */}
           <div className={`p-2 lg:p-3 rounded-lg ${
             state.currentPlayer === 'player1' && !state.winner
@@ -506,7 +506,7 @@ export function RoomScreen() {
         </div>
 
         {/* Center - Board */}
-        <div className={`flex-1 min-h-0 items-center justify-center min-h-[320px] md:min-h-[400px] ${mobileTab === 'chat' ? 'hidden lg:flex' : 'flex'}`}>
+        <div className={`flex-1 min-h-0 items-center justify-center min-h-[280px] sm:min-h-[340px] md:min-h-[400px] ${mobileTab === 'chat' ? 'hidden lg:flex' : 'flex'}`}>
           <HexBoard
             state={state}
             onRingClick={handleRingClick}

@@ -92,12 +92,12 @@ export default function HexBoard(props: HexBoardProps = {}) {
   };
 
   return (
-    <div className="flex items-center justify-center p-4 w-full">
-      <div className="relative w-full max-w-[1100px] rounded-2xl bg-[#778899] p-4 shadow-lg">
+    <div className="flex items-center justify-center p-2 sm:p-3 md:p-4 w-full">
+      <div className="relative w-full max-w-[1100px] rounded-2xl bg-[#778899] p-3 sm:p-4 shadow-lg overflow-hidden">
         <svg
           // Camera zoom: change viewBox, keep geometry (spacing) intact
           viewBox={`${viewX} ${viewY} ${viewWidth} ${viewHeight}`}
-          className="w-full h-[80vh] cursor-move"
+          className="w-full h-[52vh] sm:h-[58vh] md:h-[64vh] lg:h-[80vh] max-h-[760px] cursor-move"
           onWheel={handleWheel}
         >
           <g transform={`translate(${offsetX}, ${offsetY})`}>
