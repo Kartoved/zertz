@@ -12,6 +12,8 @@ import ChallengesModal from '../Auth/ChallengesModal';
 import PlayerProfileCard from '../UI/PlayerProfileCard';
 import GlobalChat from '../UI/GlobalChat';
 import * as roomsApi from '../../db/roomsApi';
+import { createInitialState } from '../../game/GameEngine';
+import { GameNode } from '../../game/types';
 
 type InviteMode = 'classic' | 'timedInvite';
 type TimePresetId = '5+5' | '15+0' | '30+0';
@@ -384,49 +386,12 @@ export default function MainMenu() {
                   <button
                     key={tc.id}
                     disabled={!tc.enabled || (!user && tc.preset !== null)}
-                    onClick={async () => {
+                    onClick={() => {
                       if (!user && tc.preset !== null) {
                         setShowAuthModal(true);
                         return;
                       }
-                      if (tc.preset === null) {
-                        setSelectedTimeControl(tc.id as any);
-                        return;
-                      }
-
-                      // Start searching logic
                       setSelectedTimeControl(tc.id as any);
-                      setIsSearchingMatch(true);
-                      
-                      try {
-                        const res = await roomsApi.joinMatchmaking(selectedBoardSize, tc.id);
-                        if (res.status === 'matched' && res.roomId) {
-                          // Immediately matched
-                          setIsSearchingMatch(false);
-                          const joined = await useRoomStore.getState().joinRoom(res.roomId);
-                          if (joined) setScreen('game');
-                        } else {
-                          // Polling
-                          const interval = window.setInterval(async () => {
-                            try {
-                              const pollRes = await roomsApi.pollMatchStatus();
-                              if (pollRes.status === 'matched' && pollRes.roomId) {
-                                clearInterval(interval);
-                                setIsSearchingMatch(false);
-                                setSearchIntervalId(null);
-                                const joined = await useRoomStore.getState().joinRoom(pollRes.roomId);
-                                if (joined) setScreen('game');
-                              }
-                            } catch (e) {
-                              console.error('Polling error', e);
-                            }
-                          }, 1500);
-                          setSearchIntervalId(interval);
-                        }
-                      } catch (err) {
-                        console.error('Error joining match', err);
-                        setIsSearchingMatch(false);
-                      }
                     }}
                     className={`relative flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all
                       ${(!tc.enabled || (!user && tc.preset !== null))
@@ -453,10 +418,69 @@ export default function MainMenu() {
               })}
             </div>
 
-            <div className="mt-8 flex justify-center">
+            <div className="mt-8 flex flex-col gap-3 items-center">
               <button
                 type="button"
-                className="w-full sm:w-2/3 lg:w-1/2 py-3.5 px-6 rounded-xl font-bold text-lg transition-all shadow-md hover:shadow-lg active:scale-95 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white"
+                className="w-full sm:w-2/3 lg:w-1/2 py-3.5 px-6 rounded-xl font-bold text-lg transition-all shadow-md hover:shadow-lg active:scale-95 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white"
+                onClick={async () => {
+                  const tc = TIME_CONTROLS.find(c => c.id === selectedTimeControl);
+                  if (!tc) return;
+                  if (!user && tc.preset !== null) {
+                    setShowAuthModal(true);
+                    return;
+                  }
+                  if (tc.preset === null) return; // Correspondence matchmaking isn't fully supported
+
+                  // Start searching logic
+                  setIsSearchingMatch(true);
+
+                  const initialState = createInitialState(selectedBoardSize);
+                  const rootNode: GameNode = {
+                    id: 'root',
+                    moveNumber: 0,
+                    player: 'player1',
+                    move: null,
+                    notation: '',
+                    children: [],
+                    parent: null,
+                    isMainLine: true,
+                  };
+                  
+                  try {
+                    const res = await roomsApi.joinMatchmaking(selectedBoardSize, tc.id, initialState, rootNode);
+                    if (res.status === 'matched' && res.roomId) {
+                      // Immediately matched
+                      setIsSearchingMatch(false);
+                      navigate(`/room/${res.roomId}`);
+                    } else {
+                      // Polling
+                      const interval = window.setInterval(async () => {
+                        try {
+                          const pollRes = await roomsApi.pollMatchStatus();
+                          if (pollRes.status === 'matched' && pollRes.roomId) {
+                            clearInterval(interval);
+                            setIsSearchingMatch(false);
+                            setSearchIntervalId(null);
+                            navigate(`/room/${pollRes.roomId}`);
+                          }
+                        } catch (e) {
+                          console.error('Polling error', e);
+                        }
+                      }, 1500);
+                      setSearchIntervalId(interval);
+                    }
+                  } catch (err) {
+                    console.error('Error joining match', err);
+                    setIsSearchingMatch(false);
+                  }
+                }}
+              >
+                Поиск игры
+              </button>
+
+              <button
+                type="button"
+                className="w-full sm:w-2/3 lg:w-1/2 py-3.5 px-6 rounded-xl font-bold text-lg transition-all shadow-md hover:shadow-lg active:scale-95 bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 hover:bg-gray-50 dark:hover:bg-gray-700"
                 onClick={() => {
                   const tc = TIME_CONTROLS.find(c => c.id === selectedTimeControl);
                   if (!tc) return;

@@ -255,7 +255,7 @@ export async function sendChatMessage(
   return response.json();
 }
 
-export async function joinMatchmaking(boardSize: 37 | 48 | 61, timeControl: string): Promise<{ status: 'matched' | 'searching' | 'none', roomId?: number }> {
+export async function joinMatchmaking(boardSize: 37 | 48 | 61, timeControl: string, state: GameState, tree: GameNode): Promise<{ status: 'matched' | 'searching' | 'none', roomId?: number }> {
   const token = localStorage.getItem('zertz_auth_token');
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (token) headers['Authorization'] = `Bearer ${token}`;
@@ -263,7 +263,12 @@ export async function joinMatchmaking(boardSize: 37 | 48 | 61, timeControl: stri
   const response = await fetch(`${API_BASE}/api/matchmake/join`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ boardSize, timeControl }),
+    body: JSON.stringify({ 
+      boardSize, 
+      timeControl, 
+      stateJson: serializeState(state), 
+      treeJson: serializeTree(tree) 
+    }),
   });
 
   if (!response.ok) {

@@ -924,7 +924,7 @@ const matchQueue = {};
 const matchedRooms = {};
 
 app.post('/api/matchmake/join', authRequired, async (req, res) => {
-  const { boardSize, timeControl } = req.body;
+  const { boardSize, timeControl, stateJson, treeJson } = req.body;
   const userId = req.user.id;
 
   if (!boardSize || !timeControl) {
@@ -981,30 +981,6 @@ app.post('/api/matchmake/join', authRequired, async (req, res) => {
     const cInc = incMap[timeControl];
     const isTimed = cBase !== null && cInc !== null;
     
-    // Initial state matching standard board size logic
-    const ringsArray = []; // Emptied for this snippet, real client will hydrate. Or we pass default state?
-    // Oh wait, the backend doesn't construct the state. For matchmaking, clients don't send state.
-    // The client that starts the room needs state. We will rely on empty client-side sync.
-    // Let's generate a placeholder state and tree just to get the room created.
-    const defaultState = JSON.stringify({
-      rings: [],
-      whiteMarbles: boardSize === 37 ? 5 : boardSize === 48 ? 6 : 7,
-      greyMarbles: boardSize === 37 ? 7 : boardSize === 48 ? 8 : 9,
-      blackMarbles: boardSize === 37 ? 9 : boardSize === 48 ? 10 : 12,
-      currentPlayer: 1,
-      player1Marbles: { white: 0, grey: 0, black: 0, set: 0 },
-      player2Marbles: { white: 0, grey: 0, black: 0, set: 0 },
-      lastMove: null,
-      phase: 1
-    });
-
-    const defaultTree = JSON.stringify({
-      state: JSON.parse(defaultState),
-      move: null,
-      children: [],
-      parent: null
-    });
-
     try {
       const roomRes = await pool.query(
         `INSERT INTO rooms (
@@ -1026,8 +1002,8 @@ app.post('/api/matchmake/join', authRequired, async (req, res) => {
         [
           boardSize,
           1, // Player 1
-          defaultState,
-          defaultTree,
+          otherPlayer.stateJson,
+          otherPlayer.treeJson,
           true, // Rated by default for matchmaking
           matchFound, // Player 1 is whoever was waiting
           userId, // Player 2 is the new joiner
@@ -1047,15 +1023,15 @@ app.post('/api/matchmake/join', authRequired, async (req, res) => {
       res.json({ status: 'matched', roomId });
       return;
     } catch (e) {
-      console.error("Matchmaking room creation err", e);
+      console.error("Matchmaking room creation err:", e);
       res.status(500).json({ error: 'Failed to create matched room' });
       return;
     }
   }
 
-  // Nobody found, add to queue
-  matchQueue[userId] = { boardSize, timeControl, rating, joinedAt };
-  res.json({ status: 'searching' });
+// Nobody found, add to queue
+matchQueue[userId] = { boardSize, timeControl, rating, joinedAt, stateJson, treeJson };
+res.json({ status: 'searching' });
 });
 
 app.get('/api/matchmake/status', authRequired, (req, res) => {
