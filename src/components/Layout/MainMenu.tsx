@@ -11,6 +11,7 @@ import PlayersModal from '../Auth/PlayersModal';
 import ChallengesModal from '../Auth/ChallengesModal';
 import PlayerProfileCard from '../UI/PlayerProfileCard';
 import GlobalChat from '../UI/GlobalChat';
+import * as roomsApi from '../../db/roomsApi';
 
 type InviteMode = 'classic' | 'timedInvite';
 type TimePresetId = '5+5' | '15+0' | '30+0';
@@ -69,8 +70,26 @@ export default function MainMenu() {
   const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [mobileMainTab, setMobileMainTab] = useState<'play' | 'chat'>('play');
+  const [isSearchingMatch, setIsSearchingMatch] = useState(false);
+  const [searchIntervalId, setSearchIntervalId] = useState<number | null>(null);
+
   const { user } = useAuthStore();
   const boardLabels: Record<number, string> = { 37: t.board37, 48: t.board48, 61: t.board61 };
+
+  useEffect(() => {
+    return () => {
+      if (searchIntervalId) clearInterval(searchIntervalId);
+    };
+  }, [searchIntervalId]);
+
+  const cancelSearch = async () => {
+    if (searchIntervalId) clearInterval(searchIntervalId);
+    setSearchIntervalId(null);
+    setIsSearchingMatch(false);
+    try {
+      await roomsApi.leaveMatchmaking();
+    } catch (e) { console.error('Error leaving search', e); }
+  };
   
   useEffect(() => {
     refreshSavedGames();
@@ -259,6 +278,37 @@ export default function MainMenu() {
         </div>
       )}
 
+      {/* Searching Match Overlay */}
+      {isSearchingMatch && (
+        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-sm w-full p-8 text-center relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-indigo-500/20">
+              <div className="h-full bg-indigo-500 animate-[loading_2s_ease-in-out_infinite]" />
+            </div>
+            
+            <div className="w-20 h-20 mx-auto bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mb-6">
+              <span className="text-4xl animate-pulse">
+                {TIME_CONTROLS.find(t => t.id === selectedTimeControl)?.icon || '🔍'}
+              </span>
+            </div>
+
+            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              Searching for opponent...
+            </h3>
+            <p className="text-gray-500 dark:text-gray-400 text-sm font-medium mb-8">
+              {selectedBoardSize} rings / {TIME_CONTROLS.find(t => t.id === selectedTimeControl)?.id.toUpperCase()}
+            </p>
+
+            <button
+              onClick={cancelSearch}
+              className="w-full py-3.5 px-6 rounded-xl font-bold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="lg:hidden px-3 pt-3">
         <div className="grid grid-cols-2 bg-white dark:bg-gray-800 rounded-xl p-1 shadow-sm border border-gray-200 dark:border-gray-700">
           <button
@@ -298,6 +348,28 @@ export default function MainMenu() {
         {/* CENTER: Time control modes */}
         <section className={`flex-1 flex flex-col min-w-0 order-1 lg:order-2 ${mobileMainTab !== 'play' ? 'hidden lg:flex' : ''}`}>
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 flex-1 flex flex-col overflow-y-auto">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+              {t.selectBoard}
+            </h2>
+            <div className="grid grid-cols-3 gap-3 mb-6">
+              {([37, 48, 61] as const).map(size => (
+                <button
+                  key={size}
+                  onClick={() => setSelectedBoardSize(size)}
+                  className={`py-3 rounded-xl font-bold bg-white dark:bg-gray-800 transition-colors border-2
+                    ${selectedBoardSize === size 
+                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 text-gray-900 dark:text-white shadow-sm' 
+                      : 'border-transparent dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    }`}
+                >
+                  <div className="text-xl mb-1">{size}</div>
+                  <div className="text-xs font-normal text-gray-500 dark:text-gray-400">
+                    {boardLabels[size]}
+                  </div>
+                </button>
+              ))}
+            </div>
+
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-6">
               {t.selectTimeControl}
             </h2>
@@ -312,12 +384,49 @@ export default function MainMenu() {
                   <button
                     key={tc.id}
                     disabled={!tc.enabled || (!user && tc.preset !== null)}
-                    onClick={() => {
+                    onClick={async () => {
                       if (!user && tc.preset !== null) {
                         setShowAuthModal(true);
                         return;
                       }
+                      if (tc.preset === null) {
+                        setSelectedTimeControl(tc.id as any);
+                        return;
+                      }
+
+                      // Start searching logic
                       setSelectedTimeControl(tc.id as any);
+                      setIsSearchingMatch(true);
+                      
+                      try {
+                        const res = await roomsApi.joinMatchmaking(selectedBoardSize, tc.id);
+                        if (res.status === 'matched' && res.roomId) {
+                          // Immediately matched
+                          setIsSearchingMatch(false);
+                          const joined = await useRoomStore.getState().joinRoom(res.roomId);
+                          if (joined) setScreen('game');
+                        } else {
+                          // Polling
+                          const interval = window.setInterval(async () => {
+                            try {
+                              const pollRes = await roomsApi.pollMatchStatus();
+                              if (pollRes.status === 'matched' && pollRes.roomId) {
+                                clearInterval(interval);
+                                setIsSearchingMatch(false);
+                                setSearchIntervalId(null);
+                                const joined = await useRoomStore.getState().joinRoom(pollRes.roomId);
+                                if (joined) setScreen('game');
+                              }
+                            } catch (e) {
+                              console.error('Polling error', e);
+                            }
+                          }, 1500);
+                          setSearchIntervalId(interval);
+                        }
+                      } catch (err) {
+                        console.error('Error joining match', err);
+                        setIsSearchingMatch(false);
+                      }
                     }}
                     className={`relative flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all
                       ${(!tc.enabled || (!user && tc.preset !== null))

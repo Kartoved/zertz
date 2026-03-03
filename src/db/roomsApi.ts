@@ -254,3 +254,39 @@ export async function sendChatMessage(
 
   return response.json();
 }
+
+export async function joinMatchmaking(boardSize: 37 | 48 | 61, timeControl: string): Promise<{ status: 'matched' | 'searching' | 'none', roomId?: number }> {
+  const token = localStorage.getItem('zertz_auth_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const response = await fetch(`${API_BASE}/api/matchmake/join`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ boardSize, timeControl }),
+  });
+
+  if (!response.ok) {
+    throw new Error('Failed to join matchmaking');
+  }
+
+  return response.json();
+}
+
+export async function pollMatchStatus(): Promise<{ status: 'matched' | 'searching' | 'none', roomId?: number }> {
+  const token = localStorage.getItem('zertz_auth_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const response = await fetch(`${API_BASE}/api/matchmake/status`, { headers });
+  if (!response.ok) throw new Error('Failed to poll matchmaking');
+  return response.json();
+}
+
+export async function leaveMatchmaking(): Promise<void> {
+  const token = localStorage.getItem('zertz_auth_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  await fetch(`${API_BASE}/api/matchmake/leave`, { method: 'DELETE', headers });
+}

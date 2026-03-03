@@ -34,6 +34,7 @@ type Dict = {
   board37: string;
   board48: string;
   board61: string;
+  selectBoard: string;
   chooseBoard: string;
   chooseBoardOnline: string;
   choosePlayer: string;
@@ -267,6 +268,7 @@ export const I18N: Record<Language, Dict> = {
     board37: 'Любительское 37 колец',
     board48: 'Турнирное 48 колец',
     board61: 'Турнирное 61 кольцо',
+    selectBoard: 'Выберите размер поля',
     chooseBoard: 'Выберите поле',
     chooseBoardOnline: 'Выберите размер поля',
     choosePlayer: 'Выберите игрока',
@@ -498,6 +500,7 @@ export const I18N: Record<Language, Dict> = {
     board37: 'Amateur 37 rings',
     board48: 'Tournament 48 rings',
     board61: 'Tournament 61 rings',
+    selectBoard: 'Select board size',
     chooseBoard: 'Choose board',
     chooseBoardOnline: 'Choose board size',
     choosePlayer: 'Choose player',
@@ -729,6 +732,7 @@ export const I18N: Record<Language, Dict> = {
     board37: 'Amatora 37 ringoj',
     board48: 'Turnira 48 ringoj',
     board61: 'Turnira 61 ringoj',
+    selectBoard: 'Elektu tabulon',
     chooseBoard: 'Elektu tabulon',
     chooseBoardOnline: 'Elektu tabulgrandecon',
     choosePlayer: 'Elektu ludanton',
