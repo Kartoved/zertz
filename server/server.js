@@ -951,7 +951,7 @@ app.post('/api/rooms', authOptional, async (req, res) => {
   try {
     const clockBase = isTimed ? Number(timeControlBaseMs) : null;
     const clockInc = isTimed ? Number(timeControlIncrementMs) : null;
-    const now = isTimed ? new Date() : null;
+    const now = null;
 
     const result = await pool.query(
       `INSERT INTO rooms (
@@ -1168,6 +1168,8 @@ app.put('/api/rooms/:id/state', authOptional, async (req, res) => {
     const p1Before = room.clock_p1_ms == null ? baseMs : Number(room.clock_p1_ms);
     const p2Before = room.clock_p2_ms == null ? baseMs : Number(room.clock_p2_ms);
 
+    const didTurnPass = room.current_player !== nextCurrentPlayer;
+
     if (movingPlayer === 1) {
       const afterSpent = p1Before - elapsedMs;
       if (afterSpent <= 0) {
@@ -1178,7 +1180,7 @@ app.put('/api/rooms/:id/state', authOptional, async (req, res) => {
         nextCurrentPlayer = 2;
         nextClockRunningSince = null;
       } else {
-        nextClockP1 = afterSpent + incrementMs;
+        nextClockP1 = afterSpent + (didTurnPass ? incrementMs : 0);
         nextClockP2 = p2Before;
       }
     } else {
@@ -1192,7 +1194,7 @@ app.put('/api/rooms/:id/state', authOptional, async (req, res) => {
         nextClockRunningSince = null;
       } else {
         nextClockP1 = p1Before;
-        nextClockP2 = afterSpent + incrementMs;
+        nextClockP2 = afterSpent + (didTurnPass ? incrementMs : 0);
       }
     }
 
@@ -1338,6 +1340,18 @@ app.put('/api/rooms/:id/join', authOptional, async (req, res) => {
 
   const col = playerIndex === 1 ? 'user1_id' : 'user2_id';
   await pool.query(`UPDATE rooms SET ${col} = $2 WHERE id = $1`, [id, userId]);
+
+  await pool.query(`
+    UPDATE rooms
+    SET clock_running_since = NOW()
+    WHERE id = $1
+      AND time_control_base_ms IS NOT NULL
+      AND clock_running_since IS NULL
+      AND user1_id IS NOT NULL
+      AND user2_id IS NOT NULL
+      AND winner IS NULL
+  `, [id]);
+
   res.json({ ok: true });
 });
 

@@ -13,12 +13,12 @@ import PlayerProfileCard from '../UI/PlayerProfileCard';
 import GlobalChat from '../UI/GlobalChat';
 
 type InviteMode = 'classic' | 'timedInvite';
-type TimePresetId = '3+2' | '10+0' | '15+10';
+type TimePresetId = '5+5' | '15+0' | '30+0';
 
 const FISCHER_PRESETS: Array<{ id: TimePresetId; baseMs: number; incrementMs: number }> = [
-  { id: '3+2', baseMs: 3 * 60 * 1000, incrementMs: 2 * 1000 },
-  { id: '10+0', baseMs: 10 * 60 * 1000, incrementMs: 0 },
-  { id: '15+10', baseMs: 15 * 60 * 1000, incrementMs: 10 * 1000 },
+  { id: '5+5', baseMs: 5 * 60 * 1000, incrementMs: 5 * 1000 },
+  { id: '15+0', baseMs: 15 * 60 * 1000, incrementMs: 0 },
+  { id: '30+0', baseMs: 30 * 60 * 1000, incrementMs: 0 },
 ];
 
 function formatDate(timestamp: number): string {
@@ -34,9 +34,10 @@ const LANGUAGE_BUTTONS: Array<{ code: Language; icon: string; label: string }> =
 ];
 
 const TIME_CONTROLS = [
-  { id: 'blitz', icon: '⚡', enabled: false },
-  { id: 'rapid', icon: '🏇', enabled: false },
-  { id: 'correspondence', icon: '∞', enabled: true },
+  { id: 'blitz', icon: '⚡', enabled: true, preset: '5+5' as TimePresetId },
+  { id: 'rapid', icon: '🏇', enabled: true, preset: '15+0' as TimePresetId },
+  { id: 'long', icon: '⏳', enabled: true, preset: '30+0' as TimePresetId },
+  { id: 'correspondence', icon: '∞', enabled: true, preset: null },
 ] as const;
 
 type NavTab = 'playOnline' | 'playLocal' | 'loadGame' | 'rules' | 'players' | 'challenges';
@@ -54,7 +55,8 @@ export default function MainMenu() {
   const [inviteMode, setInviteMode] = useState<InviteMode>('classic');
   const [selectedBoardSize, setSelectedBoardSize] = useState<37 | 48 | 61>(37);
   const [selectedPlayer, setSelectedPlayer] = useState<1 | 2 | 'random'>(1);
-  const [selectedPreset, setSelectedPreset] = useState<TimePresetId>('3+2');
+  const [selectedPreset, setSelectedPreset] = useState<TimePresetId>('5+5');
+  const [selectedTimeControl, setSelectedTimeControl] = useState<'blitz' | 'rapid' | 'long' | 'correspondence'>('blitz');
   const [createdRoomId, setCreatedRoomId] = useState<number | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -300,44 +302,29 @@ export default function MainMenu() {
               {t.selectTimeControl}
             </h2>
 
-            <div className="mb-4">
-              <button
-                type="button"
-                disabled={!user}
-                onClick={() => {
-                  if (!user) {
-                    setShowAuthModal(true);
-                    return;
-                  }
-                  setInviteMode('timedInvite');
-                  setOnlineStep('board');
-                  setShowOnlineDialog(true);
-                }}
-                className="w-full py-2.5 px-4 rounded-xl font-semibold transition-colors bg-indigo-500 hover:bg-indigo-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Вызвать по ссылке
-              </button>
-            </div>
+            {/* Optional generic button for inviting (hidden as we use direct buttons now) */}
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
               {TIME_CONTROLS.map((tc) => {
-                const label = t[tc.id as keyof typeof t] as string;
-                const desc = t[`${tc.id}Desc` as keyof typeof t] as string;
+                const label = t[tc.id as keyof typeof t] as string || tc.id;
+                const desc = t[`${tc.id}Desc` as keyof typeof t] as string || '';
                 return (
                   <button
                     key={tc.id}
-                    disabled={!tc.enabled}
+                    disabled={!tc.enabled || (!user && tc.preset !== null)}
                     onClick={() => {
-                      if (tc.id === 'correspondence') {
-                        setInviteMode('classic');
-                        setOnlineStep('board');
-                        setShowOnlineDialog(true);
+                      if (!user && tc.preset !== null) {
+                        setShowAuthModal(true);
+                        return;
                       }
+                      setSelectedTimeControl(tc.id as any);
                     }}
                     className={`relative flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all
-                      ${tc.enabled
-                        ? 'border-gray-200 dark:border-gray-600 hover:border-teal-500 dark:hover:border-teal-400 hover:shadow-lg cursor-pointer bg-white dark:bg-gray-700'
-                        : 'border-dashed border-gray-300 dark:border-gray-600 opacity-60 cursor-not-allowed bg-gray-50 dark:bg-gray-800'
+                      ${(!tc.enabled || (!user && tc.preset !== null))
+                        ? 'border-dashed border-gray-300 dark:border-gray-600 opacity-60 cursor-not-allowed bg-gray-50 dark:bg-gray-800'
+                        : selectedTimeControl === tc.id
+                          ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 ring-2 ring-indigo-500/50 scale-[1.02] shadow-md'
+                          : 'border-gray-200 dark:border-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500 hover:bg-gray-50 dark:hover:bg-gray-700 bg-white dark:bg-gray-800'
                       }`}
                   >
                     {!tc.enabled && (
@@ -345,16 +332,40 @@ export default function MainMenu() {
                         {t.comingSoon}
                       </span>
                     )}
-                    <span className="text-4xl mb-3">{tc.icon}</span>
+                    <span className={`text-4xl mb-3 ${selectedTimeControl === tc.id ? 'scale-110' : ''} transition-transform`}>{tc.icon}</span>
                     <span className="text-lg font-bold text-gray-900 dark:text-white uppercase tracking-wide">
                       {label}
                     </span>
-                    <span className="text-sm text-gray-500 dark:text-gray-400 mt-1 text-center">
+                    <span className="text-sm text-gray-500 dark:text-gray-400 mt-1 text-center font-medium">
                       {desc}
                     </span>
                   </button>
                 );
               })}
+            </div>
+
+            <div className="mt-8 flex justify-center">
+              <button
+                type="button"
+                className="w-full sm:w-2/3 lg:w-1/2 py-3.5 px-6 rounded-xl font-bold text-lg transition-all shadow-md hover:shadow-lg active:scale-95 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white"
+                onClick={() => {
+                  const tc = TIME_CONTROLS.find(c => c.id === selectedTimeControl);
+                  if (!tc) return;
+
+                  if (tc.preset === null) {
+                    setInviteMode('classic');
+                    setOnlineStep('board');
+                    setShowOnlineDialog(true);
+                  } else {
+                    setInviteMode('timedInvite');
+                    setSelectedPreset(tc.preset);
+                    setOnlineStep('board');
+                    setShowOnlineDialog(true);
+                  }
+                }}
+              >
+                Сыграть по ссылке
+              </button>
             </div>
 
           </div>

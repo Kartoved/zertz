@@ -210,6 +210,8 @@ type Dict = {
   blitzDesc: string;
   rapid: string;
   rapidDesc: string;
+  long: string;
+  longDesc: string;
   correspondence: string;
   correspondenceDesc: string;
   comingSoon: string;
@@ -438,9 +440,11 @@ export const I18N: Record<Language, Dict> = {
     isolationText1: 'Если группа колец отделяется от основной доски и все кольца заняты —',
     isolationText2: 'все шарики в группе автоматически захватываются текущим игроком!',
     blitz: 'Блиц',
-    blitzDesc: 'Быстрая игра, ограниченное время',
+    blitzDesc: '5+5',
     rapid: 'Рапид',
-    rapidDesc: 'Умеренный контроль времени',
+    rapidDesc: '15+0',
+    long: 'Классика',
+    longDesc: '30+0',
     correspondence: 'Заочная',
     correspondenceDesc: 'Без ограничения по времени',
     comingSoon: 'Скоро',
@@ -667,9 +671,11 @@ export const I18N: Record<Language, Dict> = {
     isolationText1: 'If a ring group separates from the main board and all rings are occupied —',
     isolationText2: 'all marbles in that group are captured by the current player!',
     blitz: 'Blitz',
-    blitzDesc: 'Fast game, limited time',
+    blitzDesc: '5+5',
     rapid: 'Rapid',
-    rapidDesc: 'Moderate time control',
+    rapidDesc: '15+0',
+    long: 'Classic',
+    longDesc: '30+0',
     correspondence: 'Correspondence',
     correspondenceDesc: 'No time limit',
     comingSoon: 'Coming soon',
@@ -895,12 +901,14 @@ export const I18N: Record<Language, Dict> = {
     isolationTitle: 'Izoliĝo',
     isolationText1: 'Se grupo de ringoj apartiĝas de la ĉefa tabulo kaj ĉiuj ringoj estas okupitaj —',
     isolationText2: 'ĉiuj globetoj en tiu grupo estas kaptitaj de la nuna ludanto!',
-    blitz: 'Blico',
-    blitzDesc: 'Rapida ludo, limigita tempo',
+    blitz: 'Fulmo',
+    blitzDesc: '5+5',
     rapid: 'Rapida',
-    rapidDesc: 'Modera tempkontrolo',
-    correspondence: 'Koresponda',
-    correspondenceDesc: 'Sen templimo',
+    rapidDesc: '15+0',
+    long: 'Klasika',
+    longDesc: '30+0',
+    correspondence: 'Leterludo',
+    correspondenceDesc: 'Sen tempolimo',
     comingSoon: 'Baldaŭ',
     globalChat: 'Ĝenerala babilejo',
     guest: 'Gasto',
