@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useRoomStore } from '../../store/roomStore';
 import { useAuthStore } from '../../store/authStore';
+import { useUIStore } from '../../store/uiStore';
 import HexBoard from '../Board/HexBoard';
 import { ChatPanel } from './ChatPanel';
 import MarbleSelector from '../UI/MarbleSelector';
@@ -14,6 +15,7 @@ import { getWinTypeLabel, useI18n } from '../../i18n';
 
 export function RoomScreen() {
   const { t } = useI18n();
+  const { toggleDarkMode, isDarkMode } = useUIStore();
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
@@ -275,10 +277,11 @@ export function RoomScreen() {
               {copied ? t.copied : `🔗 ${t.copyRoomLink}`}
             </button>
             <button
-              onClick={() => setChatCollapsed((prev) => !prev)}
-              className="px-3 py-1.5 text-sm bg-blue-500 text-white rounded-lg"
+              onClick={toggleDarkMode}
+              className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              title={isDarkMode ? t.lightMode : t.darkMode}
             >
-              💬
+              {isDarkMode ? '☀️' : '🌙'}
             </button>
           </div>
         </div>
@@ -470,7 +473,6 @@ export function RoomScreen() {
             <div className="p-3 bg-white dark:bg-gray-800 rounded-lg col-span-1 sm:col-span-2 lg:col-span-1">
               {state.phase === 'placement' && (
                 <>
-                  <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">{t.chooseMarbleShort}</div>
                   <MarbleSelector
                     reserve={state.reserve}
                     selectedColor={selectedMarbleColor}
@@ -495,7 +497,7 @@ export function RoomScreen() {
                   <button
                     type="button"
                     onClick={() => setShowSurrenderConfirm(true)}
-                    className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-red-500 text-white hover:bg-red-600"
+                    className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-black hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
                   >
                     🏳️ {t.surrender}
                   </button>

@@ -41,6 +41,7 @@ export interface ChatMessage {
   id: number;
   playerIndex: 1 | 2;
   message: string;
+  moveNumber?: number;
   createdAt: number;
 }
 
@@ -240,12 +241,13 @@ export async function getChatMessages(
 export async function sendChatMessage(
   roomId: number | string,
   playerIndex: 1 | 2,
-  message: string
+  message: string,
+  moveNumber?: number
 ): Promise<ChatMessage> {
   const response = await fetch(`${API_BASE}/api/rooms/${roomId}/messages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ playerIndex, message }),
+    body: JSON.stringify({ playerIndex, message, moveNumber }),
   });
 
   if (!response.ok) {

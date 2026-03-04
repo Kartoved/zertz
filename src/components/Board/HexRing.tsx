@@ -75,11 +75,11 @@ export default function HexRing({
   } else if (isCaptureTarget) {
     ringStrokeColor = '#ef4444';
   } else if (isRemovable) {
-    ringStrokeColor = '#22c55e'; // Green for removable rings
-    ringStrokeWidth = 4;
+    ringStrokeColor = '#4ade80'; // Lighter green for removable rings
+    ringStrokeWidth = 2;
   } else if (isValidPlacement) {
-    ringStrokeColor = '#22c55e';
-    ringStrokeWidth = 4;
+    ringStrokeColor = '#4ade80';
+    ringStrokeWidth = 2;
   }
   
   const outerRadius = size * 0.85;
@@ -116,6 +116,38 @@ export default function HexRing({
           <stop offset="0%" stopColor="#4a4a4a" />
           <stop offset="100%" stopColor="#000000" />
         </radialGradient>
+        {ring.marble && (
+          <radialGradient
+            id={`marble-gradient-${ring.id}`}
+            cx="35%"
+            cy="35%"
+            r="65%"
+            fx="30%"
+            fy="30%"
+          >
+            {ring.marble.color === 'white' && (
+              <>
+                <stop offset="0%" stopColor="#ffffff" />
+                <stop offset="60%" stopColor="#d1d5db" />
+                <stop offset="100%" stopColor="#9ca3af" />
+              </>
+            )}
+            {ring.marble.color === 'gray' && (
+              <>
+                <stop offset="0%" stopColor="#d1d5db" />
+                <stop offset="50%" stopColor="#9ca3af" />
+                <stop offset="100%" stopColor="#4b5563" />
+              </>
+            )}
+            {ring.marble.color === 'black' && (
+              <>
+                <stop offset="0%" stopColor="#6b7280" />
+                <stop offset="50%" stopColor="#374151" />
+                <stop offset="100%" stopColor="#111827" />
+              </>
+            )}
+          </radialGradient>
+        )}
       </defs>
       <path
         d={ringPath}
@@ -123,6 +155,7 @@ export default function HexRing({
         fillRule="evenodd"
         stroke={ringStrokeColor}
         strokeWidth={ringStrokeWidth}
+        style={{ filter: 'drop-shadow(0px 5px 6px rgba(0,0,0,0.5))' }}
       />
       
       {/* Marble (smaller than inner hole, sits on top of ring) */}
@@ -131,19 +164,15 @@ export default function HexRing({
           cx={0}
           cy={0}
           r={marbleRadius}
-          fill={
-            ring.marble.color === 'white' ? '#f9fafb' :
-            ring.marble.color === 'gray' ? '#9ca3af' :
-            '#374151'
-          }
+          fill={`url(#marble-gradient-${ring.id})`}
           stroke={
-            ring.marble.color === 'white' ? '#d1d5db' :
-            ring.marble.color === 'gray' ? '#6b7280' :
-            '#4b5563'
+            ring.marble.color === 'white' ? '#9ca3af' :
+            ring.marble.color === 'gray' ? '#4b5563' :
+            '#1f2937'
           }
-          strokeWidth={2}
+          strokeWidth={1}
           style={{
-            filter: 'drop-shadow(0 3px 4px rgba(0,0,0,0.4))',
+            filter: 'drop-shadow(0 6px 6px rgba(0,0,0,0.6)) drop-shadow(0 2px 3px rgba(0,0,0,0.4))',
           }}
         />
       )}

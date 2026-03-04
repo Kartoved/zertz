@@ -215,6 +215,8 @@ type Dict = {
   longDesc: string;
   correspondence: string;
   correspondenceDesc: string;
+  searchGame: string;
+  playByLink: string;
   comingSoon: string;
   globalChat: string;
   guest: string;
@@ -447,8 +449,10 @@ export const I18N: Record<Language, Dict> = {
     rapidDesc: '15+0',
     long: 'Классика',
     longDesc: '30+0',
-    correspondence: 'Заочная',
+  correspondence: 'Заочная',
     correspondenceDesc: 'Без ограничения по времени',
+    searchGame: 'Поиск игры',
+    playByLink: 'Сыграть по ссылке',
     comingSoon: 'Скоро',
     globalChat: 'Общий чат',
     guest: 'Гость',
@@ -679,8 +683,10 @@ export const I18N: Record<Language, Dict> = {
     rapidDesc: '15+0',
     long: 'Classic',
     longDesc: '30+0',
-    correspondence: 'Correspondence',
+    correspondence: 'Async',
     correspondenceDesc: 'No time limit',
+    searchGame: 'Search game',
+    playByLink: 'Play by link',
     comingSoon: 'Coming soon',
     globalChat: 'Global Chat',
     guest: 'Guest',
@@ -911,8 +917,10 @@ export const I18N: Record<Language, Dict> = {
     rapidDesc: '15+0',
     long: 'Klasika',
     longDesc: '30+0',
-    correspondence: 'Leterludo',
+    correspondence: 'Asinkrona',
     correspondenceDesc: 'Sen tempolimo',
+    searchGame: 'Serĉi ludon',
+    playByLink: 'Ludi per ligilo',
     comingSoon: 'Baldaŭ',
     globalChat: 'Ĝenerala babilejo',
     guest: 'Gasto',

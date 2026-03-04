@@ -13,7 +13,7 @@ export default function PlayerProfileCard({ onLoginClick }: PlayerProfileCardPro
 
   if (!user) {
     return (
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-5 flex flex-col items-center justify-center h-full">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-5 flex flex-col items-center justify-center">
         <div className="w-16 h-16 rounded-full bg-gray-200 dark:bg-gray-700 flex items-center justify-center mb-3">
           <span className="text-2xl text-gray-400">?</span>
         </div>
@@ -34,7 +34,7 @@ export default function PlayerProfileCard({ onLoginClick }: PlayerProfileCardPro
   const winrate = games > 0 ? Math.round((user.wins / games) * 100) : 0;
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-5 flex flex-col h-full">
+    <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-5 flex flex-col">
       {/* Avatar + name */}
       <div className="flex items-center gap-3 mb-4">
         <div className="w-12 h-12 rounded-full bg-indigo-500 flex items-center justify-center text-white text-lg font-bold flex-shrink-0">
@@ -63,7 +63,8 @@ export default function PlayerProfileCard({ onLoginClick }: PlayerProfileCardPro
               href={user.contactLink}
               target="_blank"
               rel="noopener noreferrer"
-              className="block text-xs text-blue-600 dark:text-blue-400 hover:underline break-all"
+              className="block text-xs text-blue-600 dark:text-blue-400 hover:underline truncate"
+              title={user.contactLink}
             >
               {t.contact}: {user.contactLink}
             </a>
@@ -72,7 +73,7 @@ export default function PlayerProfileCard({ onLoginClick }: PlayerProfileCardPro
       )}
 
       {/* Stats */}
-      <div className="grid grid-cols-2 gap-2 mb-4">
+      <div className="grid grid-cols-2 gap-2">
         <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-2.5 text-center">
           <div className="text-lg font-bold text-blue-600 dark:text-blue-400">{Math.round(user.rating)}</div>
           <div className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t.rating}</div>
@@ -81,24 +82,14 @@ export default function PlayerProfileCard({ onLoginClick }: PlayerProfileCardPro
           <div className="text-lg font-bold text-gray-900 dark:text-white">{games}</div>
           <div className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t.games}</div>
         </div>
-        <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-2.5 text-center">
-          <div className="text-sm font-bold">
-            <span className="text-green-600">{user.wins}</span>
-            <span className="text-gray-400 mx-0.5">/</span>
-            <span className="text-red-500">{user.losses}</span>
-          </div>
-          <div className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t.winsLosses}</div>
+        <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-2.5 text-center flex flex-col items-center justify-center">
+          <div className="text-lg font-bold text-gray-900 dark:text-white leading-none">{winrate}%</div>
+          <div className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide mt-1 leading-none">{t.winrate}</div>
         </div>
         <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-2.5 text-center">
-          <div className="text-sm font-bold text-gray-900 dark:text-white">{winrate}%</div>
-          <div className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t.winrate}</div>
+          <div className="text-lg font-bold text-orange-500">{user.bestStreak}</div>
+          <div className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t.bestStreak}</div>
         </div>
-      </div>
-
-      {/* Best streak */}
-      <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-2.5 text-center mb-4">
-        <div className="text-lg font-bold text-orange-500">{user.bestStreak}</div>
-        <div className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t.bestStreak}</div>
       </div>
     </div>
   );

@@ -103,14 +103,22 @@ export default function MainMenu() {
 
   const handleSelectBoard = (boardSize: 37 | 48 | 61) => {
     newGame(boardSize);
+    navigate('/board');
     setShowBoardDialog(false);
-    setScreen('game');
   };
   
   const handleLoadGame = async (gameId: string) => {
+    const game = savedGames.find(g => g.id === gameId);
+    if (!game) return;
+
     await loadSavedGame(gameId);
     setShowLoadDialog(false);
-    setScreen('game');
+
+    if (game.isOnline) {
+      navigate(`/room/${gameId}`);
+    } else {
+      navigate('/board');
+    }
   };
 
   const handleNavTab = (tab: NavTab) => {
@@ -137,6 +145,8 @@ export default function MainMenu() {
     { id: 'community', label: t.community },
   ];
   
+  const currentGames = savedGames.filter(g => !g.winner);
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-900 dark:to-gray-800">
       {/* ═══════ TOP NAV BAR ═══════ */}
@@ -341,10 +351,54 @@ export default function MainMenu() {
       {/* ═══════ MAIN CONTENT: 3 columns ═══════ */}
       <main className="flex-1 flex flex-col lg:flex-row gap-4 p-3 md:p-4 overflow-visible lg:overflow-y-auto max-w-[1400px] mx-auto w-full">
         {/* LEFT: Player profile card */}
-        <aside className="hidden lg:flex w-full lg:w-72 flex-shrink-0 flex-col order-2 lg:order-1">
-          <PlayerProfileCard
-            onLoginClick={() => setShowAuthModal(true)}
-          />
+        <aside className="hidden lg:flex w-full lg:w-72 flex-shrink-0 flex-col order-2 lg:order-1 gap-4 items-start">
+          <div className="w-full">
+            <PlayerProfileCard
+              onLoginClick={() => setShowAuthModal(true)}
+            />
+          </div>
+          
+          {/* Active Games Widget */}
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-4 flex flex-col w-full" style={{ maxHeight: '400px' }}>
+            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3 px-1">{t.loadCurrent} ({currentGames.length})</h3>
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+              {currentGames.length === 0 ? (
+                <p className="text-gray-500 dark:text-gray-400 text-center py-8 text-sm">
+                  {t.noGames}
+                </p>
+              ) : (
+                currentGames.map(game => (
+                  <button
+                    key={game.id}
+                    onClick={() => handleLoadGame(game.id)}
+                    className="w-full p-2.5 text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 
+                      dark:hover:bg-gray-700 rounded-xl transition-colors border-2 border-gray-200 dark:border-gray-700"
+                  >
+                    <div className="flex justify-between items-start mb-1">
+                      <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-1.5 text-sm truncate pr-2">
+                        <span className="truncate">{game.playerNames.player1}</span>
+                        <span className="text-gray-400 text-xs font-normal relative top-[1px]">vs</span>
+                        <span className="truncate">{game.playerNames.player2}</span>
+                      </div>
+                    </div>
+                    
+                    <div className="flex justify-between items-end mt-2">
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${
+                        game.isOnline 
+                          ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 border border-purple-200 dark:border-purple-800' 
+                          : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600'
+                      }`}>
+                        {game.isOnline ? t.onlineLabel : t.localLabel}
+                      </span>
+                      <div className="text-[10px] text-gray-400 font-medium">
+                        {game.moveCount} {t.moves.toLowerCase()}
+                      </div>
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
         </aside>
 
         {/* CENTER: Time control modes */}
@@ -361,7 +415,7 @@ export default function MainMenu() {
                   className={`py-3 rounded-xl font-bold bg-white dark:bg-gray-800 transition-colors border-2
                     ${selectedBoardSize === size 
                       ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 text-gray-900 dark:text-white shadow-sm' 
-                      : 'border-transparent dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                      : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
                     }`}
                 >
                   <div className="text-xl mb-1">{size}</div>
@@ -475,7 +529,7 @@ export default function MainMenu() {
                   }
                 }}
               >
-                Поиск игры
+                {t.searchGame}
               </button>
 
               <button
@@ -497,7 +551,7 @@ export default function MainMenu() {
                   }
                 }}
               >
-                Сыграть по ссылке
+                {t.playByLink}
               </button>
             </div>
 
@@ -521,7 +575,6 @@ export default function MainMenu() {
       </main>
       
       {showLoadDialog && (() => {
-        const currentGames = savedGames.filter(g => !g.winner);
         const completedGames = savedGames.filter(g => !!g.winner);
         const tabGames = loadTab === 'current' ? currentGames : completedGames;
         const filteredGames = loadFilter === 'all' ? tabGames

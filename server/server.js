@@ -131,10 +131,10 @@ async function ensureSchema() {
       ALTER TABLE rooms ADD COLUMN IF NOT EXISTS time_control_increment_ms BIGINT;
       ALTER TABLE rooms ADD COLUMN IF NOT EXISTS clock_p1_ms BIGINT;
       ALTER TABLE rooms ADD COLUMN IF NOT EXISTS clock_p2_ms BIGINT;
-      ALTER TABLE rooms ADD COLUMN IF NOT EXISTS clock_running_since TIMESTAMP;
       ALTER TABLE rooms ADD COLUMN IF NOT EXISTS time_forfeit_player INTEGER;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS contact_link TEXT NOT NULL DEFAULT '';
       ALTER TABLE games ADD COLUMN IF NOT EXISTS is_online BOOLEAN NOT NULL DEFAULT false;
+      ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS move_number INTEGER;
     EXCEPTION WHEN others THEN NULL;
     END $$;
   `);
@@ -1514,12 +1514,12 @@ app.get('/api/rooms/:id/messages', async (req, res) => {
   }
   
   query += ' ORDER BY created_at ASC';
-  
   const result = await pool.query(query, params);
   res.json(result.rows.map(row => ({
     id: row.id,
     playerIndex: row.player_index,
     message: row.message,
+    moveNumber: row.move_number,
     createdAt: row.created_at.getTime(),
   })));
 });
@@ -1527,7 +1527,7 @@ app.get('/api/rooms/:id/messages', async (req, res) => {
 // Send chat message
 app.post('/api/rooms/:id/messages', async (req, res) => {
   const { id } = req.params;
-  const { playerIndex, message } = req.body;
+  const { playerIndex, message, moveNumber } = req.body;
   
   if (!message || (playerIndex !== 1 && playerIndex !== 2)) {
     res.status(400).json({ error: 'Invalid message or player' });
@@ -1535,16 +1535,17 @@ app.post('/api/rooms/:id/messages', async (req, res) => {
   }
   
   const result = await pool.query(
-    `INSERT INTO chat_messages (room_id, player_index, message)
-     VALUES ($1, $2, $3)
+    `INSERT INTO chat_messages (room_id, player_index, message, move_number)
+     VALUES ($1, $2, $3, $4)
      RETURNING id, created_at`,
-    [id, playerIndex, message]
+    [id, playerIndex, message, moveNumber]
   );
   
   res.json({
     id: result.rows[0].id,
     playerIndex,
     message,
+    moveNumber,
     createdAt: result.rows[0].created_at.getTime(),
   });
 });

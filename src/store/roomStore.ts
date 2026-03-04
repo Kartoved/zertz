@@ -425,11 +425,11 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   },
 
   sendMessage: async (text) => {
-    const { roomId, myPlayer } = get();
+    const { roomId, myPlayer, state } = get();
     if (!roomId || !myPlayer || !text.trim()) return;
 
     try {
-      const message = await roomsApi.sendChatMessage(roomId, myPlayer, text.trim());
+      const message = await roomsApi.sendChatMessage(roomId, myPlayer, text.trim(), state.moveNumber);
       set(s => ({
         messages: [...s.messages, message],
         lastMessageId: message.id,

@@ -40,6 +40,12 @@ export function ChatPanel({ inputBottomOffset = 0 }: ChatPanelProps) {
     return d.toLocaleDateString(locale, { day: 'numeric', month: 'short' });
   };
 
+  const getMoveLabel = (num: number) => {
+    if (locale === 'ru') return `${num} ход`;
+    if (locale === 'eo') return `${num} movo`;
+    return `Move ${num}`;
+  };
+
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-800 rounded-lg shadow-md">
       <div className="p-3 border-b border-gray-200 dark:border-gray-700">
@@ -65,8 +71,13 @@ export function ChatPanel({ inputBottomOffset = 0 }: ChatPanelProps) {
                   <span className="text-xs text-gray-500 dark:text-gray-400">
                     {playerName}
                   </span>
-                  <span className="text-xs text-gray-400 dark:text-gray-500">
-                    {formatDate(msg.createdAt)} {formatTime(msg.createdAt)}
+                  <span className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
+                    {msg.moveNumber !== undefined && (
+                      <span className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
+                        {getMoveLabel(msg.moveNumber + 1)}
+                      </span>
+                    )}
+                    <span>{formatDate(msg.createdAt)} {formatTime(msg.createdAt)}</span>
                   </span>
                 </div>
                 <div
