@@ -73,6 +73,7 @@ export function RoomScreen() {
     clockP1Ms,
     clockP2Ms,
     clockRunningSince,
+    surrender,
   } = useRoomStore();
   const { user } = useAuthStore();
   const isAuthed = !!user;
@@ -590,7 +591,10 @@ export function RoomScreen() {
               </button>
               <button
                 type="button"
-                onClick={() => navigate('/')}
+                onClick={async () => {
+                  setShowSurrenderConfirm(false);
+                  await surrender();
+                }}
                 className="flex-1 py-2 px-4 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold transition-colors"
               >
                 {t.confirmAction}

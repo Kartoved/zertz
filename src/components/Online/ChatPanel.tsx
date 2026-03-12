@@ -67,9 +67,10 @@ export function ChatPanel({ inputBottomOffset = 0 }: ChatPanelProps) {
             {t.noMessagesYet}
           </p>
         ) : (
-          messages.map((msg) => {
+          messages.map((msg, idx) => {
             const isMe = msg.playerIndex === myPlayer;
             const playerName = msg.playerIndex === 1 ? playerNames.player1 : playerNames.player2;
+            const hasAnswer = messages.some((m, i) => i > idx && (m.message === '[UNDO_ACCEPTED]' || m.message === '[UNDO_REJECTED]'));
             
             return (
               <div
@@ -99,7 +100,7 @@ export function ChatPanel({ inputBottomOffset = 0 }: ChatPanelProps) {
                   {msg.message === '[UNDO_REQUEST]' ? (
                     <div>
                       <div className="font-semibold">{t.undoRequestChat || 'Requests undo'}</div>
-                      {!isMe && msg.moveNumber === state.moveNumber && (
+                      {!isMe && msg.moveNumber === state.moveNumber && !hasAnswer && !state.winner && (
                         <div className="flex gap-2 mt-2">
                           <button
                             onClick={handleAcceptUndo}

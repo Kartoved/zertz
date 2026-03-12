@@ -42,14 +42,14 @@ export default function MarbleSelector(props: MarbleSelectorProps = {}) {
       <div className="text-sm font-medium text-gray-600 dark:text-gray-400">
         {mustCapture ? t.mandatoryCapture : t.chooseMarble}
       </div>
-      <div className="flex gap-4">
+      <div className="flex gap-2 justify-between">
         {marbles.map(({ color, count }) => (
           <button
             key={color}
             onClick={() => !isDisabled && count > 0 && selectMarbleColor(color)}
             disabled={isDisabled || count === 0}
             className={`
-              flex flex-col items-center gap-2 p-3 rounded-xl transition-all
+              flex flex-col flex-1 items-center gap-1.5 p-2 rounded-xl transition-all
               ${selectedMarbleColor === color 
                 ? 'bg-blue-100 dark:bg-blue-900 ring-2 ring-blue-500' 
                 : 'bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700'}
@@ -58,7 +58,7 @@ export default function MarbleSelector(props: MarbleSelectorProps = {}) {
           >
             <div
               className={`
-                w-12 h-12 rounded-full border-[3px] shadow-sm
+                w-10 h-10 rounded-full border-[3px] shadow-sm
                 ${color === 'white' ? 'bg-white border-gray-300' : ''}
                 ${color === 'gray' ? 'bg-gray-400 border-gray-500' : ''}
                 ${color === 'black' ? 'bg-gray-700 border-gray-800' : ''}

@@ -137,11 +137,10 @@ export default function GameScreen() {
       <main className="flex-1 min-h-0 flex flex-col lg:flex-row gap-3 md:gap-4 p-2 md:p-4 max-w-7xl mx-auto w-full pb-28 sm:pb-24 lg:pb-4 overflow-y-auto">
         {/* Left panel - Stats and Controls */}
         <div className={`lg:w-64 lg:flex lg:flex-col gap-2 lg:gap-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 min-w-0 ${isGameOver ? 'hidden lg:flex' : ''}`}>
-          <GameStats compact={false} hideLabels={true} />
+          <GameStats compact={false} />
 
           {!isGameOver && (
             <div className="p-3 bg-white dark:bg-gray-800 rounded-lg col-span-1 sm:col-span-2 lg:col-span-1 shadow-sm">
-              <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">{t.chooseMarbleShort}</div>
               <MarbleSelector />
               <div className="mt-3">
                 <ControlPanel onSurrender={() => setShowSurrenderConfirm(true)} />
@@ -234,7 +233,10 @@ export default function GameScreen() {
               </button>
               <button
                 type="button"
-                onClick={() => setScreen('menu')}
+                onClick={() => {
+                  useGameStore.getState().surrender();
+                  setShowSurrenderConfirm(false);
+                }}
                 className="flex-1 py-2 px-4 bg-red-500 hover:bg-red-600 text-white rounded-lg font-semibold transition-colors"
               >
                 {t.confirmAction}

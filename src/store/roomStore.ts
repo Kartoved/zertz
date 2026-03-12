@@ -94,6 +94,7 @@ interface RoomStore {
   undoLastMove: (overrideCheck?: boolean) => Promise<void>;
   navigateToNode: (targetNode: GameNode) => void;
   setPlayerName: (player: 1 | 2, name: string) => Promise<void>;
+  surrender: () => Promise<void>;
   
   reset: () => void;
 }
@@ -731,6 +732,34 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     set({ playerNames: newNames });
     await roomsApi.updatePlayerName(roomId, player, name);
     await persistOnlineGame(roomId, state, gameTree, newNames, null);
+  },
+
+  surrender: async () => {
+    const { roomId, state, gameTree, myPlayer, playerNames } = get();
+    if (!roomId || !myPlayer || state.winner) return;
+
+    pendingMoveCount++;
+    try {
+      const newState = cloneState(state);
+      const winnerPlayer = myPlayer === 1 ? 'player2' : 'player1';
+      newState.winner = winnerPlayer;
+      const winType = 'surrender';
+
+      set({
+        state: newState,
+        winType,
+      });
+
+      const winnerNum = winnerPlayer === 'player1' ? 1 : 2;
+      const currentPlayerNum = newState.currentPlayer === 'player1' ? 1 : 2;
+      const result = await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, winnerNum, winType, myPlayer);
+      if (result.ratingDelta) set({ ratingDelta: result.ratingDelta });
+      await persistOnlineGame(roomId, newState, gameTree, playerNames, winType);
+    } catch (err) {
+      console.error('[roomStore.surrender] ERROR:', err);
+    } finally {
+      pendingMoveCount--;
+    }
   },
 
   reset: () => {

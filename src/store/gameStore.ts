@@ -54,6 +54,7 @@ interface GameStore {
   handleRingRemoval: (ringId: string) => void;
   handleCapture: (capture: CaptureMove[]) => void;
   undo: () => void;
+  surrender: () => void;
   setPlayerNames: (player1: string, player2: string) => void;
   deleteBranchFrom: (nodeId: string) => void;
   loadSavedGame: (id: string) => Promise<void>;
@@ -361,48 +362,32 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
   
   undo: () => {
-    const { currentNode } = get();
-    if (currentNode.parent) {
-      const parentNode = currentNode.parent;
-      const idx = parentNode.children.indexOf(currentNode);
-      if (idx > -1) {
-        parentNode.children.splice(idx, 1);
-      }
-      
-      let newState = createInitialState(get().state.boardSize);
-      let node: GameNode | null = parentNode;
-      const moves: GameNode[] = [];
-      
-      while (node && node.move) {
-        moves.unshift(node);
-        node = node.parent;
-      }
-      
-      for (const moveNode of moves) {
-        if (moveNode.move?.type === 'placement') {
-          const { marbleColor, ringId, removedRingId } = moveNode.move.data;
-          placeMarble(newState, ringId, marbleColor);
-          if (removedRingId) {
-            removeRing(newState, removedRingId);
-          } else {
-            skipRingRemoval(newState);
-          }
-        } else if (moveNode.move?.type === 'capture') {
-          const captures = [moveNode.move.data, ...(moveNode.move.data.chain || [])];
-          executeCapture(newState, captures);
-        }
-      }
-      
-      playUndoSound();
-      
-      set({
-        state: newState,
-        currentNode: parentNode,
-        selectedMarbleColor: null,
-        selectedRingId: null,
-        highlightedCaptures: [],
-      });
+    const { state, currentNode } = get();
+    if (!currentNode.parent || state.winner) return;
+
+    // Delete the state node from tree
+    const parentNode = currentNode.parent;
+    const idx = parentNode.children.indexOf(currentNode);
+    if (idx > -1) {
+      parentNode.children.splice(idx, 1);
     }
+    
+    // We already have rebuild logic down in navigateToNode
+    get().navigateToNode(parentNode);
+    playUndoSound();
+  },
+
+  surrender: () => {
+    const { state } = get();
+    if (state.winner) return;
+    const newState = cloneState(state);
+    newState.winner = state.currentPlayer === 'player1' ? 'player2' : 'player1';
+    newState.phase = 'gameOver';
+    set({
+      state: newState,
+      winType: 'surrender',
+    });
+    get().autoSave();
   },
   
   setPlayerNames: (player1, player2) => {
