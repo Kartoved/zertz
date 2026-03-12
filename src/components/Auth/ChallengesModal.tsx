@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getChallenges, cancelChallenge, acceptChallenge, declineChallenge, Challenge } from '../../db/authApi';
+import { getPendingRooms, deleteRoom, PendingRoom } from '../../db/roomsApi';
 import { useAuthStore } from '../../store/authStore';
 import { useI18n } from '../../i18n';
 
@@ -19,6 +20,7 @@ export default function ChallengesModal({ onClose }: ChallengesModalProps) {
   const { t, locale } = useI18n();
   const { user } = useAuthStore();
   const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [pendingRooms, setPendingRooms] = useState<PendingRoom[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [tab, setTab] = useState<'incoming' | 'outgoing'>('incoming');
   const [toast, setToast] = useState('');
@@ -30,8 +32,12 @@ export default function ChallengesModal({ onClose }: ChallengesModalProps) {
   const loadChallenges = async () => {
     setIsLoading(true);
     try {
-      const data = await getChallenges();
-      setChallenges(data);
+      const [challengeData, roomData] = await Promise.all([
+        getChallenges(),
+        getPendingRooms(),
+      ]);
+      setChallenges(challengeData);
+      setPendingRooms(roomData);
     } catch {
       // ignore
     }
@@ -45,7 +51,6 @@ export default function ChallengesModal({ onClose }: ChallengesModalProps) {
 
   const incoming = challenges.filter(c => c.toUserId === user?.id);
   const outgoing = challenges.filter(c => c.fromUserId === user?.id);
-  const displayed = tab === 'incoming' ? incoming : outgoing;
 
   const handleAccept = async (challenge: Challenge) => {
     try {
@@ -77,10 +82,36 @@ export default function ChallengesModal({ onClose }: ChallengesModalProps) {
     }
   };
 
+  const handleDeleteRoom = async (roomId: number) => {
+    try {
+      await deleteRoom(roomId);
+      setPendingRooms(prev => prev.filter(r => r.id !== roomId));
+      showToast(t.challengeCanceled);
+    } catch (err: any) {
+      showToast(err.message);
+    }
+  };
+
+  const handleCopyLink = (roomId: number) => {
+    navigator.clipboard.writeText(`${window.location.origin}/room/${roomId}`);
+    showToast(t.copied);
+  };
+
   const formatTime = (ts: number) => {
     const d = new Date(ts);
     return d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
   };
+
+  const formatTimeControl = (room: PendingRoom) => {
+    if (room.timeControlBaseMs && room.timeControlIncrementMs !== null) {
+      const mins = Math.round(room.timeControlBaseMs / 60000);
+      const inc = Math.round((room.timeControlIncrementMs || 0) / 1000);
+      return `${mins}+${inc}`;
+    }
+    return '∞';
+  };
+
+  const outgoingCount = outgoing.length + pendingRooms.length;
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
@@ -108,7 +139,7 @@ export default function ChallengesModal({ onClose }: ChallengesModalProps) {
                 tab === 'outgoing' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'
               }`}
             >
-              {t.outgoing} {outgoing.length > 0 && `(${outgoing.length})`}
+              {t.outgoing} {outgoingCount > 0 && `(${outgoingCount})`}
             </button>
           </div>
         </div>
@@ -117,29 +148,26 @@ export default function ChallengesModal({ onClose }: ChallengesModalProps) {
         <div className="flex-1 overflow-auto">
           {isLoading ? (
             <div className="p-8 text-center text-gray-500 dark:text-gray-400">{t.loading}</div>
-          ) : displayed.length === 0 ? (
-            <div className="p-8 text-center text-gray-500 dark:text-gray-400">
-              {tab === 'incoming' ? t.noIncoming : t.noOutgoing}
-            </div>
-          ) : (
-            <div className="divide-y dark:divide-gray-700">
-              {displayed.map(c => (
-                <div key={c.id} className="p-3 flex items-center justify-between gap-3">
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-gray-900 dark:text-white truncate">
-                      {tab === 'incoming'
-                        ? `${c.fromCountry} ${c.fromUsername} (${c.fromRating})`
-                        : `${c.toCountry} ${c.toUsername} (${c.toRating})`
-                      }
+          ) : tab === 'incoming' ? (
+            incoming.length === 0 ? (
+              <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                {t.noIncoming}
+              </div>
+            ) : (
+              <div className="divide-y dark:divide-gray-700">
+                {incoming.map(c => (
+                  <div key={c.id} className="p-3 flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-gray-900 dark:text-white truncate">
+                        {c.fromCountry} {c.fromUsername} ({c.fromRating})
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 flex gap-2">
+                        <span>{t.boardLabel}: {BOARD_LABELS[c.boardSize]}</span>
+                        {c.rated && <span className="text-purple-500 font-medium">{t.rated}</span>}
+                        <span>{formatTime(c.createdAt)}</span>
+                      </div>
                     </div>
-                    <div className="text-xs text-gray-500 dark:text-gray-400 flex gap-2">
-                      <span>{t.boardLabel}: {BOARD_LABELS[c.boardSize]}</span>
-                      {c.rated && <span className="text-purple-500 font-medium">{t.rated}</span>}
-                      <span>{formatTime(c.createdAt)}</span>
-                    </div>
-                  </div>
 
-                  {tab === 'incoming' ? (
                     <div className="flex gap-1.5">
                       <button
                         onClick={() => handleAccept(c)}
@@ -154,7 +182,31 @@ export default function ChallengesModal({ onClose }: ChallengesModalProps) {
                         {t.decline}
                       </button>
                     </div>
-                  ) : (
+                  </div>
+                ))}
+              </div>
+            )
+          ) : (
+            // Outgoing tab: challenges + pending invite rooms
+            outgoing.length === 0 && pendingRooms.length === 0 ? (
+              <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                {t.noOutgoing}
+              </div>
+            ) : (
+              <div className="divide-y dark:divide-gray-700">
+                {/* Direct challenges */}
+                {outgoing.map(c => (
+                  <div key={`ch-${c.id}`} className="p-3 flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-gray-900 dark:text-white truncate">
+                        {c.toCountry} {c.toUsername} ({c.toRating})
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 flex gap-2">
+                        <span>{t.boardLabel}: {BOARD_LABELS[c.boardSize]}</span>
+                        {c.rated && <span className="text-purple-500 font-medium">{t.rated}</span>}
+                        <span>{formatTime(c.createdAt)}</span>
+                      </div>
+                    </div>
                     <button
                       onClick={() => handleCancel(c)}
                       className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 hover:bg-red-100 hover:text-red-600 
@@ -162,10 +214,46 @@ export default function ChallengesModal({ onClose }: ChallengesModalProps) {
                     >
                       {t.cancel}
                     </button>
-                  )}
-                </div>
-              ))}
-            </div>
+                  </div>
+                ))}
+
+                {/* Pending invite rooms (play by link) */}
+                {pendingRooms.map(room => (
+                  <div key={`room-${room.id}`} className="p-3 flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium text-gray-900 dark:text-white truncate flex items-center gap-2">
+                        <span>🔗 {t.playByLink}</span>
+                        <span className="text-xs text-gray-400">#{room.id}</span>
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400 flex gap-2 flex-wrap">
+                        <span>{t.boardLabel}: {BOARD_LABELS[room.boardSize]}</span>
+                        <span>{formatTimeControl(room)}</span>
+                        {room.rated && <span className="text-purple-500 font-medium">{t.rated}</span>}
+                        <span>{formatTime(room.createdAt)}</span>
+                      </div>
+                    </div>
+                    <div className="flex gap-1.5">
+                      <button
+                        onClick={() => handleCopyLink(room.id)}
+                        className="px-2.5 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600
+                          text-gray-700 dark:text-gray-300 rounded-lg transition-colors"
+                        title={t.copyLink}
+                      >
+                        📋
+                      </button>
+                      <button
+                        onClick={() => handleDeleteRoom(room.id)}
+                        className="px-2.5 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 hover:bg-red-100 hover:text-red-600 
+                          text-gray-700 dark:text-gray-300 rounded-lg transition-colors"
+                        title={t.cancel}
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
           )}
         </div>
 

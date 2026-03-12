@@ -15,7 +15,7 @@ type Tab = 'all' | 'friends';
 export default function PlayersModal({ onClose }: PlayersModalProps) {
   const { t, locale } = useI18n();
   const { user } = useAuthStore();
-  const [tab, setTab] = useState<Tab>('all');
+  const [tab, setTab] = useState<Tab>(user ? 'friends' : 'all');
   const [allPlayers, setAllPlayers] = useState<PlayerInfo[]>([]);
   const [friends, setFriends] = useState<PlayerInfo[]>([]);
   const [followIds, setFollowIds] = useState<Set<number>>(new Set());
@@ -125,14 +125,6 @@ export default function PlayersModal({ onClose }: PlayersModalProps) {
 
           {/* Tabs */}
           <div className="flex gap-1 mb-3">
-            <button
-              onClick={() => setTab('all')}
-              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                tab === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
-              }`}
-            >
-              {t.allPlayers}
-            </button>
             {user && (
               <button
                 onClick={() => setTab('friends')}
@@ -143,6 +135,14 @@ export default function PlayersModal({ onClose }: PlayersModalProps) {
                 {t.friends}
               </button>
             )}
+            <button
+              onClick={() => setTab('all')}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                tab === 'all' ? 'bg-blue-500 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200'
+              }`}
+            >
+              {t.allPlayers}
+            </button>
           </div>
 
           {/* Search */}

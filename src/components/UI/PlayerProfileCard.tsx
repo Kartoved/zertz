@@ -45,9 +45,6 @@ export default function PlayerProfileCard({ onLoginClick }: PlayerProfileCardPro
             <CountryBadge country={country} size={16} className="mr-1.5" />
             {user.username}
           </div>
-          <div className="text-xs text-gray-500 dark:text-gray-400">
-            {t.rating}: {Math.round(user.rating)}
-          </div>
         </div>
       </div>
 

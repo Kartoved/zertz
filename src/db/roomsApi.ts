@@ -307,3 +307,30 @@ export async function leaveMatchmaking(): Promise<void> {
 
   await fetch(`${API_BASE}/api/matchmake/leave`, { method: 'DELETE', headers });
 }
+
+export interface PendingRoom {
+  id: number;
+  boardSize: number;
+  creatorPlayer: number;
+  player1Name: string;
+  player2Name: string;
+  rated: boolean;
+  timeControlBaseMs: number | null;
+  timeControlIncrementMs: number | null;
+  createdAt: number;
+}
+
+export async function getPendingRooms(): Promise<PendingRoom[]> {
+  const token = localStorage.getItem('zertz_auth_token');
+  if (!token) return [];
+  const headers: Record<string, string> = { 'Authorization': `Bearer ${token}` };
+  
+  const response = await fetch(`${API_BASE}/api/rooms/pending`, { headers });
+  if (!response.ok) return [];
+  return response.json();
+}
+
+export async function deleteRoom(id: number | string): Promise<void> {
+  const response = await fetch(`${API_BASE}/api/rooms/${id}`, { method: 'DELETE' });
+  if (!response.ok) throw new Error('Failed to delete room');
+}

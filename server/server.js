@@ -1607,6 +1607,36 @@ app.post('/api/global-chat', authRequired, async (req, res) => {
   });
 });
 
+// Get pending invite rooms (rooms where user is creator but opponent hasn't joined yet)
+app.get('/api/rooms/pending', authRequired, async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const result = await pool.query(
+      `SELECT id, board_size, creator_player, player1_name, player2_name, rated,
+              time_control_base_ms, time_control_increment_ms, created_at
+       FROM rooms
+       WHERE winner IS NULL
+         AND ((user1_id = $1 AND user2_id IS NULL) OR (user2_id = $1 AND user1_id IS NULL))
+       ORDER BY created_at DESC`,
+      [userId]
+    );
+    res.json(result.rows.map(r => ({
+      id: r.id,
+      boardSize: r.board_size,
+      creatorPlayer: r.creator_player,
+      player1Name: r.player1_name,
+      player2Name: r.player2_name,
+      rated: r.rated || false,
+      timeControlBaseMs: r.time_control_base_ms,
+      timeControlIncrementMs: r.time_control_increment_ms,
+      createdAt: r.created_at.getTime(),
+    })));
+  } catch (err) {
+    console.error('Get pending rooms error:', err);
+    res.status(500).json({ error: 'Failed to get pending rooms' });
+  }
+});
+
 // Delete room
 app.delete('/api/rooms/:id', async (req, res) => {
   const { id } = req.params;

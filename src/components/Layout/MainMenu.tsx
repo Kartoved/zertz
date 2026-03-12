@@ -75,7 +75,7 @@ export default function MainMenu() {
   const [isSearchingMatch, setIsSearchingMatch] = useState(false);
   const [searchIntervalId, setSearchIntervalId] = useState<number | null>(null);
 
-  const { user } = useAuthStore();
+  const { user, fetchMe } = useAuthStore();
   const boardLabels: Record<number, string> = { 37: t.board37, 48: t.board48, 61: t.board61 };
 
   useEffect(() => {
@@ -95,7 +95,9 @@ export default function MainMenu() {
   
   useEffect(() => {
     refreshSavedGames();
-  }, [refreshSavedGames]);
+    // Refresh user profile to get updated rating after games
+    fetchMe();
+  }, [refreshSavedGames, fetchMe]);
   
   const handleNewGame = () => {
     setShowBoardDialog(true);
@@ -103,7 +105,7 @@ export default function MainMenu() {
 
   const handleSelectBoard = (boardSize: 37 | 48 | 61) => {
     newGame(boardSize);
-    navigate('/board');
+    setScreen('game');
     setShowBoardDialog(false);
   };
   
@@ -117,7 +119,7 @@ export default function MainMenu() {
     if (game.isOnline) {
       navigate(`/room/${gameId}`);
     } else {
-      navigate('/board');
+      setScreen('game');
     }
   };
 
@@ -367,7 +369,18 @@ export default function MainMenu() {
                   {t.noGames}
                 </p>
               ) : (
-                currentGames.map(game => (
+              currentGames.map(game => {
+                  // Determine if it's the user's turn
+                  let isMyTurn = false;
+                  if (user && game.isOnline) {
+                    const isPlayer1 = game.playerNames.player1 === user.username;
+                    const isPlayer2 = game.playerNames.player2 === user.username;
+                    // moveCount = current move number; odd = player1's turn, even = player2's turn
+                    const isPlayer1Turn = game.moveCount % 2 === 1;
+                    isMyTurn = (isPlayer1 && isPlayer1Turn) || (isPlayer2 && !isPlayer1Turn);
+                  }
+                  
+                  return (
                   <button
                     key={game.id}
                     onClick={() => handleLoadGame(game.id)}
@@ -383,19 +396,27 @@ export default function MainMenu() {
                     </div>
                     
                     <div className="flex justify-between items-end mt-2">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${
-                        game.isOnline 
-                          ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 border border-purple-200 dark:border-purple-800' 
-                          : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600'
-                      }`}>
-                        {game.isOnline ? t.onlineLabel : t.localLabel}
-                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${
+                          game.isOnline 
+                            ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 border border-purple-200 dark:border-purple-800' 
+                            : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600'
+                        }`}>
+                          {game.isOnline ? t.onlineLabel : t.localLabel}
+                        </span>
+                        {isMyTurn && (
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-300 border border-green-200 dark:border-green-800">
+                            {t.yourTurn}
+                          </span>
+                        )}
+                      </div>
                       <div className="text-[10px] text-gray-400 font-medium">
                         {game.moveCount} {t.moves.toLowerCase()}
                       </div>
                     </div>
                   </button>
-                ))
+                  );
+                })
               )}
             </div>
           </div>
