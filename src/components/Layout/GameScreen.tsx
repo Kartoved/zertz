@@ -4,6 +4,7 @@ import MarbleSelector from '../UI/MarbleSelector';
 import GameStats from '../UI/GameStats';
 import ControlPanel from '../UI/ControlPanel';
 import MoveHistory from '../UI/MoveHistory';
+import RulesContent from '../UI/RulesContent';
 import { useGameStore } from '../../store/gameStore';
 import { useUIStore } from '../../store/uiStore';
 import { useAuthStore } from '../../store/authStore';
@@ -18,6 +19,7 @@ export default function GameScreen() {
   const [showRematchDialog, setShowRematchDialog] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [showSurrenderConfirm, setShowSurrenderConfirm] = useState(false);
+  const [showRulesModal, setShowRulesModal] = useState(false);
 
   const navTabs: Array<{ id: string; label: string; authOnly?: boolean }> = [
     { id: 'playLocal', label: t.playLocal },
@@ -34,7 +36,7 @@ export default function GameScreen() {
   const handleMobileMenuAction = (tabId: string) => {
     setShowMobileMenu(false);
     if (tabId === 'rules') {
-      setScreen('rules');
+      setShowRulesModal(true);
       return;
     }
     setScreen('menu');
@@ -59,6 +61,12 @@ export default function GameScreen() {
             title={showMobileMenu ? t.closeMenu : t.openMenu}
           >
             {showMobileMenu ? '✕' : '☰'}
+          </button>
+          <button
+            onClick={() => setShowRulesModal(true)}
+            className="hidden md:inline-flex px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+          >
+            📘 {t.rules}
           </button>
           <button
             onClick={toggleDarkMode}
@@ -113,16 +121,7 @@ export default function GameScreen() {
             </div>
           )}
 
-          {state.phase === 'ringRemoval' && (
-            <div className="p-3 bg-yellow-100 dark:bg-yellow-900 rounded-xl">
-              <div className="text-yellow-800 dark:text-yellow-200 font-medium text-sm">
-                ⚠️ {t.removeRing}
-              </div>
-              <div className="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
-                {t.freeRingLead}
-              </div>
-            </div>
-          )}
+
         </div>
 
         <div className="flex-1 flex flex-col items-center justify-center">
@@ -142,16 +141,7 @@ export default function GameScreen() {
             <ControlPanel onSurrender={() => setShowSurrenderConfirm(true)} />
           </div>
           
-          {state.phase === 'ringRemoval' && (
-            <div className="p-4 bg-yellow-100 dark:bg-yellow-900 rounded-xl">
-              <div className="text-yellow-800 dark:text-yellow-200 font-medium">
-                ⚠️ {t.removeRing}
-              </div>
-              <div className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                {t.freeRingLead}
-              </div>
-            </div>
-          )}
+
         </aside>
       </main>
 
@@ -235,6 +225,28 @@ export default function GameScreen() {
               >
                 {t.confirmAction}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRulesModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowRulesModal(false)}>
+          <div
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">{t.rules}</h2>
+              <button
+                onClick={() => setShowRulesModal(false)}
+                className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto">
+              <RulesContent />
             </div>
           </div>
         </div>

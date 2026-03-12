@@ -65,15 +65,19 @@ export default function HexRing({
   // Pure black rings with gradient for contrast with marbles
   let ringStrokeColor = '#1a1a1a';
   let ringStrokeWidth = 3;
+  let glowFilter = '';
   
   if (isSelected) {
-    ringStrokeColor = '#3b82f6';
+    ringStrokeColor = '#ef4444';
     ringStrokeWidth = 4;
+    glowFilter = 'drop-shadow(0 0 6px rgba(239,68,68,0.8)) drop-shadow(0 0 12px rgba(239,68,68,0.5))';
   } else if (isCaptureSource) {
     ringStrokeColor = '#ef4444';
     ringStrokeWidth = 4;
+    glowFilter = 'drop-shadow(0 0 6px rgba(239,68,68,0.8)) drop-shadow(0 0 12px rgba(239,68,68,0.5))';
   } else if (isCaptureTarget) {
     ringStrokeColor = '#ef4444';
+    glowFilter = 'drop-shadow(0 0 5px rgba(239,68,68,0.7)) drop-shadow(0 0 10px rgba(239,68,68,0.4))';
   } else if (isRemovable) {
     ringStrokeColor = '#4ade80'; // Lighter green for removable rings
     ringStrokeWidth = 2;
@@ -155,7 +159,7 @@ export default function HexRing({
         fillRule="evenodd"
         stroke={ringStrokeColor}
         strokeWidth={ringStrokeWidth}
-        style={{ filter: 'drop-shadow(0px 5px 6px rgba(0,0,0,0.5))' }}
+        style={{ filter: `drop-shadow(0px 5px 6px rgba(0,0,0,0.5))${glowFilter ? ' ' + glowFilter : ''}` }}
       />
       
       {/* Marble (smaller than inner hole, sits on top of ring) */}

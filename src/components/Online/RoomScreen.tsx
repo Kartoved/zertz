@@ -126,8 +126,10 @@ export function RoomScreen() {
     return '';
   };
 
-  const winnerName = state.winner === 'player1' ? playerNames.player1 : playerNames.player2;
-  const winnerWinType = state.winner ? (winType || getWinType(state, state.winner)) : null;
+  const safePlayerNames = playerNames || { player1: 'Player 1', player2: 'Player 2' };
+  const safeCaptures = state.captures || { player1: { white: 0, gray: 0, black: 0 }, player2: { white: 0, gray: 0, black: 0 } };
+  const winnerName = state.winner === 'player1' ? safePlayerNames.player1 : safePlayerNames.player2;
+  const winnerWinType = state.winner ? (winType || (state.captures ? getWinType(state, state.winner) : null)) : null;
 
   const LOW_TIME_THRESHOLD_MS = 20 * 1000;
 
@@ -361,7 +363,7 @@ export function RoomScreen() {
                   onClick={() => user1Id && setSelectedPlayerId(user1Id)}
                   className="font-semibold text-gray-800 dark:text-gray-200 text-left hover:text-blue-600 dark:hover:text-blue-400 hover:underline disabled:no-underline disabled:cursor-default disabled:hover:text-gray-800 dark:disabled:hover:text-gray-200"
                 >
-                  {playerNames.player1}
+                  {safePlayerNames.player1}
                 </button>
               ) : (
                 <input
@@ -388,16 +390,16 @@ export function RoomScreen() {
             )}
             {ratingDelta && state.winner && rated && (
               <div className="text-xs mb-1">
-                <span className="text-gray-500">{ratingDelta.player1.before} → {ratingDelta.player1.after}</span>
-                <span className={`ml-1 font-bold ${ratingDelta.player1.delta >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                  {ratingDelta.player1.delta >= 0 ? '+' : ''}{ratingDelta.player1.delta}
+                <span className="text-gray-500">{ratingDelta?.player1?.before} → {ratingDelta?.player1?.after}</span>
+                <span className={`ml-1 font-bold ${(ratingDelta?.player1?.delta ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {(ratingDelta?.player1?.delta ?? 0) >= 0 ? '+' : ''}{ratingDelta?.player1?.delta}
                 </span>
               </div>
             )}
             <div className="flex gap-2 text-xs lg:text-sm">
-              <span>⚪ {state.captures.player1.white}</span>
-              <span>🔘 {state.captures.player1.gray}</span>
-              <span>⚫ {state.captures.player1.black}</span>
+              <span>⚪ {safeCaptures.player1.white}</span>
+              <span>🔘 {safeCaptures.player1.gray}</span>
+              <span>⚫ {safeCaptures.player1.black}</span>
             </div>
             {state.currentPlayer === 'player1' && !state.winner && (
               <div className="mt-2 text-sm font-medium text-blue-700 dark:text-blue-200">
@@ -422,7 +424,7 @@ export function RoomScreen() {
                   onClick={() => user2Id && setSelectedPlayerId(user2Id)}
                   className="font-semibold text-gray-800 dark:text-gray-200 text-left hover:text-blue-600 dark:hover:text-blue-400 hover:underline disabled:no-underline disabled:cursor-default disabled:hover:text-gray-800 dark:disabled:hover:text-gray-200"
                 >
-                  {playerNames.player2}
+                  {safePlayerNames.player2}
                 </button>
               ) : (
                 <input
@@ -449,16 +451,16 @@ export function RoomScreen() {
             )}
             {ratingDelta && state.winner && rated && (
               <div className="text-xs mb-1">
-                <span className="text-gray-500">{ratingDelta.player2.before} → {ratingDelta.player2.after}</span>
-                <span className={`ml-1 font-bold ${ratingDelta.player2.delta >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                  {ratingDelta.player2.delta >= 0 ? '+' : ''}{ratingDelta.player2.delta}
+                <span className="text-gray-500">{ratingDelta?.player2?.before} → {ratingDelta?.player2?.after}</span>
+                <span className={`ml-1 font-bold ${(ratingDelta?.player2?.delta ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {(ratingDelta?.player2?.delta ?? 0) >= 0 ? '+' : ''}{ratingDelta?.player2?.delta}
                 </span>
               </div>
             )}
             <div className="flex gap-2 text-xs lg:text-sm">
-              <span>⚪ {state.captures.player2.white}</span>
-              <span>🔘 {state.captures.player2.gray}</span>
-              <span>⚫ {state.captures.player2.black}</span>
+              <span>⚪ {safeCaptures.player2.white}</span>
+              <span>🔘 {safeCaptures.player2.gray}</span>
+              <span>⚫ {safeCaptures.player2.black}</span>
             </div>
             {state.currentPlayer === 'player2' && !state.winner && (
               <div className="mt-2 text-sm font-medium text-blue-700 dark:text-blue-200">

@@ -53,6 +53,16 @@ function serializeState(state: GameState): string {
 function deserializeState(json: string): GameState {
   const parsed = JSON.parse(json);
   parsed.rings = new Map(parsed.rings);
+  // Ensure captures are always present (defensive against older data formats)
+  if (!parsed.captures) {
+    parsed.captures = {
+      player1: { white: 0, gray: 0, black: 0 },
+      player2: { white: 0, gray: 0, black: 0 },
+    };
+  } else {
+    if (!parsed.captures.player1) parsed.captures.player1 = { white: 0, gray: 0, black: 0 };
+    if (!parsed.captures.player2) parsed.captures.player2 = { white: 0, gray: 0, black: 0 };
+  }
   return parsed as GameState;
 }
 

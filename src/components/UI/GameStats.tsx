@@ -124,12 +124,6 @@ export default function GameStats({ compact = false }: GameStatsProps) {
         {renderCaptures('player2')}
       </div>
       
-      {!compact && (
-        <div className="text-center text-sm text-gray-600 dark:text-gray-400">
-          {t.move} #{state.moveNumber} • {state.currentPlayer === 'player1' ? playerNames.player1 : playerNames.player2}
-          {state.phase === 'ringRemoval' && ` • ${t.removeRing}`}
-        </div>
-      )}
     </div>
   );
 }
