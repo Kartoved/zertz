@@ -14,14 +14,15 @@ import GlobalChat from '../UI/GlobalChat';
 import * as roomsApi from '../../db/roomsApi';
 import { createInitialState } from '../../game/GameEngine';
 import { GameNode } from '../../game/types';
+import RulesContent from '../UI/RulesContent';
 
-type InviteMode = 'classic' | 'timedInvite';
-type TimePresetId = '5+5' | '15+0' | '30+0';
+type TimePresetId = '5+5' | '15+0' | '30+0' | '7d';
 
 const FISCHER_PRESETS: Array<{ id: TimePresetId; baseMs: number; incrementMs: number }> = [
   { id: '5+5', baseMs: 5 * 60 * 1000, incrementMs: 5 * 1000 },
   { id: '15+0', baseMs: 15 * 60 * 1000, incrementMs: 0 },
   { id: '30+0', baseMs: 30 * 60 * 1000, incrementMs: 0 },
+  { id: '7d', baseMs: 7 * 24 * 60 * 60 * 1000, incrementMs: -1 },
 ];
 
 function formatDate(timestamp: number): string {
@@ -40,7 +41,7 @@ const TIME_CONTROLS = [
   { id: 'blitz', icon: '⚡', enabled: true, preset: '5+5' as TimePresetId },
   { id: 'rapid', icon: '🏇', enabled: true, preset: '15+0' as TimePresetId },
   { id: 'long', icon: '⏳', enabled: true, preset: '30+0' as TimePresetId },
-  { id: 'correspondence', icon: '∞', enabled: true, preset: null },
+  { id: 'correspondence', icon: '∞', enabled: true, preset: '7d' as TimePresetId },
 ] as const;
 
 type NavTab = 'playOnline' | 'playLocal' | 'loadGame' | 'rules' | 'players' | 'challenges';
@@ -54,8 +55,7 @@ export default function MainMenu() {
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [showBoardDialog, setShowBoardDialog] = useState(false);
   const [showOnlineDialog, setShowOnlineDialog] = useState(false);
-  const [onlineStep, setOnlineStep] = useState<'board' | 'time' | 'player' | 'link'>('board');
-  const [inviteMode, setInviteMode] = useState<InviteMode>('classic');
+  const [onlineStep, setOnlineStep] = useState<'board' | 'link'>('board');
   const [selectedBoardSize, setSelectedBoardSize] = useState<37 | 48 | 61>(37);
   const [selectedPlayer, setSelectedPlayer] = useState<1 | 2 | 'random'>(1);
   const [selectedPreset, setSelectedPreset] = useState<TimePresetId>('5+5');
@@ -65,6 +65,7 @@ export default function MainMenu() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showPlayersModal, setShowPlayersModal] = useState(false);
+  const [showRulesModal, setShowRulesModal] = useState(false);
   const [isRated, setIsRated] = useState(false);
   const [loadTab, setLoadTab] = useState<'current' | 'completed'>('current');
   const [loadFilter, setLoadFilter] = useState<'all' | 'local' | 'online'>('all');
@@ -129,7 +130,7 @@ export default function MainMenu() {
       case 'playOnline': setShowOnlineDialog(true); break;
       case 'playLocal': handleNewGame(); break;
       case 'loadGame': setShowLoadDialog(true); break;
-      case 'rules': setScreen('rules'); break;
+      case 'rules': setShowRulesModal(true); break;
       case 'players': setShowPlayersModal(true); break;
       case 'challenges': setShowChallengesModal(true); break;
     }
@@ -561,11 +562,9 @@ export default function MainMenu() {
                   if (!tc) return;
 
                   if (tc.preset === null) {
-                    setInviteMode('classic');
                     setOnlineStep('board');
                     setShowOnlineDialog(true);
                   } else {
-                    setInviteMode('timedInvite');
                     setSelectedPreset(tc.preset);
                     setOnlineStep('board');
                     setShowOnlineDialog(true);
@@ -753,15 +752,11 @@ export default function MainMenu() {
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
             <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                {onlineStep === 'board' && t.chooseBoardOnline}
-                {onlineStep === 'time' && t.selectTimeControl}
-                {onlineStep === 'player' && t.choosePlayer}
-                {onlineStep === 'link' && t.inviteLinkTitle}
+                {onlineStep === 'link' ? t.inviteLinkTitle : t.challengeSettings}
               </h2>
               <button
                 onClick={() => {
                   setShowOnlineDialog(false);
-                  setInviteMode('classic');
                   setOnlineStep('board');
                   setCreatedRoomId(null);
                   setLinkCopied(false);
@@ -771,117 +766,94 @@ export default function MainMenu() {
                 ✕
               </button>
             </div>
-            <div className="p-4">
-              {onlineStep === 'board' && (
-                <>
-                  <p className="text-gray-600 dark:text-gray-400 mb-4">
-                    {t.onlineBoardPrompt}
-                  </p>
-                  <div className="space-y-3">
-                    {([37, 48, 61] as const).map((size) => (
+            
+            <div className="p-4 overflow-y-auto max-h-[80vh]">
+              {onlineStep !== 'link' && (
+                <div className="space-y-6">
+                  {/* Board Size */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">{t.chooseBoardOnline}</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {([37, 48, 61] as const).map((size) => (
+                        <button
+                          key={size}
+                          onClick={() => setSelectedBoardSize(size)}
+                          className={`p-2 text-center rounded-lg border-2 transition-colors ${
+                            selectedBoardSize === size
+                              ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 text-gray-900 dark:text-white'
+                              : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                          }`}
+                        >
+                          <div className="text-lg font-bold mb-0.5">{size}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Time Control */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">{t.selectTimeControl}</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      {FISCHER_PRESETS.map((preset) => {
+                        const labelText = TIME_CONTROLS.find(c => c.preset === preset.id)?.id;
+                        const labelKey = labelText ? t[labelText as keyof typeof t] as string : preset.id;
+                        return (
+                          <button
+                            key={preset.id}
+                            onClick={() => setSelectedPreset(preset.id)}
+                            className={`p-2 text-center rounded-lg border-2 transition-colors ${
+                              selectedPreset === preset.id
+                                ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 text-gray-900 dark:text-white'
+                                : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                            }`}
+                          >
+                            <div className="font-medium text-sm">{labelKey} ({preset.id})</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Player side */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">{t.choosePlayer}</label>
+                    <div className="grid grid-cols-3 gap-2">
                       <button
-                        key={size}
-                        onClick={() => {
-                          setSelectedBoardSize(size);
-                          setOnlineStep(inviteMode === 'timedInvite' ? 'time' : 'player');
-                        }}
-                        className={`w-full p-3 text-left rounded-lg transition-colors ${
-                          selectedBoardSize === size
-                            ? 'bg-purple-100 dark:bg-purple-900 border-2 border-purple-500'
-                            : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        onClick={() => setSelectedPlayer(1)}
+                        className={`p-2 text-center rounded-lg border-2 transition-colors ${
+                          selectedPlayer === 1
+                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 text-gray-900 dark:text-white'
+                            : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
                         }`}
                       >
-                        {boardLabels[size]}
+                        <div className="font-medium text-sm">{t.firstShort || '1'}</div>
                       </button>
-                    ))}
-                  </div>
-                </>
-              )}
-
-              {onlineStep === 'time' && (
-                <>
-                  <p className="text-gray-600 dark:text-gray-400 mb-4">
-                    {t.selectTimeControl}
-                  </p>
-                  <div className="space-y-3">
-                    {FISCHER_PRESETS.map((preset) => (
                       <button
-                        key={preset.id}
-                        onClick={() => setSelectedPreset(preset.id)}
-                        className={`w-full p-3 text-left rounded-lg transition-colors ${
-                          selectedPreset === preset.id
-                            ? 'bg-purple-100 dark:bg-purple-900 border-2 border-purple-500'
-                            : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
+                        onClick={() => setSelectedPlayer(2)}
+                        className={`p-2 text-center rounded-lg border-2 transition-colors ${
+                          selectedPlayer === 2
+                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 text-gray-900 dark:text-white'
+                            : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
                         }`}
                       >
-                        <div className="font-medium">{preset.id}</div>
+                        <div className="font-medium text-sm">{t.secondShort || '2'}</div>
                       </button>
-                    ))}
+                      <button
+                        onClick={() => setSelectedPlayer('random')}
+                        className={`p-2 text-center rounded-lg border-2 transition-colors ${
+                          selectedPlayer === 'random'
+                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 text-gray-900 dark:text-white'
+                            : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        <div className="font-medium text-sm">{t.random}</div>
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="flex gap-2 mt-4">
-                    <button
-                      onClick={() => setOnlineStep('board')}
-                      className="flex-1 py-2 px-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white 
-                        rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-                    >
-                      {t.back}
-                    </button>
-                    <button
-                      onClick={() => setOnlineStep('player')}
-                      className="flex-1 py-2 px-4 bg-purple-500 hover:bg-purple-600 text-white font-semibold 
-                        rounded-lg transition-colors"
-                    >
-                      Далее
-                    </button>
-                  </div>
-                </>
-              )}
-
-              {onlineStep === 'player' && (
-                <>
-                  <p className="text-gray-600 dark:text-gray-400 mb-4">
-                    {t.playerPrompt}
-                  </p>
-                  <div className="space-y-3">
-                    <button
-                      onClick={() => setSelectedPlayer(1)}
-                      className={`w-full p-3 text-left rounded-lg transition-colors ${
-                        selectedPlayer === 1
-                          ? 'bg-purple-100 dark:bg-purple-900 border-2 border-purple-500'
-                          : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
-                      }`}
-                    >
-                      <div className="font-medium">{t.playerFirst}</div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">{t.playerFirstHint}</div>
-                    </button>
-                    <button
-                      onClick={() => setSelectedPlayer(2)}
-                      className={`w-full p-3 text-left rounded-lg transition-colors ${
-                        selectedPlayer === 2
-                          ? 'bg-purple-100 dark:bg-purple-900 border-2 border-purple-500'
-                          : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
-                      }`}
-                    >
-                      <div className="font-medium">{t.playerSecond}</div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">{t.playerSecondHint}</div>
-                    </button>
-                    <button
-                      onClick={() => setSelectedPlayer('random')}
-                      className={`w-full p-3 text-left rounded-lg transition-colors ${
-                        selectedPlayer === 'random'
-                          ? 'bg-purple-100 dark:bg-purple-900 border-2 border-purple-500'
-                          : 'bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600'
-                      }`}
-                    >
-                      <div className="font-medium">{t.playerRandom}</div>
-                      <div className="text-sm text-gray-500 dark:text-gray-400">{t.playerRandomHint}</div>
-                    </button>
-                  </div>
-
-                  {/* Rated toggle — only for authenticated users */}
+                  {/* Rated toggle */}
                   {user && (
-                    <div className="flex items-center justify-between mt-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
                       <div>
                         <div className="font-medium text-gray-900 dark:text-white text-sm">{t.ratedGame}</div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">{t.ratedHint}</div>
@@ -890,7 +862,7 @@ export default function MainMenu() {
                         type="button"
                         onClick={() => setIsRated(!isRated)}
                         className={`relative w-12 h-6 rounded-full transition-colors ${
-                          isRated ? 'bg-purple-500' : 'bg-gray-300 dark:bg-gray-600'
+                          isRated ? 'bg-indigo-500' : 'bg-gray-300 dark:bg-gray-600'
                         }`}
                       >
                         <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
@@ -900,82 +872,69 @@ export default function MainMenu() {
                     </div>
                   )}
 
-                  <div className="flex gap-2 mt-4">
-                    <button
-                      onClick={() => setOnlineStep(inviteMode === 'timedInvite' ? 'time' : 'board')}
-                      className="flex-1 py-2 px-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white 
-                        rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-                    >
-                      {t.back}
-                    </button>
-                    <button
-                      disabled={isCreatingRoom}
-                      onClick={async () => {
-                        try {
-                          const player = selectedPlayer === 'random' 
-                            ? (Math.random() < 0.5 ? 1 : 2) 
-                            : selectedPlayer;
-                          const preset = FISCHER_PRESETS.find((p) => p.id === selectedPreset) || FISCHER_PRESETS[0];
-                          const roomId = await createRoom(
-                            selectedBoardSize,
-                            player,
-                            isRated,
-                            inviteMode === 'timedInvite'
-                              ? { baseMs: preset.baseMs, incrementMs: preset.incrementMs }
-                              : null
-                          );
-                          setCreatedRoomId(roomId);
-                          setOnlineStep('link');
-                        } catch {
-                          alert(t.createRoomError);
-                        }
-                      }}
-                      className="flex-1 py-2 px-4 bg-purple-500 hover:bg-purple-600 text-white font-semibold 
-                        rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      {isCreatingRoom ? t.creating : t.createGame}
-                    </button>
-                  </div>
-                </>
+                  <button
+                    disabled={isCreatingRoom}
+                    onClick={async () => {
+                      try {
+                        const player = selectedPlayer === 'random' 
+                          ? (Math.random() < 0.5 ? 1 : 2) as 1 | 2
+                          : selectedPlayer as 1 | 2;
+                        const preset = FISCHER_PRESETS.find((p) => p.id === selectedPreset) || FISCHER_PRESETS[0];
+                        const roomId = await createRoom(
+                          selectedBoardSize,
+                          player,
+                          user ? isRated : false,
+                          { baseMs: preset.baseMs, incrementMs: preset.incrementMs }
+                        );
+                        setCreatedRoomId(roomId);
+                        setOnlineStep('link');
+                        // Make rooms list re-poll fast to show outgoing game immediately
+                        setTimeout(() => roomsApi.getPendingRooms().catch(() => {}), 500);
+                      } catch (err: any) {
+                        alert(t.createRoomError + ' ' + (err.message || ''));
+                      }
+                    }}
+                    className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all active:scale-95 disabled:opacity-50"
+                  >
+                    {isCreatingRoom ? t.creating : t.createGame}
+                  </button>
+                </div>
               )}
 
               {onlineStep === 'link' && createdRoomId && (
                 <>
-                  <p className="text-gray-600 dark:text-gray-400 mb-4">
+                  <p className="text-gray-600 dark:text-gray-400 mb-4 text-center pb-2">
                     {t.gameCreatedHint}
                   </p>
-                  <div className="bg-gray-100 dark:bg-gray-700 rounded-lg p-3 mb-4">
-                    <div className="text-sm text-gray-500 dark:text-gray-400 mb-1">{t.gameLink}</div>
+                  <div className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl p-4 mb-6">
+                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">{t.gameLink}</div>
                     <a 
                       href={`${window.location.origin}/room/${createdRoomId}`}
-                      className="text-purple-600 dark:text-purple-400 hover:underline break-all font-medium"
+                      className="text-indigo-600 dark:text-indigo-400 hover:underline break-all font-medium text-lg"
                       target="_blank"
                       rel="noopener noreferrer"
                     >
                       {window.location.origin}/room/{createdRoomId}
                     </a>
                   </div>
-                  <div className="flex gap-2">
+                  <div className="flex gap-3">
                     <button
                       onClick={() => {
                         navigator.clipboard.writeText(`${window.location.origin}/room/${createdRoomId}`);
                         setLinkCopied(true);
                         setTimeout(() => setLinkCopied(false), 2000);
                       }}
-                      className="flex-1 py-2 px-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white 
-                        rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                      className="flex-1 py-3 px-4 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-white font-semibold rounded-xl border border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
                     >
                       {linkCopied ? t.copied : t.copyLink}
                     </button>
                     <button
                       onClick={() => {
                         setShowOnlineDialog(false);
-                        setInviteMode('classic');
                         setOnlineStep('board');
                         navigate(`/room/${createdRoomId}`);
                       }}
-                      className="flex-1 py-2 px-4 bg-purple-500 hover:bg-purple-600 text-white font-semibold 
-                        rounded-lg transition-colors"
+                      className="flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition-colors"
                     >
                       {t.goToGame}
                     </button>
@@ -991,6 +950,28 @@ export default function MainMenu() {
       {showProfileModal && <ProfileModal onClose={() => setShowProfileModal(false)} />}
       {showPlayersModal && <PlayersModal onClose={() => setShowPlayersModal(false)} />}
       {showChallengesModal && <ChallengesModal onClose={() => setShowChallengesModal(false)} />}
+
+      {showRulesModal && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowRulesModal(false)}>
+          <div
+            className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">{t.rules}</h2>
+              <button
+                onClick={() => setShowRulesModal(false)}
+                className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="p-4 overflow-y-auto">
+              <RulesContent />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

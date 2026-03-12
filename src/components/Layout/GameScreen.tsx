@@ -47,72 +47,100 @@ export default function GameScreen() {
   const winnerName = state.winner === 'player1' ? playerNames.player1 : playerNames.player2;
   
   return (
-    <div className="min-h-screen flex flex-col bg-gray-100 dark:bg-gray-900 transition-colors">
-      <header className="flex items-center justify-between p-4 bg-white dark:bg-gray-800 shadow-sm">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">ZERTZ</h1>
-        <div className="flex-1 mx-4 hidden md:block">
-          <MoveHistory />
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setShowMobileMenu((prev) => !prev)}
-            className="md:hidden p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
-            title={showMobileMenu ? t.closeMenu : t.openMenu}
-          >
-            {showMobileMenu ? '✕' : '☰'}
-          </button>
-          <button
-            onClick={() => setShowRulesModal(true)}
-            className="hidden md:inline-flex px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-          >
-            📘 {t.rules}
-          </button>
-          <button
-            onClick={toggleDarkMode}
-            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 
-              dark:hover:bg-gray-600 transition-colors"
-          >
-            {isDarkMode ? '☀️' : '🌙'}
-          </button>
+    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col overflow-x-hidden">
+      {/* Header */}
+      <header className="bg-white dark:bg-gray-800 shadow-sm p-3 md:p-4">
+        <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-2 md:gap-4">
+            <button
+              type="button"
+              onClick={() => setShowMobileMenu((prev) => !prev)}
+              className="md:hidden px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg"
+              title={showMobileMenu ? t.closeMenu : t.openMenu}
+            >
+              {showMobileMenu ? '✕' : '☰'}
+            </button>
+            <button
+              onClick={() => setScreen('menu')}
+              className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+            >
+              ← {t.roomMenu}
+            </button>
+            <h1 className="text-lg md:text-xl font-bold text-gray-800 dark:text-gray-200">
+              ZÈRTZ
+            </h1>
+          </div>
+
+          <div className="hidden md:block flex-1 min-w-[220px] md:mx-3">
+            <MoveHistory />
+          </div>
+          
+          <div className="hidden md:flex items-center gap-2">
+            <button
+              onClick={() => setShowRulesModal(true)}
+              className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            >
+              📘 {t.rules}
+            </button>
+            <button
+              onClick={toggleDarkMode}
+              className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              title={isDarkMode ? t.lightMode : t.darkMode}
+            >
+              {isDarkMode ? '☀️' : '🌙'}
+            </button>
+          </div>
         </div>
       </header>
 
       {showMobileMenu && (
-        <div className="md:hidden px-4 pb-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 space-y-2">
-          {navTabs
-            .filter((tab) => !tab.authOnly || user)
-            .map((tab) => (
+        <div className="md:hidden px-3 pb-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+          <div className="space-y-2">
+            {navTabs
+              .filter((tab) => !tab.authOnly || user)
+              .map((tab) => (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => handleMobileMenuAction(tab.id)}
+                  className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700"
+                >
+                  {tab.label}
+                </button>
+              ))}
+            {topExtraTabs.map((tab) => (
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => handleMobileMenuAction(tab.id)}
-                className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700"
+                className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 border border-dashed border-gray-300 dark:border-gray-600"
               >
                 {tab.label}
               </button>
             ))}
-          {topExtraTabs.map((tab) => (
-            <button
-              key={tab.id}
-              type="button"
-              className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700 border border-dashed border-gray-300 dark:border-gray-600"
-            >
-              {tab.label}
-            </button>
-          ))}
-          <div className="pt-1">
             <MoveHistory />
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => {
+                  setShowMobileMenu(false);
+                  setShowRulesModal(true);
+                }}
+                className="flex-1 px-3 py-2 text-sm bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg"
+              >
+                📘 {t.rules}
+              </button>
+            </div>
           </div>
         </div>
       )}
       
-      <main className="flex-1 flex flex-col lg:flex-row gap-4 p-4 max-w-7xl mx-auto w-full">
-        <div className="md:hidden space-y-3">
-          <GameStats compact />
+      {/* Main content */}
+      <main className="flex-1 min-h-0 flex flex-col lg:flex-row gap-3 md:gap-4 p-2 md:p-4 max-w-7xl mx-auto w-full pb-28 sm:pb-24 lg:pb-4 overflow-y-auto">
+        {/* Left panel - Stats and Controls */}
+        <div className={`lg:w-64 lg:flex lg:flex-col gap-2 lg:gap-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 min-w-0 ${isGameOver ? 'hidden lg:flex' : ''}`}>
+          <GameStats compact={false} hideLabels={true} />
 
           {!isGameOver && (
-            <div className="p-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm">
+            <div className="p-3 bg-white dark:bg-gray-800 rounded-lg col-span-1 sm:col-span-2 lg:col-span-1 shadow-sm">
               <div className="text-sm text-gray-600 dark:text-gray-400 mb-2">{t.chooseMarbleShort}</div>
               <MarbleSelector />
               <div className="mt-3">
@@ -120,29 +148,15 @@ export default function GameScreen() {
               </div>
             </div>
           )}
-
-
         </div>
 
-        <div className="flex-1 flex flex-col items-center justify-center">
+        {/* Board */}
+        <div className="flex-1 min-w-0 flex flex-col items-center justify-center p-2 lg:bg-white lg:dark:bg-gray-800 lg:rounded-xl shadow-sm">
           <HexBoard />
         </div>
         
-        <aside className="hidden md:flex lg:w-80 flex-col gap-4">
-          <GameStats />
-          
-          {!isGameOver && (
-            <div className="p-4 bg-white dark:bg-gray-800 rounded-xl shadow-md">
-              <MarbleSelector />
-            </div>
-          )}
-          
-          <div className="p-4 bg-white dark:bg-gray-800 rounded-xl shadow-md">
-            <ControlPanel onSurrender={() => setShowSurrenderConfirm(true)} />
-          </div>
-          
-
-        </aside>
+        {/* Empty right area to balance layout identical to online chat panel implicitly */}
+        <div className="hidden lg:block lg:w-72 opacity-0 pointer-events-none"></div>
       </main>
 
       {isGameOver && (

@@ -238,7 +238,7 @@ type Dict = {
   confirmSurrenderTitle: string;
   confirmSurrenderText: string;
   confirmAction: string;
-  cancelAction: string;
+  cancelAction: string; undoRequestChat: string; undoAccept: string; undoReject: string; undoRejectedChat: string; undoAcceptedChat: string;
 };
 
 export const I18N: Record<Language, Dict> = {
@@ -449,8 +449,8 @@ export const I18N: Record<Language, Dict> = {
     rapidDesc: '15+0',
     long: 'Классика',
     longDesc: '30+0',
-  correspondence: 'Заочная',
-    correspondenceDesc: 'Без ограничения по времени',
+    correspondence: 'Заочная',
+    correspondenceDesc: '7 дней на ход',
     searchGame: 'Поиск игры',
     playByLink: 'Сыграть по ссылке',
     comingSoon: 'Скоро',
@@ -472,9 +472,14 @@ export const I18N: Record<Language, Dict> = {
     tabPlayers: 'Игроки',
     surrender: 'Сдаться',
     confirmSurrenderTitle: 'Подтвердите сдачу',
-    confirmSurrenderText: 'Вы точно хотите сдаться?',
+    confirmSurrenderText: 'Вы уверены, что хотите сдаться? Это приведет к немедленному поражению.',
     confirmAction: 'Да, сдаться',
     cancelAction: 'Отмена',
+    undoRequestChat: 'Просит отменить ход',
+    undoAccept: 'Разрешить',
+    undoReject: 'Отказ',
+    undoRejectedChat: 'Запрос на отмену хода отклонён.',
+    undoAcceptedChat: 'Запрос на отмену хода принят.',
   },
   en: {
     appSubtitle: 'Abstract strategy game',
@@ -684,7 +689,7 @@ export const I18N: Record<Language, Dict> = {
     long: 'Classic',
     longDesc: '30+0',
     correspondence: 'Async',
-    correspondenceDesc: 'No time limit',
+    correspondenceDesc: '7 days per move',
     searchGame: 'Search game',
     playByLink: 'Play by link',
     comingSoon: 'Coming soon',
@@ -706,9 +711,14 @@ export const I18N: Record<Language, Dict> = {
     tabPlayers: 'Players',
     surrender: 'Resign',
     confirmSurrenderTitle: 'Confirm resignation',
-    confirmSurrenderText: 'Are you sure you want to resign?',
-    confirmAction: 'Yes, resign',
+    confirmSurrenderText: 'Are you sure you want to surrender? This will result in an immediate loss.',
+    confirmAction: 'Yes, surrender',
     cancelAction: 'Cancel',
+    undoRequestChat: 'Requests to undo the move',
+    undoAccept: 'Accept',
+    undoReject: 'Reject',
+    undoRejectedChat: 'Undo request was rejected.',
+    undoAcceptedChat: 'Undo request was accepted.',
   },
   eo: {
     appSubtitle: 'Abstrakta strategia ludo',
@@ -918,7 +928,7 @@ export const I18N: Record<Language, Dict> = {
     long: 'Klasika',
     longDesc: '30+0',
     correspondence: 'Asinkrona',
-    correspondenceDesc: 'Sen tempolimo',
+    correspondenceDesc: '7 tagoj por movo',
     searchGame: 'Serĉi ludon',
     playByLink: 'Ludi per ligilo',
     comingSoon: 'Baldaŭ',
@@ -940,9 +950,14 @@ export const I18N: Record<Language, Dict> = {
     tabPlayers: 'Ludantoj',
     surrender: 'Rezigni',
     confirmSurrenderTitle: 'Konfirmu rezignon',
-    confirmSurrenderText: 'Ĉu vi certe volas rezigni?',
-    confirmAction: 'Jes, rezigni',
+    confirmSurrenderText: 'Ĉu vi certe volas kapitulaci? Tio rezultigos tujan malvenkon.',
+    confirmAction: 'Jes, kapitulaci',
     cancelAction: 'Nuligi',
+    undoRequestChat: 'Peto nuligi la movon',
+    undoAccept: 'Akcepti',
+    undoReject: 'Rifuzi',
+    undoRejectedChat: 'Peto nuligi movon rifuzita.',
+    undoAcceptedChat: 'Peto nuligi movon akceptita.',
   },
 };
 

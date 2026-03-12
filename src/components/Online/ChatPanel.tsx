@@ -8,9 +8,18 @@ interface ChatPanelProps {
 
 export function ChatPanel({ inputBottomOffset = 0 }: ChatPanelProps) {
   const { t, locale } = useI18n();
-  const { messages, playerNames, myPlayer, sendMessage } = useRoomStore();
+  const { messages, playerNames, myPlayer, sendMessage, state, undoLastMove } = useRoomStore();
   const [text, setText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const handleAcceptUndo = async () => {
+    await undoLastMove(true);
+    sendMessage('[UNDO_ACCEPTED]');
+  };
+
+  const handleRejectUndo = () => {
+    sendMessage('[UNDO_REJECTED]');
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -87,7 +96,33 @@ export function ChatPanel({ inputBottomOffset = 0 }: ChatPanelProps) {
                       : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
                   }`}
                 >
-                  {msg.message}
+                  {msg.message === '[UNDO_REQUEST]' ? (
+                    <div>
+                      <div className="font-semibold">{t.undoRequestChat || 'Requests undo'}</div>
+                      {!isMe && msg.moveNumber === state.moveNumber && (
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            onClick={handleAcceptUndo}
+                            className="bg-green-500 hover:bg-green-600 text-white px-3 py-1 rounded text-xs transition-colors"
+                          >
+                            {t.undoAccept || 'Accept'}
+                          </button>
+                          <button
+                            onClick={handleRejectUndo}
+                            className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs transition-colors"
+                          >
+                            {t.undoReject || 'Reject'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ) : msg.message === '[UNDO_ACCEPTED]' ? (
+                    <div className="font-semibold text-green-200">{t.undoAcceptedChat || 'Undo accepted.'}</div>
+                  ) : msg.message === '[UNDO_REJECTED]' ? (
+                    <div className="font-semibold text-red-200">{t.undoRejectedChat || 'Undo rejected.'}</div>
+                  ) : (
+                    msg.message
+                  )}
                 </div>
               </div>
             );

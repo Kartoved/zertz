@@ -60,7 +60,7 @@ export function RoomScreen() {
     selectedRingId,
     highlightedCaptures,
     availableCaptureChains,
-    undoLastMove,
+    sendMessage,
     currentNode,
     setPlayerName,
     reset,
@@ -490,7 +490,7 @@ export function RoomScreen() {
                 <div className="flex gap-2">
                   <button
                     type="button"
-                    onClick={() => void undoLastMove()}
+                    onClick={() => sendMessage('[UNDO_REQUEST]')}
                     disabled={!canUndoOwnLastMove()}
                     className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                   >

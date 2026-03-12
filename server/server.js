@@ -968,13 +968,13 @@ app.post('/api/matchmake/join', authRequired, async (req, res) => {
       'blitz': 5 * 60 * 1000,
       'rapid': 15 * 60 * 1000,
       'long': 30 * 60 * 1000,
-      'correspondence': null
+      'correspondence': 7 * 24 * 60 * 60 * 1000
     };
     const incMap = {
       'blitz': 5 * 1000,
       'rapid': 0,
       'long': 0,
-      'correspondence': null
+      'correspondence': -1
     };
 
     const cBase = baseMap[timeControl];
@@ -1325,7 +1325,11 @@ app.put('/api/rooms/:id/state', authOptional, async (req, res) => {
         nextCurrentPlayer = 2;
         nextClockRunningSince = null;
       } else {
-        nextClockP1 = afterSpent + (didTurnPass ? incrementMs : 0);
+        if (didTurnPass && incrementMs === -1) {
+          nextClockP1 = baseMs;
+        } else {
+          nextClockP1 = afterSpent + (didTurnPass ? incrementMs : 0);
+        }
         nextClockP2 = p2Before;
       }
     } else {
@@ -1339,7 +1343,11 @@ app.put('/api/rooms/:id/state', authOptional, async (req, res) => {
         nextClockRunningSince = null;
       } else {
         nextClockP1 = p1Before;
-        nextClockP2 = afterSpent + (didTurnPass ? incrementMs : 0);
+        if (didTurnPass && incrementMs === -1) {
+          nextClockP2 = baseMs;
+        } else {
+          nextClockP2 = afterSpent + (didTurnPass ? incrementMs : 0);
+        }
       }
     }
 

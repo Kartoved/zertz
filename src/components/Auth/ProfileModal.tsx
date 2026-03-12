@@ -38,13 +38,9 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
     setSuccessMsg('');
     try {
       const trimmedContact = contactLink.trim();
-      if (trimmedContact) {
-        try {
-          new URL(trimmedContact);
-        } catch {
-          setLocalError(t.contactInvalid);
-          return;
-        }
+      if (trimmedContact.length > 100) {
+        setLocalError('Contact is too long (max 100 characters)');
+        return;
       }
 
       await updateProfile({ quote, country, contactLink: trimmedContact });
@@ -196,14 +192,16 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
               {t.contact}
             </label>
             <input
-              type="url"
+              type="text"
               value={contactLink}
               onChange={(e) => setContactLink(e.target.value)}
+              maxLength={100}
               placeholder={t.contactPlaceholder}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
                 bg-white dark:bg-gray-700 text-gray-900 dark:text-white
                 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
             />
+            <div className="text-xs text-gray-400 text-right mt-0.5">{contactLink.length}/100</div>
           </div>
 
           {/* Country */}

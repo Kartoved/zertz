@@ -91,7 +91,7 @@ interface RoomStore {
   handlePlacement: (ringId: string) => Promise<void>;
   handleRingRemoval: (ringId: string) => Promise<void>;
   handleCapture: (captures: CaptureMove[]) => Promise<void>;
-  undoLastMove: () => Promise<void>;
+  undoLastMove: (overrideCheck?: boolean) => Promise<void>;
   navigateToNode: (targetNode: GameNode) => void;
   setPlayerName: (player: 1 | 2, name: string) => Promise<void>;
   
@@ -667,11 +667,11 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     }
   },
 
-  undoLastMove: async () => {
+  undoLastMove: async (overrideCheck = false) => {
     const { roomId, currentNode, state, gameTree, playerNames, myPlayer } = get();
     if (!roomId || !myPlayer || !currentNode.parent) return;
     const myPlayerStr = myPlayer === 1 ? 'player1' : 'player2';
-    if (currentNode.player !== myPlayerStr) return;
+    if (!overrideCheck && currentNode.player !== myPlayerStr) return;
 
     pendingMoveCount++;
     try {
