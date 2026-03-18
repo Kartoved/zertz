@@ -43,13 +43,14 @@ export async function listGames(): Promise<Array<{
   boardSize: 37 | 48 | 61;
   isOnline: boolean;
 }>> {
+  const token = localStorage.getItem('zertz_auth_token');
+  if (!token) return [];
+
   try {
-    const remote = await api.listGames();
-    if (remote.length > 0) return remote;
+    return await api.listGames();
   } catch {
-    // fall back to local
+    return [];
   }
-  return local.listGames();
 }
 
 export async function deleteGame(id: string): Promise<void> {

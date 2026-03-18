@@ -239,6 +239,12 @@ type Dict = {
   confirmSurrenderText: string;
   confirmAction: string;
   cancelAction: string; undoRequestChat: string; undoAccept: string; undoReject: string; undoRejectedChat: string; undoAcceptedChat: string;
+  tabMainPlay: string;
+  tabMainLearning: string;
+  tabMainCommunity: string;
+  boardSizeSmall: string;
+  boardSizeMedium: string;
+  boardSizeLarge: string;
 };
 
 export const I18N: Record<Language, Dict> = {
@@ -480,6 +486,12 @@ export const I18N: Record<Language, Dict> = {
     undoReject: 'Отказ',
     undoRejectedChat: 'Запрос на отмену хода отклонён.',
     undoAcceptedChat: 'Запрос на отмену хода принят.',
+    tabMainPlay: 'Игра',
+    tabMainLearning: 'Обучение',
+    tabMainCommunity: 'Комьюнити',
+    boardSizeSmall: 'Малая',
+    boardSizeMedium: 'Средняя',
+    boardSizeLarge: 'Большая',
   },
   en: {
     appSubtitle: 'Abstract strategy game',
@@ -719,6 +731,12 @@ export const I18N: Record<Language, Dict> = {
     undoReject: 'Reject',
     undoRejectedChat: 'Undo request was rejected.',
     undoAcceptedChat: 'Undo request was accepted.',
+    tabMainPlay: 'Play',
+    tabMainLearning: 'Learning',
+    tabMainCommunity: 'Community',
+    boardSizeSmall: 'Small',
+    boardSizeMedium: 'Medium',
+    boardSizeLarge: 'Large',
   },
   eo: {
     appSubtitle: 'Abstrakta strategia ludo',
@@ -958,6 +976,12 @@ export const I18N: Record<Language, Dict> = {
     undoReject: 'Rifuzi',
     undoRejectedChat: 'Peto nuligi movon rifuzita.',
     undoAcceptedChat: 'Peto nuligi movon akceptita.',
+    tabMainPlay: 'Ludi',
+    tabMainLearning: 'Lernado',
+    tabMainCommunity: 'Komunumo',
+    boardSizeSmall: 'Malgranda',
+    boardSizeMedium: 'Meza',
+    boardSizeLarge: 'Granda',
   },
 };
 

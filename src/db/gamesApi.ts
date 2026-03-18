@@ -74,9 +74,13 @@ export async function saveGame(
   winType: string | null,
   isOnline: boolean
 ): Promise<void> {
+  const token = localStorage.getItem('zertz_auth_token');
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
   const response = await fetch(`${API_BASE}/api/games`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({
       id,
       playerNames,
@@ -101,7 +105,11 @@ export async function loadGame(id: string): Promise<{
   playerNames: { player1: string; player2: string };
   winType: string | null;
 } | null> {
-  const response = await fetch(`${API_BASE}/api/games/${id}`);
+  const token = localStorage.getItem('zertz_auth_token');
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const response = await fetch(`${API_BASE}/api/games/${id}`, { headers });
   if (response.status === 404) return null;
   if (!response.ok) {
     throw new Error('Failed to load game');
@@ -122,7 +130,11 @@ export async function loadGame(id: string): Promise<{
 }
 
 export async function listGames(): Promise<SavedGameSummary[]> {
-  const response = await fetch(`${API_BASE}/api/games`);
+  const token = localStorage.getItem('zertz_auth_token');
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const response = await fetch(`${API_BASE}/api/games`, { headers });
   if (!response.ok) {
     throw new Error('Failed to list games');
   }
@@ -134,7 +146,11 @@ export async function listGames(): Promise<SavedGameSummary[]> {
 }
 
 export async function deleteGame(id: string): Promise<void> {
-  const response = await fetch(`${API_BASE}/api/games/${id}`, { method: 'DELETE' });
+  const token = localStorage.getItem('zertz_auth_token');
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+
+  const response = await fetch(`${API_BASE}/api/games/${id}`, { method: 'DELETE', headers });
   if (!response.ok) {
     throw new Error('Failed to delete game');
   }

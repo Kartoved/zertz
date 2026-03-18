@@ -80,7 +80,12 @@ export default function GlobalChat() {
 
   const formatTime = (createdAt: number) => {
     const d = new Date(createdAt);
-    return d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleString(locale, { 
+      day: '2-digit', 
+      month: '2-digit', 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
   };
 
   return (

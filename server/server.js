@@ -134,6 +134,7 @@ async function ensureSchema() {
       ALTER TABLE rooms ADD COLUMN IF NOT EXISTS time_forfeit_player INTEGER;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS contact_link TEXT NOT NULL DEFAULT '';
       ALTER TABLE games ADD COLUMN IF NOT EXISTS is_online BOOLEAN NOT NULL DEFAULT false;
+      ALTER TABLE games ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);
       ALTER TABLE chat_messages ADD COLUMN IF NOT EXISTS move_number INTEGER;
     EXCEPTION WHEN others THEN NULL;
     END $$;
@@ -817,11 +818,14 @@ app.get('/api/players/:id', authOptional, async (req, res) => {
 
 // ==================== GAMES API ====================
 
-app.get('/api/games', async (_req, res) => {
+app.get('/api/games', authRequired, async (req, res) => {
+  const userId = req.user.id;
+  const username = req.user.username;
   const result = await pool.query(
     `SELECT id, player1_name, player2_name, updated_at, move_count, winner, win_type, board_size, is_online
      FROM games
-     ORDER BY updated_at DESC`
+     WHERE user_id = $1 OR (is_online = true AND (player1_name = $2 OR player2_name = $2)) OR (is_online = false AND (player1_name = $2 OR player2_name = $2))
+     ORDER BY updated_at DESC`, [userId, username]
   );
   res.json(
     result.rows.map(row => ({
@@ -859,7 +863,8 @@ app.get('/api/games/:id', async (req, res) => {
   });
 });
 
-app.post('/api/games', async (req, res) => {
+app.post('/api/games', authOptional, async (req, res) => {
+  const userId = req.user ? req.user.id : null;
   const {
     id,
     playerNames,
@@ -878,9 +883,10 @@ app.post('/api/games', async (req, res) => {
   }
 
   await pool.query(
-    `INSERT INTO games (id, player1_name, player2_name, move_count, winner, win_type, is_online, board_size, state_json, tree_json)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+    `INSERT INTO games (id, user_id, player1_name, player2_name, move_count, winner, win_type, is_online, board_size, state_json, tree_json)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
      ON CONFLICT (id) DO UPDATE SET
+       user_id = EXCLUDED.user_id,
        player1_name = EXCLUDED.player1_name,
        player2_name = EXCLUDED.player2_name,
        updated_at = NOW(),
@@ -894,6 +900,7 @@ app.post('/api/games', async (req, res) => {
     `,
     [
       id,
+      userId,
       playerNames.player1,
       playerNames.player2,
       moveCount,
@@ -909,9 +916,14 @@ app.post('/api/games', async (req, res) => {
   res.json({ ok: true });
 });
 
-app.delete('/api/games/:id', async (req, res) => {
+app.delete('/api/games/:id', authOptional, async (req, res) => {
   const { id } = req.params;
-  await pool.query('DELETE FROM games WHERE id = $1', [id]);
+  const userId = req.user ? req.user.id : null;
+  if (userId) {
+     await pool.query('DELETE FROM games WHERE id = $1 AND (user_id = $2 OR user_id IS NULL)', [id, userId]);
+  } else {
+     await pool.query('DELETE FROM games WHERE id = $1 AND user_id IS NULL', [id]);
+  }
   res.json({ ok: true });
 });
 
