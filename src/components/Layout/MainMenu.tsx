@@ -2,9 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUIStore, Language } from '../../store/uiStore';
 import { useGameStore } from '../../store/gameStore';
-import { useRoomStore } from '../../store/roomStore';
 import { useAuthStore } from '../../store/authStore';
-import { getWinTypeLabel, useI18n } from '../../i18n';
+import { useI18n } from '../../i18n';
 import AuthModal from '../Auth/AuthModal';
 import ProfileModal from '../Auth/ProfileModal';
 import PlayersModal from '../Auth/PlayersModal';
@@ -14,23 +13,22 @@ import GlobalChat from '../UI/GlobalChat';
 import * as roomsApi from '../../db/roomsApi';
 import { createInitialState } from '../../game/GameEngine';
 import { GameNode } from '../../game/types';
-import RulesContent from '../UI/RulesContent';
 import { Settings, Users, Swords } from 'lucide-react';
+import LoadGameModal from './LoadGameModal';
+import RulesModal from './RulesModal';
+import BoardSelectionModal from './BoardSelectionModal';
+import SearchingMatchOverlay from './SearchingMatchOverlay';
+import OnlineChallengeModal from './OnlineChallengeModal';
+import ActiveGamesWidget from './ActiveGamesWidget';
 
-type TimePresetId = '5+5' | '15+0' | '30+0' | '7d';
+export type TimePresetId = '5+5' | '15+0' | '30+0' | '7d';
 
-const FISCHER_PRESETS: Array<{ id: TimePresetId; baseMs: number; incrementMs: number }> = [
+export const FISCHER_PRESETS: Array<{ id: TimePresetId; baseMs: number; incrementMs: number }> = [
   { id: '5+5', baseMs: 5 * 60 * 1000, incrementMs: 5 * 1000 },
   { id: '15+0', baseMs: 15 * 60 * 1000, incrementMs: 0 },
   { id: '30+0', baseMs: 30 * 60 * 1000, incrementMs: 0 },
   { id: '7d', baseMs: 7 * 24 * 60 * 60 * 1000, incrementMs: -1 },
 ];
-
-function formatDate(timestamp: number): string {
-  const d = new Date(timestamp);
-  const pad = (n: number) => n.toString().padStart(2, '0');
-  return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
-}
 
 const LANGUAGE_BUTTONS: Array<{ code: Language; icon: string; label: string }> = [
   { code: 'en', icon: '🇬🇧', label: 'English' },
@@ -38,7 +36,7 @@ const LANGUAGE_BUTTONS: Array<{ code: Language; icon: string; label: string }> =
   { code: 'eo', icon: '🟢', label: 'Esperanto' },
 ];
 
-const TIME_CONTROLS = [
+export const TIME_CONTROLS = [
   { id: 'blitz', icon: '⚡', enabled: true, preset: '5+5' as TimePresetId },
   { id: 'rapid', icon: '🏇', enabled: true, preset: '15+0' as TimePresetId },
   { id: 'long', icon: '⏳', enabled: true, preset: '30+0' as TimePresetId },
@@ -52,24 +50,17 @@ export default function MainMenu() {
   const { setScreen, toggleDarkMode, isDarkMode, language, setLanguage } = useUIStore();
   const { t } = useI18n();
   const { newGame, savedGames, refreshSavedGames, loadSavedGame } = useGameStore();
-  const { createRoom, isLoading: isCreatingRoom } = useRoomStore();
   const [showLoadDialog, setShowLoadDialog] = useState(false);
   const [showBoardDialog, setShowBoardDialog] = useState(false);
   const [showOnlineDialog, setShowOnlineDialog] = useState(false);
-  const [onlineStep, setOnlineStep] = useState<'board' | 'link'>('board');
+  const [onlineModalInitialStep, setOnlineModalInitialStep] = useState<'board' | 'link'>('board');
   const [selectedBoardSize, setSelectedBoardSize] = useState<37 | 48 | 61>(37);
-  const [selectedPlayer, setSelectedPlayer] = useState<1 | 2 | 'random'>(1);
   const [selectedPreset, setSelectedPreset] = useState<TimePresetId>('5+5');
   const [selectedTimeControl, setSelectedTimeControl] = useState<'blitz' | 'rapid' | 'long' | 'correspondence'>('blitz');
-  const [createdRoomId, setCreatedRoomId] = useState<number | null>(null);
-  const [linkCopied, setLinkCopied] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showProfileModal, setShowProfileModal] = useState(false);
   const [showPlayersModal, setShowPlayersModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
-  const [isRated, setIsRated] = useState(false);
-  const [loadTab, setLoadTab] = useState<'current' | 'completed'>('current');
-  const [loadFilter, setLoadFilter] = useState<'all' | 'local' | 'online'>('all');
   const [showChallengesModal, setShowChallengesModal] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [mobileMainTab, setMobileMainTab] = useState<'play' | 'chat'>('play');
@@ -380,33 +371,12 @@ export default function MainMenu() {
 
       {/* Searching Match Overlay */}
       {isSearchingMatch && (
-        <div className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-2xl max-w-sm w-full p-8 text-center relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-indigo-500/20">
-              <div className="h-full bg-indigo-500 animate-[loading_2s_ease-in-out_infinite]" />
-            </div>
-            
-            <div className="w-20 h-20 mx-auto bg-indigo-100 dark:bg-indigo-900/30 rounded-full flex items-center justify-center mb-6">
-              <span className="text-4xl animate-pulse">
-                {TIME_CONTROLS.find(t => t.id === selectedTimeControl)?.icon || '🔍'}
-              </span>
-            </div>
-
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-              Searching for opponent...
-            </h3>
-            <p className="text-gray-500 dark:text-gray-400 text-sm font-medium mb-8">
-              {selectedBoardSize} rings / {TIME_CONTROLS.find(t => t.id === selectedTimeControl)?.id.toUpperCase()}
-            </p>
-
-            <button
-              onClick={cancelSearch}
-              className="w-full py-3.5 px-6 rounded-xl font-bold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
+        <SearchingMatchOverlay
+          onCancel={cancelSearch}
+          icon={TIME_CONTROLS.find(t => t.id === selectedTimeControl)?.icon || '🔍'}
+          timeControlId={TIME_CONTROLS.find(t => t.id === selectedTimeControl)?.id.toUpperCase() || ''}
+          boardSize={selectedBoardSize}
+        />
       )}
 
       <div className="lg:hidden px-3 pt-3">
@@ -446,66 +416,11 @@ export default function MainMenu() {
             />
           </div>
           
-          {/* Active Games Widget */}
-          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-4 flex flex-col w-full" style={{ maxHeight: '400px' }}>
-            <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-3 px-1">{t.loadCurrent} ({currentGames.length})</h3>
-            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-              {currentGames.length === 0 ? (
-                <p className="text-gray-500 dark:text-gray-400 text-center py-8 text-sm">
-                  {t.noGames}
-                </p>
-              ) : (
-              currentGames.map(game => {
-                  // Determine if it's the user's turn
-                  let isMyTurn = false;
-                  if (user && game.isOnline) {
-                    const isPlayer1 = game.playerNames.player1 === user.username;
-                    const isPlayer2 = game.playerNames.player2 === user.username;
-                    // moveCount = current move number; odd = player1's turn, even = player2's turn
-                    const isPlayer1Turn = game.moveCount % 2 === 1;
-                    isMyTurn = (isPlayer1 && isPlayer1Turn) || (isPlayer2 && !isPlayer1Turn);
-                  }
-                  
-                  return (
-                  <button
-                    key={game.id}
-                    onClick={() => handleLoadGame(game.id)}
-                    className="w-full p-2.5 text-left bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 
-                      dark:hover:bg-gray-700 rounded-xl transition-colors border-2 border-gray-200 dark:border-gray-700"
-                  >
-                    <div className="flex justify-between items-start mb-1">
-                      <div className="font-semibold text-gray-900 dark:text-white flex items-center gap-1.5 text-sm truncate pr-2">
-                        <span className="truncate">{game.playerNames.player1}</span>
-                        <span className="text-gray-400 text-xs font-normal relative top-[1px]">vs</span>
-                        <span className="truncate">{game.playerNames.player2}</span>
-                      </div>
-                    </div>
-                    
-                    <div className="flex justify-between items-end mt-2">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-medium ${
-                          game.isOnline 
-                            ? 'bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300 border border-purple-200 dark:border-purple-800' 
-                            : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600'
-                        }`}>
-                          {game.isOnline ? t.onlineLabel : t.localLabel}
-                        </span>
-                        {isMyTurn && (
-                          <span className="text-[10px] px-1.5 py-0.5 rounded-md font-medium bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-300 border border-green-200 dark:border-green-800">
-                            {t.yourTurn}
-                          </span>
-                        )}
-                      </div>
-                      <div className="text-[10px] text-gray-400 font-medium">
-                        {game.moveCount} {t.moves.toLowerCase()}
-                      </div>
-                    </div>
-                  </button>
-                  );
-                })
-              )}
-            </div>
-          </div>
+          <ActiveGamesWidget
+            currentGames={currentGames}
+            user={user}
+            onLoadGame={handleLoadGame}
+          />
         </aside>
 
         {/* CENTER: Time control modes */}
@@ -649,11 +564,11 @@ export default function MainMenu() {
                   if (!tc) return;
 
                   if (tc.preset === null) {
-                    setOnlineStep('board');
+                    setOnlineModalInitialStep('board');
                     setShowOnlineDialog(true);
                   } else {
                     setSelectedPreset(tc.preset);
-                    setOnlineStep('board');
+                    setOnlineModalInitialStep('board');
                     setShowOnlineDialog(true);
                   }
                 }}
@@ -681,356 +596,29 @@ export default function MainMenu() {
         </aside>
       </main>
       
-      {showLoadDialog && (() => {
-        const completedGames = savedGames.filter(g => !!g.winner);
-        const tabGames = loadTab === 'current' ? currentGames : completedGames;
-        const filteredGames = loadFilter === 'all' ? tabGames
-          : loadFilter === 'local' ? tabGames.filter(g => !g.isOnline)
-          : tabGames.filter(g => g.isOnline);
-
-        return (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full max-h-[80vh] overflow-hidden">
-              <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">{t.loadGame}</h2>
-                <button 
-                  onClick={() => setShowLoadDialog(false)}
-                  className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                >
-                  ✕
-                </button>
-              </div>
-              {/* Tabs */}
-              <div className="flex border-b dark:border-gray-700">
-                <button
-                  onClick={() => setLoadTab('current')}
-                  className={`flex-1 py-2 px-4 text-center text-sm font-semibold transition-colors ${
-                    loadTab === 'current'
-                      ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
-                  }`}
-                >
-                  {t.loadCurrent} ({currentGames.length})
-                </button>
-                <button
-                  onClick={() => setLoadTab('completed')}
-                  className={`flex-1 py-2 px-4 text-center text-sm font-semibold transition-colors ${
-                    loadTab === 'completed'
-                      ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-500'
-                      : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
-                  }`}
-                >
-                  {t.loadCompleted} ({completedGames.length})
-                </button>
-              </div>
-              {/* Filters */}
-              <div className="flex gap-1 px-4 pt-3">
-                {(['all', 'local', 'online'] as const).map(f => (
-                  <button
-                    key={f}
-                    onClick={() => setLoadFilter(f)}
-                    className={`px-3 py-1 text-xs rounded-full transition-colors ${
-                      loadFilter === f
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-200'
-                    }`}
-                  >
-                    {f === 'all' ? t.filterAll : f === 'local' ? t.filterLocal : t.filterOnline}
-                  </button>
-                ))}
-              </div>
-              <div className="p-4 overflow-y-auto max-h-96">
-                {filteredGames.length === 0 ? (
-                  <p className="text-gray-500 dark:text-gray-400 text-center py-8">
-                    {t.noGames}
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {filteredGames.map(game => (
-                      <button
-                        key={game.id}
-                        onClick={() => handleLoadGame(game.id)}
-                        className="w-full p-3 text-left bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 
-                          dark:hover:bg-gray-600 rounded-lg transition-colors"
-                      >
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <div className="font-medium text-gray-900 dark:text-white flex items-center gap-2">
-                              {game.playerNames.player1} vs {game.playerNames.player2}
-                              <span className={`text-xs px-1.5 py-0.5 rounded ${
-                                game.isOnline 
-                                  ? 'bg-purple-100 dark:bg-purple-900 text-purple-600 dark:text-purple-300' 
-                                  : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300'
-                              }`}>
-                                {game.isOnline ? t.onlineLabel : t.localLabel}
-                              </span>
-                            </div>
-                            <div className="text-sm text-gray-500 dark:text-gray-400">
-                              {t.moves}: {game.moveCount} • {t.board}: {boardLabels[game.boardSize] ?? `${game.boardSize}`}
-                            </div>
-                            {game.winType && (
-                              <div className="text-sm text-gray-500 dark:text-gray-400">
-                                {getWinTypeLabel(t, game.winType)}
-                              </div>
-                            )}
-                          </div>
-                          <div className="text-right">
-                            <div className={`text-sm font-medium ${
-                              game.winner ? 'text-green-600 dark:text-green-400' : 'text-yellow-600 dark:text-yellow-400'
-                            }`}>
-                              {game.winner ? `${game.winner === 'player1' ? game.playerNames.player1 : game.playerNames.player2}` : t.inProgress}
-                            </div>
-                            <div className="text-xs text-gray-400">
-                              {formatDate(game.updatedAt)}
-                            </div>
-                          </div>
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
+      {showLoadDialog && (
+        <LoadGameModal
+          savedGames={savedGames}
+          boardLabels={boardLabels}
+          onClose={() => setShowLoadDialog(false)}
+          onLoadGame={handleLoadGame}
+        />
+      )}
 
       {showBoardDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
-            <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">{t.chooseBoard}</h2>
-              <button
-                onClick={() => setShowBoardDialog(false)}
-                className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="p-4 space-y-3">
-              <button
-                onClick={() => handleSelectBoard(37)}
-                className="w-full p-3 text-left bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 
-                  dark:hover:bg-gray-600 rounded-lg transition-colors"
-              >
-                {t.board37}
-              </button>
-              <button
-                onClick={() => handleSelectBoard(48)}
-                className="w-full p-3 text-left bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 
-                  dark:hover:bg-gray-600 rounded-lg transition-colors"
-              >
-                {t.board48}
-              </button>
-              <button
-                onClick={() => handleSelectBoard(61)}
-                className="w-full p-3 text-left bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 
-                  dark:hover:bg-gray-600 rounded-lg transition-colors"
-              >
-                {t.board61}
-              </button>
-            </div>
-          </div>
-        </div>
+        <BoardSelectionModal
+          onClose={() => setShowBoardDialog(false)}
+          onSelectBoard={handleSelectBoard}
+        />
       )}
 
       {showOnlineDialog && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
-            <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-                {onlineStep === 'link' ? t.inviteLinkTitle : t.challengeSettings}
-              </h2>
-              <button
-                onClick={() => {
-                  setShowOnlineDialog(false);
-                  setOnlineStep('board');
-                  setCreatedRoomId(null);
-                  setLinkCopied(false);
-                }}
-                className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div className="p-4 overflow-y-auto max-h-[80vh]">
-              {onlineStep !== 'link' && (
-                <div className="space-y-6">
-                  {/* Board Size */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">{t.chooseBoardOnline}</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {([37, 48, 61] as const).map((size) => (
-                        <button
-                          key={size}
-                          onClick={() => setSelectedBoardSize(size)}
-                          className={`p-2 text-center rounded-lg border-2 transition-colors ${
-                            selectedBoardSize === size
-                              ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 text-gray-900 dark:text-white'
-                              : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                          }`}
-                        >
-                          <div className="text-lg font-bold mb-0.5">{size}</div>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Time Control */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">{t.selectTimeControl}</label>
-                    <div className="grid grid-cols-2 gap-2">
-                      {FISCHER_PRESETS.map((preset) => {
-                        const labelText = TIME_CONTROLS.find(c => c.preset === preset.id)?.id;
-                        const labelKey = labelText ? t[labelText as keyof typeof t] as string : preset.id;
-                        return (
-                          <button
-                            key={preset.id}
-                            onClick={() => setSelectedPreset(preset.id)}
-                            className={`p-2 text-center rounded-lg border-2 transition-colors ${
-                              selectedPreset === preset.id
-                                ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 text-gray-900 dark:text-white'
-                                : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                            }`}
-                          >
-                            <div className="font-medium text-sm">{labelKey} ({preset.id})</div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Player side */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">{t.choosePlayer}</label>
-                    <div className="grid grid-cols-3 gap-2">
-                      <button
-                        onClick={() => setSelectedPlayer(1)}
-                        className={`p-2 text-center rounded-lg border-2 transition-colors ${
-                          selectedPlayer === 1
-                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 text-gray-900 dark:text-white'
-                            : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                        }`}
-                      >
-                        <div className="font-medium text-sm">{t.firstShort || '1'}</div>
-                      </button>
-                      <button
-                        onClick={() => setSelectedPlayer(2)}
-                        className={`p-2 text-center rounded-lg border-2 transition-colors ${
-                          selectedPlayer === 2
-                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 text-gray-900 dark:text-white'
-                            : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                        }`}
-                      >
-                        <div className="font-medium text-sm">{t.secondShort || '2'}</div>
-                      </button>
-                      <button
-                        onClick={() => setSelectedPlayer('random')}
-                        className={`p-2 text-center rounded-lg border-2 transition-colors ${
-                          selectedPlayer === 'random'
-                            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 text-gray-900 dark:text-white'
-                            : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                        }`}
-                      >
-                        <div className="font-medium text-sm">{t.random}</div>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Rated toggle */}
-                  {user && (
-                    <div className="flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg border border-gray-200 dark:border-gray-600">
-                      <div>
-                        <div className="font-medium text-gray-900 dark:text-white text-sm">{t.ratedGame}</div>
-                        <div className="text-xs text-gray-500 dark:text-gray-400">{t.ratedHint}</div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => setIsRated(!isRated)}
-                        className={`relative w-12 h-6 rounded-full transition-colors ${
-                          isRated ? 'bg-indigo-500' : 'bg-gray-300 dark:bg-gray-600'
-                        }`}
-                      >
-                        <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
-                          isRated ? 'translate-x-6' : ''
-                        }`} />
-                      </button>
-                    </div>
-                  )}
-
-                  <button
-                    disabled={isCreatingRoom}
-                    onClick={async () => {
-                      try {
-                        const player = selectedPlayer === 'random' 
-                          ? (Math.random() < 0.5 ? 1 : 2) as 1 | 2
-                          : selectedPlayer as 1 | 2;
-                        const preset = FISCHER_PRESETS.find((p) => p.id === selectedPreset) || FISCHER_PRESETS[0];
-                        const roomId = await createRoom(
-                          selectedBoardSize,
-                          player,
-                          user ? isRated : false,
-                          { baseMs: preset.baseMs, incrementMs: preset.incrementMs }
-                        );
-                        setCreatedRoomId(roomId);
-                        setOnlineStep('link');
-                        // Make rooms list re-poll fast to show outgoing game immediately
-                        setTimeout(() => roomsApi.getPendingRooms().catch(() => {}), 500);
-                      } catch (err: any) {
-                        alert(t.createRoomError + ' ' + (err.message || ''));
-                      }
-                    }}
-                    className="w-full py-3.5 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-bold rounded-xl shadow-md hover:shadow-lg transition-all active:scale-95 disabled:opacity-50"
-                  >
-                    {isCreatingRoom ? t.creating : t.createGame}
-                  </button>
-                </div>
-              )}
-
-              {onlineStep === 'link' && createdRoomId && (
-                <>
-                  <p className="text-gray-600 dark:text-gray-400 mb-4 text-center pb-2">
-                    {t.gameCreatedHint}
-                  </p>
-                  <div className="bg-gray-50 dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-xl p-4 mb-6">
-                    <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">{t.gameLink}</div>
-                    <a 
-                      href={`${window.location.origin}/room/${createdRoomId}`}
-                      className="text-indigo-600 dark:text-indigo-400 hover:underline break-all font-medium text-lg"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {window.location.origin}/room/{createdRoomId}
-                    </a>
-                  </div>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(`${window.location.origin}/room/${createdRoomId}`);
-                        setLinkCopied(true);
-                        setTimeout(() => setLinkCopied(false), 2000);
-                      }}
-                      className="flex-1 py-3 px-4 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-white font-semibold rounded-xl border border-gray-200 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors"
-                    >
-                      {linkCopied ? t.copied : t.copyLink}
-                    </button>
-                    <button
-                      onClick={() => {
-                        setShowOnlineDialog(false);
-                        setOnlineStep('board');
-                        navigate(`/room/${createdRoomId}`);
-                      }}
-                      className="flex-1 py-3 px-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl shadow-md transition-colors"
-                    >
-                      {t.goToGame}
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
+        <OnlineChallengeModal
+          onClose={() => setShowOnlineDialog(false)}
+          initialStep={onlineModalInitialStep}
+          initialPreset={selectedPreset}
+          initialBoardSize={selectedBoardSize}
+        />
       )}
 
       {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
@@ -1038,27 +626,7 @@ export default function MainMenu() {
       {showPlayersModal && <PlayersModal onClose={() => setShowPlayersModal(false)} />}
       {showChallengesModal && <ChallengesModal onClose={() => setShowChallengesModal(false)} />}
 
-      {showRulesModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowRulesModal(false)}>
-          <div
-            className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">{t.rules}</h2>
-              <button
-                onClick={() => setShowRulesModal(false)}
-                className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="p-4 overflow-y-auto">
-              <RulesContent />
-            </div>
-          </div>
-        </div>
-      )}
+      {showRulesModal && <RulesModal onClose={() => setShowRulesModal(false)} />}
     </div>
   );
 }
