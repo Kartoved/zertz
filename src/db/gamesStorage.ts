@@ -1,6 +1,7 @@
 import { GameState, GameNode } from '../game/types';
 import * as api from './gamesApi';
 import * as local from './indexedDB';
+import { getToken } from './apiClient';
 
 export async function saveGame(
   id: string,
@@ -43,8 +44,7 @@ export async function listGames(): Promise<Array<{
   boardSize: 37 | 48 | 61;
   isOnline: boolean;
 }>> {
-  const token = localStorage.getItem('zertz_auth_token');
-  if (!token) return [];
+  if (!getToken()) return [];
 
   try {
     return await api.listGames();

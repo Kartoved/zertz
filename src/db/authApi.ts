@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || '';
+import { API_BASE, getToken, authHeaders } from './apiClient';
 
 export interface User {
   id: number;
@@ -28,14 +28,10 @@ export interface PlayerInfo {
   createdAt: number;
 }
 
-function getAuthHeader(token: string): Record<string, string> {
-  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
-}
-
 export async function register(username: string, password: string): Promise<{ token: string; user: User }> {
   const response = await fetch(`${API_BASE}/api/auth/register`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify({ username, password }),
   });
 
@@ -49,7 +45,7 @@ export async function register(username: string, password: string): Promise<{ to
 export async function login(username: string, password: string): Promise<{ token: string; user: User }> {
   const response = await fetch(`${API_BASE}/api/auth/login`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders(),
     body: JSON.stringify({ username, password }),
   });
 
@@ -62,7 +58,7 @@ export async function login(username: string, password: string): Promise<{ token
 
 export async function getMe(token: string): Promise<User> {
   const response = await fetch(`${API_BASE}/api/auth/me`, {
-    headers: getAuthHeader(token),
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
   });
 
   const data = await response.json();
@@ -78,7 +74,7 @@ export async function updateProfile(
 ): Promise<User> {
   const response = await fetch(`${API_BASE}/api/auth/profile`, {
     method: 'PUT',
-    headers: getAuthHeader(token),
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
     body: JSON.stringify(updates),
   });
 
@@ -119,11 +115,7 @@ export interface PlayerProfile {
 }
 
 export async function getPlayerProfile(playerId: number): Promise<PlayerProfile> {
-  const token = localStorage.getItem('zertz_auth_token');
-  const headers: Record<string, string> = {};
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
-  const response = await fetch(`${API_BASE}/api/players/${playerId}`, { headers });
+  const response = await fetch(`${API_BASE}/api/players/${playerId}`, { headers: authHeaders(false) });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || 'Ошибка получения профиля игрока');
   return data;
@@ -132,12 +124,11 @@ export async function getPlayerProfile(playerId: number): Promise<PlayerProfile>
 // ==================== Follows ====================
 
 export async function followUser(userId: number): Promise<void> {
-  const token = localStorage.getItem('zertz_auth_token');
-  if (!token) throw new Error('Требуется авторизация');
+  if (!getToken()) throw new Error('Требуется авторизация');
 
   const response = await fetch(`${API_BASE}/api/follows/${userId}`, {
     method: 'POST',
-    headers: getAuthHeader(token),
+    headers: authHeaders(),
   });
   if (!response.ok) {
     const data = await response.json();
@@ -146,12 +137,11 @@ export async function followUser(userId: number): Promise<void> {
 }
 
 export async function unfollowUser(userId: number): Promise<void> {
-  const token = localStorage.getItem('zertz_auth_token');
-  if (!token) throw new Error('Требуется авторизация');
+  if (!getToken()) throw new Error('Требуется авторизация');
 
   const response = await fetch(`${API_BASE}/api/follows/${userId}`, {
     method: 'DELETE',
-    headers: getAuthHeader(token),
+    headers: authHeaders(),
   });
   if (!response.ok) {
     const data = await response.json();
@@ -160,22 +150,20 @@ export async function unfollowUser(userId: number): Promise<void> {
 }
 
 export async function getFollowing(): Promise<PlayerInfo[]> {
-  const token = localStorage.getItem('zertz_auth_token');
-  if (!token) throw new Error('Требуется авторизация');
+  if (!getToken()) throw new Error('Требуется авторизация');
 
   const response = await fetch(`${API_BASE}/api/follows`, {
-    headers: getAuthHeader(token),
+    headers: authHeaders(),
   });
   if (!response.ok) throw new Error('Ошибка получения подписок');
   return response.json();
 }
 
 export async function getFollowIds(): Promise<number[]> {
-  const token = localStorage.getItem('zertz_auth_token');
-  if (!token) return [];
+  if (!getToken()) return [];
 
   const response = await fetch(`${API_BASE}/api/follows/ids`, {
-    headers: getAuthHeader(token),
+    headers: authHeaders(),
   });
   if (!response.ok) return [];
   return response.json();
@@ -208,12 +196,11 @@ export async function createChallenge(
   stateJson: string,
   treeJson: string
 ): Promise<{ id: number; roomId: number }> {
-  const token = localStorage.getItem('zertz_auth_token');
-  if (!token) throw new Error('Требуется авторизация');
+  if (!getToken()) throw new Error('Требуется авторизация');
 
   const response = await fetch(`${API_BASE}/api/challenges`, {
     method: 'POST',
-    headers: getAuthHeader(token),
+    headers: authHeaders(),
     body: JSON.stringify({ toUserId, boardSize, rated, creatorPlayer, stateJson, treeJson }),
   });
   const data = await response.json();
@@ -222,12 +209,11 @@ export async function createChallenge(
 }
 
 export async function cancelChallenge(challengeId: number): Promise<void> {
-  const token = localStorage.getItem('zertz_auth_token');
-  if (!token) throw new Error('Требуется авторизация');
+  if (!getToken()) throw new Error('Требуется авторизация');
 
   const response = await fetch(`${API_BASE}/api/challenges/${challengeId}`, {
     method: 'DELETE',
-    headers: getAuthHeader(token),
+    headers: authHeaders(),
   });
   if (!response.ok) {
     const data = await response.json();
@@ -236,12 +222,11 @@ export async function cancelChallenge(challengeId: number): Promise<void> {
 }
 
 export async function acceptChallenge(challengeId: number): Promise<{ roomId: number }> {
-  const token = localStorage.getItem('zertz_auth_token');
-  if (!token) throw new Error('Требуется авторизация');
+  if (!getToken()) throw new Error('Требуется авторизация');
 
   const response = await fetch(`${API_BASE}/api/challenges/${challengeId}/accept`, {
     method: 'PUT',
-    headers: getAuthHeader(token),
+    headers: authHeaders(),
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || 'Ошибка принятия вызова');
@@ -249,12 +234,11 @@ export async function acceptChallenge(challengeId: number): Promise<{ roomId: nu
 }
 
 export async function declineChallenge(challengeId: number): Promise<void> {
-  const token = localStorage.getItem('zertz_auth_token');
-  if (!token) throw new Error('Требуется авторизация');
+  if (!getToken()) throw new Error('Требуется авторизация');
 
   const response = await fetch(`${API_BASE}/api/challenges/${challengeId}/decline`, {
     method: 'PUT',
-    headers: getAuthHeader(token),
+    headers: authHeaders(),
   });
   if (!response.ok) {
     const data = await response.json();
@@ -263,11 +247,10 @@ export async function declineChallenge(challengeId: number): Promise<void> {
 }
 
 export async function getChallenges(): Promise<Challenge[]> {
-  const token = localStorage.getItem('zertz_auth_token');
-  if (!token) return [];
+  if (!getToken()) return [];
 
   const response = await fetch(`${API_BASE}/api/challenges`, {
-    headers: getAuthHeader(token),
+    headers: authHeaders(),
   });
   if (!response.ok) return [];
   return response.json();

@@ -1,6 +1,5 @@
 import { GameState, GameNode } from '../game/types';
-
-const API_BASE = import.meta.env.VITE_API_URL || '';
+import { API_BASE, authHeaders, jsonHeaders, serializeState, deserializeState, serializeTree, deserializeTree } from './apiClient';
 
 export interface RatingDelta {
   player1: { before: number; after: number; delta: number };
@@ -45,51 +44,6 @@ export interface ChatMessage {
   createdAt: number;
 }
 
-function serializeState(state: GameState): string {
-  const ringsArray = Array.from(state.rings.entries());
-  return JSON.stringify({ ...state, rings: ringsArray });
-}
-
-function deserializeState(json: string): GameState {
-  const parsed = JSON.parse(json);
-  parsed.rings = new Map(parsed.rings);
-  // Ensure captures are always present (defensive against older data formats)
-  if (!parsed.captures) {
-    parsed.captures = {
-      player1: { white: 0, gray: 0, black: 0 },
-      player2: { white: 0, gray: 0, black: 0 },
-    };
-  } else {
-    if (!parsed.captures.player1) parsed.captures.player1 = { white: 0, gray: 0, black: 0 };
-    if (!parsed.captures.player2) parsed.captures.player2 = { white: 0, gray: 0, black: 0 };
-  }
-  return parsed as GameState;
-}
-
-function serializeTree(node: GameNode): string {
-  function serializeNode(n: GameNode): object {
-    return {
-      ...n,
-      parent: null,
-      children: n.children.map(c => serializeNode(c)),
-    };
-  }
-  return JSON.stringify(serializeNode(node));
-}
-
-function deserializeTree(json: string): GameNode {
-  const obj = JSON.parse(json);
-
-  function rebuildNode(n: any, parent: GameNode | null): GameNode {
-    const node = n as GameNode;
-    node.parent = parent;
-    node.children = (node.children || []).map((c: any) => rebuildNode(c, node));
-    return node;
-  }
-
-  return rebuildNode(obj, null);
-}
-
 export async function createRoom(
   boardSize: 37 | 48 | 61,
   state: GameState,
@@ -98,13 +52,9 @@ export async function createRoom(
   rated: boolean = false,
   timeControl?: FischerTimeControl | null
 ): Promise<number> {
-  const token = localStorage.getItem('zertz_auth_token');
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
   const response = await fetch(`${API_BASE}/api/rooms`, {
     method: 'POST',
-    headers,
+    headers: authHeaders(),
     body: JSON.stringify({
       boardSize,
       creatorPlayer,
@@ -190,13 +140,9 @@ export async function updateRoomState(
   winType: string | null,
   playerIndex?: 1 | 2
 ): Promise<{ ratingDelta: RatingDelta | null }> {
-  const token = localStorage.getItem('zertz_auth_token');
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
   const response = await fetch(`${API_BASE}/api/rooms/${id}/state`, {
     method: 'PUT',
-    headers,
+    headers: authHeaders(),
     body: JSON.stringify({
       stateJson: serializeState(state),
       treeJson: serializeTree(tree),
@@ -222,7 +168,7 @@ export async function updatePlayerName(
 ): Promise<void> {
   const response = await fetch(`${API_BASE}/api/rooms/${roomId}/players/${playerIndex}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonHeaders(),
     body: JSON.stringify({ name }),
   });
 
@@ -256,7 +202,7 @@ export async function sendChatMessage(
 ): Promise<ChatMessage> {
   const response = await fetch(`${API_BASE}/api/rooms/${roomId}/messages`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: jsonHeaders(),
     body: JSON.stringify({ playerIndex, message, moveNumber }),
   });
 
@@ -268,13 +214,9 @@ export async function sendChatMessage(
 }
 
 export async function joinMatchmaking(boardSize: 37 | 48 | 61, timeControl: string, state: GameState, tree: GameNode): Promise<{ status: 'matched' | 'searching' | 'none', roomId?: number }> {
-  const token = localStorage.getItem('zertz_auth_token');
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
   const response = await fetch(`${API_BASE}/api/matchmake/join`, {
     method: 'POST',
-    headers,
+    headers: authHeaders(),
     body: JSON.stringify({ 
       boardSize, 
       timeControl, 
@@ -291,21 +233,13 @@ export async function joinMatchmaking(boardSize: 37 | 48 | 61, timeControl: stri
 }
 
 export async function pollMatchStatus(): Promise<{ status: 'matched' | 'searching' | 'none', roomId?: number }> {
-  const token = localStorage.getItem('zertz_auth_token');
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
-  const response = await fetch(`${API_BASE}/api/matchmake/status`, { headers });
+  const response = await fetch(`${API_BASE}/api/matchmake/status`, { headers: authHeaders() });
   if (!response.ok) throw new Error('Failed to poll matchmaking');
   return response.json();
 }
 
 export async function leaveMatchmaking(): Promise<void> {
-  const token = localStorage.getItem('zertz_auth_token');
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) headers['Authorization'] = `Bearer ${token}`;
-
-  await fetch(`${API_BASE}/api/matchmake/leave`, { method: 'DELETE', headers });
+  await fetch(`${API_BASE}/api/matchmake/leave`, { method: 'DELETE', headers: authHeaders() });
 }
 
 export interface PendingRoom {
@@ -321,11 +255,7 @@ export interface PendingRoom {
 }
 
 export async function getPendingRooms(): Promise<PendingRoom[]> {
-  const token = localStorage.getItem('zertz_auth_token');
-  if (!token) return [];
-  const headers: Record<string, string> = { 'Authorization': `Bearer ${token}` };
-  
-  const response = await fetch(`${API_BASE}/api/rooms/pending`, { headers });
+  const response = await fetch(`${API_BASE}/api/rooms/pending`, { headers: authHeaders(false) });
   if (!response.ok) return [];
   return response.json();
 }

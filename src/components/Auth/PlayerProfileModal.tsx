@@ -3,38 +3,14 @@ import { useNavigate } from 'react-router-dom';
 import { getPlayerProfile, followUser, unfollowUser, createChallenge, PlayerProfile } from '../../db/authApi';
 import { useAuthStore } from '../../store/authStore';
 import { createInitialState } from '../../game/GameEngine';
-import { GameNode } from '../../game/types';
 import CountryBadge from '../UI/CountryBadge';
 import { useI18n } from '../../i18n';
+import { createRootNode } from '../../utils/gameTreeUtils';
+import { serializeState, serializeTree } from '../../db/apiClient';
 
 interface PlayerProfileModalProps {
   playerId: number;
   onClose: () => void;
-}
-
-function serializeState(state: any): string {
-  const ringsArray = Array.from(state.rings.entries());
-  return JSON.stringify({ ...state, rings: ringsArray });
-}
-
-function createRootNode(): GameNode {
-  return {
-    id: 'root',
-    moveNumber: 0,
-    player: 'player1',
-    move: null,
-    notation: '',
-    children: [],
-    parent: null,
-    isMainLine: true,
-  };
-}
-
-function serializeTree(node: GameNode): string {
-  function serializeNode(n: GameNode): object {
-    return { ...n, parent: null, children: n.children.map(c => serializeNode(c)) };
-  }
-  return JSON.stringify(serializeNode(node));
 }
 
 export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileModalProps) {

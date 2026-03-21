@@ -1,5 +1,6 @@
 import { openDB, IDBPDatabase } from 'idb';
 import { GameState, GameNode } from '../game/types';
+import { serializeState, deserializeState, serializeTree, deserializeTree } from './apiClient';
 
 const DB_NAME = 'zertz-games-summary';
 const DB_VERSION = 1;
@@ -40,55 +41,6 @@ async function getDB(): Promise<IDBPDatabase> {
   return dbPromise;
 }
 
-function serializeState(state: GameState): string {
-  const obj = {
-    ...state,
-    rings: Array.from(state.rings.entries()),
-  };
-  return JSON.stringify(obj);
-}
-
-function deserializeState(json: string): GameState {
-  const obj = JSON.parse(json);
-  // Ensure captures are always present (defensive against older data formats)
-  if (!obj.captures) {
-    obj.captures = {
-      player1: { white: 0, gray: 0, black: 0 },
-      player2: { white: 0, gray: 0, black: 0 },
-    };
-  } else {
-    if (!obj.captures.player1) obj.captures.player1 = { white: 0, gray: 0, black: 0 };
-    if (!obj.captures.player2) obj.captures.player2 = { white: 0, gray: 0, black: 0 };
-  }
-  return {
-    ...obj,
-    rings: new Map(obj.rings),
-  };
-}
-
-function serializeTree(node: GameNode): string {
-  function serializeNode(n: GameNode): object {
-    return {
-      ...n,
-      parent: null,
-      children: n.children.map(c => serializeNode(c)),
-    };
-  }
-  return JSON.stringify(serializeNode(node));
-}
-
-function deserializeTree(json: string): GameNode {
-  const obj = JSON.parse(json);
-  
-  function rebuildNode(n: object, parent: GameNode | null): GameNode {
-    const node = n as GameNode;
-    node.parent = parent;
-    node.children = (node.children || []).map((c: object) => rebuildNode(c, node));
-    return node;
-  }
-  
-  return rebuildNode(obj, null);
-}
 
 export async function saveGame(
   id: string,

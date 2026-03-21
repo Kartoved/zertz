@@ -10,9 +10,6 @@ import PlayersModal from '../Auth/PlayersModal';
 import ChallengesModal from '../Auth/ChallengesModal';
 import PlayerProfileCard from '../UI/PlayerProfileCard';
 import GlobalChat from '../UI/GlobalChat';
-import * as roomsApi from '../../db/roomsApi';
-import { createInitialState } from '../../game/GameEngine';
-import { GameNode } from '../../game/types';
 import { Settings, Users, Swords } from 'lucide-react';
 import LoadGameModal from './LoadGameModal';
 import RulesModal from './RulesModal';
@@ -20,6 +17,8 @@ import BoardSelectionModal from './BoardSelectionModal';
 import SearchingMatchOverlay from './SearchingMatchOverlay';
 import OnlineChallengeModal from './OnlineChallengeModal';
 import ActiveGamesWidget from './ActiveGamesWidget';
+import { useMainMenuModals, NavTab } from './useMainMenuModals';
+import { useMatchmaking } from './useMatchmaking';
 
 export type TimePresetId = '5+5' | '15+0' | '30+0' | '7d';
 
@@ -43,87 +42,45 @@ export const TIME_CONTROLS = [
   { id: 'correspondence', icon: '∞', enabled: true, preset: '7d' as TimePresetId },
 ] as const;
 
-type NavTab = 'playOnline' | 'playLocal' | 'loadGame' | 'rules' | 'players' | 'challenges';
-
 export default function MainMenu() {
   const navigate = useNavigate();
   const { setScreen, toggleDarkMode, isDarkMode, language, setLanguage } = useUIStore();
   const { t } = useI18n();
   const { newGame, savedGames, refreshSavedGames, loadSavedGame } = useGameStore();
-  const [showLoadDialog, setShowLoadDialog] = useState(false);
-  const [showBoardDialog, setShowBoardDialog] = useState(false);
-  const [showOnlineDialog, setShowOnlineDialog] = useState(false);
-  const [onlineModalInitialStep, setOnlineModalInitialStep] = useState<'board' | 'link'>('board');
+
+  const modals = useMainMenuModals();
+  const { isSearchingMatch, cancelSearch, startSearch } = useMatchmaking();
+
   const [selectedBoardSize, setSelectedBoardSize] = useState<37 | 48 | 61>(37);
   const [selectedPreset, setSelectedPreset] = useState<TimePresetId>('5+5');
   const [selectedTimeControl, setSelectedTimeControl] = useState<'blitz' | 'rapid' | 'long' | 'correspondence'>('blitz');
-  const [showAuthModal, setShowAuthModal] = useState(false);
-  const [showProfileModal, setShowProfileModal] = useState(false);
-  const [showPlayersModal, setShowPlayersModal] = useState(false);
-  const [showRulesModal, setShowRulesModal] = useState(false);
-  const [showChallengesModal, setShowChallengesModal] = useState(false);
-  const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [mobileMainTab, setMobileMainTab] = useState<'play' | 'chat'>('play');
-  const [isSearchingMatch, setIsSearchingMatch] = useState(false);
-  const [searchIntervalId, setSearchIntervalId] = useState<number | null>(null);
 
   const { user, fetchMe } = useAuthStore();
   const boardLabels: Record<number, string> = { 37: t.board37, 48: t.board48, 61: t.board61 };
 
   useEffect(() => {
-    return () => {
-      if (searchIntervalId) clearInterval(searchIntervalId);
-    };
-  }, [searchIntervalId]);
-
-  const cancelSearch = async () => {
-    if (searchIntervalId) clearInterval(searchIntervalId);
-    setSearchIntervalId(null);
-    setIsSearchingMatch(false);
-    try {
-      await roomsApi.leaveMatchmaking();
-    } catch (e) { console.error('Error leaving search', e); }
-  };
-  
-  useEffect(() => {
     refreshSavedGames();
-    // Refresh user profile to get updated rating after games
     fetchMe();
   }, [refreshSavedGames, fetchMe, user?.id]);
-  
-  const handleNewGame = () => {
-    setShowBoardDialog(true);
-  };
 
   const handleSelectBoard = (boardSize: 37 | 48 | 61) => {
     newGame(boardSize);
     setScreen('game');
-    setShowBoardDialog(false);
+    modals.setShowBoardDialog(false);
   };
-  
+
   const handleLoadGame = async (gameId: string) => {
     const game = savedGames.find(g => g.id === gameId);
     if (!game) return;
 
     await loadSavedGame(gameId);
-    setShowLoadDialog(false);
+    modals.setShowLoadDialog(false);
 
     if (game.isOnline) {
       navigate(`/room/${gameId}`);
     } else {
       setScreen('game');
-    }
-  };
-
-  const handleNavTab = (tab: NavTab) => {
-    setShowMobileMenu(false);
-    switch (tab) {
-      case 'playOnline': setShowOnlineDialog(true); break;
-      case 'playLocal': handleNewGame(); break;
-      case 'loadGame': setShowLoadDialog(true); break;
-      case 'rules': setShowRulesModal(true); break;
-      case 'players': setShowPlayersModal(true); break;
-      case 'challenges': setShowChallengesModal(true); break;
     }
   };
 
@@ -174,13 +131,13 @@ export default function MainMenu() {
             {activeDropdown === 'play' && (
               <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50">
                 <button
-                  onClick={() => { handleNavTab('playLocal'); setActiveDropdown(null); }}
+                  onClick={() => { modals.handleNavTab('playLocal'); setActiveDropdown(null); }}
                   className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
                   {t.playLocal}
                 </button>
                 <button
-                  onClick={() => { handleNavTab('loadGame'); setActiveDropdown(null); }}
+                  onClick={() => { modals.handleNavTab('loadGame'); setActiveDropdown(null); }}
                   className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
                   {t.loadGame}
@@ -203,7 +160,7 @@ export default function MainMenu() {
             {activeDropdown === 'learning' && (
               <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50">
                 <button
-                  onClick={() => { handleNavTab('rules'); setActiveDropdown(null); }}
+                  onClick={() => { modals.handleNavTab('rules'); setActiveDropdown(null); }}
                   className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
                   {t.rules}
@@ -212,7 +169,7 @@ export default function MainMenu() {
                   onClick={() => { setActiveDropdown(null); }}
                   className="w-full text-left px-4 py-2 text-sm font-medium text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-700/50 cursor-not-allowed"
                 >
-                  {t.tasks} (Скоро)
+                  {t.tasks} ({t.comingSoon})
                 </button>
               </div>
             )}
@@ -232,7 +189,7 @@ export default function MainMenu() {
             {activeDropdown === 'community' && (
               <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50">
                 <button
-                  onClick={() => { handleNavTab('players'); setActiveDropdown(null); }}
+                  onClick={() => { modals.handleNavTab('players'); setActiveDropdown(null); }}
                   className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
                   {t.players}
@@ -248,11 +205,11 @@ export default function MainMenu() {
         <div className="flex items-center gap-2 flex-shrink-0 relative">
           <button
             type="button"
-            onClick={() => setShowMobileMenu((prev) => !prev)}
+            onClick={() => modals.setShowMobileMenu((prev) => !prev)}
             className="lg:hidden p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
-            title={showMobileMenu ? t.closeMenu : t.openMenu}
+            title={modals.showMobileMenu ? t.closeMenu : t.openMenu}
           >
-            {showMobileMenu ? '✕' : '☰'}
+            {modals.showMobileMenu ? '✕' : '☰'}
           </button>
 
           {/* Settings Icon (Language & Theme) */}
@@ -268,7 +225,7 @@ export default function MainMenu() {
             {activeDropdown === 'settings' && (
               <div className="absolute top-full right-0 mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-2 z-50">
                 <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700 mb-1">
-                  Язык
+                  {t.language}
                 </div>
                 <div className="flex justify-around px-2 mb-2">
                   {LANGUAGE_BUTTONS.map((btn) => (
@@ -302,8 +259,8 @@ export default function MainMenu() {
               {/* Friends (placeholder for now) */}
               <button
                 className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                title="Друзья"
-                onClick={() => handleNavTab('players')}
+                title={t.friends}
+                onClick={() => modals.handleNavTab('players')}
               >
                 <Users size={20} />
               </button>
@@ -311,7 +268,7 @@ export default function MainMenu() {
               <button
                 className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 title={t.challenges}
-                onClick={() => handleNavTab('challenges')}
+                onClick={() => modals.handleNavTab('challenges')}
               >
                 <Swords size={20} />
               </button>
@@ -321,7 +278,7 @@ export default function MainMenu() {
           {/* User avatar / login */}
           {user ? (
             <button
-              onClick={() => setShowProfileModal(true)}
+              onClick={() => modals.setShowProfileModal(true)}
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             >
               <div className="w-8 h-8 rounded-full bg-indigo-500 flex items-center justify-center text-white text-sm font-bold">
@@ -333,7 +290,7 @@ export default function MainMenu() {
             </button>
           ) : (
             <button
-              onClick={() => setShowAuthModal(true)}
+              onClick={() => modals.setShowAuthModal(true)}
               className="hidden sm:block px-4 py-1.5 bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold rounded-lg transition-colors"
             >
               {t.loginRegister}
@@ -342,14 +299,14 @@ export default function MainMenu() {
         </div>
       </header>
 
-      {showMobileMenu && (
+      {modals.showMobileMenu && (
         <div className="lg:hidden bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3 space-y-2">
           {navTabs
             .filter((tab) => !tab.authOnly || user)
             .map((tab) => (
               <button
                 key={tab.id}
-                onClick={() => handleNavTab(tab.id)}
+                onClick={() => modals.handleNavTab(tab.id)}
                 className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700"
               >
                 {tab.label}
@@ -358,8 +315,8 @@ export default function MainMenu() {
           {!user && (
             <button
               onClick={() => {
-                setShowMobileMenu(false);
-                setShowAuthModal(true);
+                modals.setShowMobileMenu(false);
+                modals.setShowAuthModal(true);
               }}
               className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold text-white bg-indigo-500"
             >
@@ -412,7 +369,7 @@ export default function MainMenu() {
         <aside className="hidden lg:flex w-full lg:w-72 flex-shrink-0 flex-col order-2 lg:order-1 gap-4 items-start">
           <div className="w-full">
             <PlayerProfileCard
-              onLoginClick={() => setShowAuthModal(true)}
+              onLoginClick={() => modals.setShowAuthModal(true)}
             />
           </div>
           
@@ -466,10 +423,10 @@ export default function MainMenu() {
                     disabled={!tc.enabled || (!user && tc.preset !== null)}
                     onClick={() => {
                       if (!user && tc.preset !== null) {
-                        setShowAuthModal(true);
+                        modals.setShowAuthModal(true);
                         return;
                       }
-                      setSelectedTimeControl(tc.id as any);
+                      setSelectedTimeControl(tc.id);
                     }}
                     className={`relative flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all
                       ${(!tc.enabled || (!user && tc.preset !== null))
@@ -500,58 +457,7 @@ export default function MainMenu() {
               <button
                 type="button"
                 className="w-full sm:w-2/3 lg:w-1/2 py-3.5 px-6 rounded-xl font-bold text-lg transition-all shadow-md hover:shadow-lg active:scale-95 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white"
-                onClick={async () => {
-                  const tc = TIME_CONTROLS.find(c => c.id === selectedTimeControl);
-                  if (!tc) return;
-                  if (!user && tc.preset !== null) {
-                    setShowAuthModal(true);
-                    return;
-                  }
-                  if (tc.preset === null) return; // Correspondence matchmaking isn't fully supported
-
-                  // Start searching logic
-                  setIsSearchingMatch(true);
-
-                  const initialState = createInitialState(selectedBoardSize);
-                  const rootNode: GameNode = {
-                    id: 'root',
-                    moveNumber: 0,
-                    player: 'player1',
-                    move: null,
-                    notation: '',
-                    children: [],
-                    parent: null,
-                    isMainLine: true,
-                  };
-                  
-                  try {
-                    const res = await roomsApi.joinMatchmaking(selectedBoardSize, tc.id, initialState, rootNode);
-                    if (res.status === 'matched' && res.roomId) {
-                      // Immediately matched
-                      setIsSearchingMatch(false);
-                      navigate(`/room/${res.roomId}`);
-                    } else {
-                      // Polling
-                      const interval = window.setInterval(async () => {
-                        try {
-                          const pollRes = await roomsApi.pollMatchStatus();
-                          if (pollRes.status === 'matched' && pollRes.roomId) {
-                            clearInterval(interval);
-                            setIsSearchingMatch(false);
-                            setSearchIntervalId(null);
-                            navigate(`/room/${pollRes.roomId}`);
-                          }
-                        } catch (e) {
-                          console.error('Polling error', e);
-                        }
-                      }, 1500);
-                      setSearchIntervalId(interval);
-                    }
-                  } catch (err) {
-                    console.error('Error joining match', err);
-                    setIsSearchingMatch(false);
-                  }
-                }}
+                onClick={() => startSearch(selectedBoardSize, selectedTimeControl, () => modals.setShowAuthModal(true))}
               >
                 {t.searchGame}
               </button>
@@ -563,14 +469,11 @@ export default function MainMenu() {
                   const tc = TIME_CONTROLS.find(c => c.id === selectedTimeControl);
                   if (!tc) return;
 
-                  if (tc.preset === null) {
-                    setOnlineModalInitialStep('board');
-                    setShowOnlineDialog(true);
-                  } else {
+                  if (tc.preset !== null) {
                     setSelectedPreset(tc.preset);
-                    setOnlineModalInitialStep('board');
-                    setShowOnlineDialog(true);
                   }
+                  modals.setOnlineModalInitialStep('board');
+                  modals.setShowOnlineDialog(true);
                 }}
               >
                 {t.playByLink}
@@ -596,37 +499,37 @@ export default function MainMenu() {
         </aside>
       </main>
       
-      {showLoadDialog && (
+      {modals.showLoadDialog && (
         <LoadGameModal
           savedGames={savedGames}
           boardLabels={boardLabels}
-          onClose={() => setShowLoadDialog(false)}
+          onClose={() => modals.setShowLoadDialog(false)}
           onLoadGame={handleLoadGame}
         />
       )}
 
-      {showBoardDialog && (
+      {modals.showBoardDialog && (
         <BoardSelectionModal
-          onClose={() => setShowBoardDialog(false)}
+          onClose={() => modals.setShowBoardDialog(false)}
           onSelectBoard={handleSelectBoard}
         />
       )}
 
-      {showOnlineDialog && (
+      {modals.showOnlineDialog && (
         <OnlineChallengeModal
-          onClose={() => setShowOnlineDialog(false)}
-          initialStep={onlineModalInitialStep}
+          onClose={() => modals.setShowOnlineDialog(false)}
+          initialStep={modals.onlineModalInitialStep}
           initialPreset={selectedPreset}
           initialBoardSize={selectedBoardSize}
         />
       )}
 
-      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
-      {showProfileModal && <ProfileModal onClose={() => setShowProfileModal(false)} />}
-      {showPlayersModal && <PlayersModal onClose={() => setShowPlayersModal(false)} />}
-      {showChallengesModal && <ChallengesModal onClose={() => setShowChallengesModal(false)} />}
+      {modals.showAuthModal && <AuthModal onClose={() => modals.setShowAuthModal(false)} />}
+      {modals.showProfileModal && <ProfileModal onClose={() => modals.setShowProfileModal(false)} />}
+      {modals.showPlayersModal && <PlayersModal onClose={() => modals.setShowPlayersModal(false)} />}
+      {modals.showChallengesModal && <ChallengesModal onClose={() => modals.setShowChallengesModal(false)} />}
 
-      {showRulesModal && <RulesModal onClose={() => setShowRulesModal(false)} />}
+      {modals.showRulesModal && <RulesModal onClose={() => modals.setShowRulesModal(false)} />}
     </div>
   );
 }

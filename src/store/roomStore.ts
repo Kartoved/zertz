@@ -3,15 +3,15 @@ import { GameState, GameNode, MarbleColor, CaptureMove, Move, Player } from '../
 import {
   createInitialState,
   cloneState,
-  placeMarble,
-  removeRing,
-  skipRingRemoval,
-  executeCapture,
   hasAvailableCaptures,
   checkWinCondition,
   getCaptureChains,
   moveToNotation,
   getWinType,
+  placeMarble,
+  removeRing,
+  skipRingRemoval,
+  executeCapture,
 } from '../game/GameEngine';
 import { getValidRemovableRings } from '../game/Board';
 import * as roomsApi from '../db/roomsApi';
@@ -20,18 +20,14 @@ import * as gamesStorage from '../db/gamesStorage';
 import { playPlaceSound, playRemoveRingSound, playCaptureSound, playWinSound } from '../utils/sounds';
 import { useAuthStore } from './authStore';
 import { getI18nFromStorage } from '../i18n';
-
-function getDefaultPlayerNames() {
-  const { language } = getI18nFromStorage();
-  if (language === 'ru') return { player1: 'Игрок 1', player2: 'Игрок 2' };
-  if (language === 'eo') return { player1: 'Ludanto 1', player2: 'Ludanto 2' };
-  return { player1: 'Player 1', player2: 'Player 2' };
-}
-
-function findDeepestMainLine(node: GameNode): GameNode {
-  if (node.children.length === 0) return node;
-  return findDeepestMainLine(node.children[0]);
-}
+import { API_BASE, authHeaders } from '../db/apiClient';
+import {
+  getDefaultPlayerNames,
+  createRootNode,
+  addMoveToTree,
+  rebuildStateFromNode,
+  findDeepestMainLine,
+} from '../utils/gameTreeUtils';
 
 interface RoomStore {
   // Room info
@@ -99,70 +95,8 @@ interface RoomStore {
   reset: () => void;
 }
 
-function createRootNode(): GameNode {
-  return {
-    id: 'root',
-    moveNumber: 0,
-    player: 'player1',
-    move: null,
-    notation: '',
-    children: [],
-    parent: null,
-    isMainLine: true,
-  };
-}
-
-function addMoveToTree(
-  currentNode: GameNode,
-  move: Move,
-  player: Player,
-  moveNumber: number,
-  boardSize: 37 | 48 | 61
-): GameNode {
-  const newNode: GameNode = {
-    id: `${moveNumber}-${Date.now()}`,
-    moveNumber,
-    player,
-    move,
-    notation: moveToNotation(move, boardSize),
-    children: [],
-    parent: currentNode,
-    isMainLine: currentNode.children.length === 0,
-  };
-  currentNode.children.push(newNode);
-  return newNode;
-}
-
 // Guard: block polling while a move is being persisted to server
 let pendingMoveCount = 0;
-
-function rebuildStateFromNode(targetNode: GameNode, boardSize: 37 | 48 | 61): GameState {
-  const nextState = createInitialState(boardSize);
-  const moves: GameNode[] = [];
-
-  let node: GameNode | null = targetNode;
-  while (node && node.move) {
-    moves.unshift(node);
-    node = node.parent;
-  }
-
-  for (const moveNode of moves) {
-    if (moveNode.move?.type === 'placement') {
-      const { marbleColor, ringId, removedRingId } = moveNode.move.data;
-      placeMarble(nextState, ringId, marbleColor);
-      if (removedRingId) {
-        removeRing(nextState, removedRingId);
-      } else {
-        skipRingRemoval(nextState);
-      }
-    } else if (moveNode.move?.type === 'capture') {
-      const captures = [moveNode.move.data, ...(moveNode.move.data.chain || [])];
-      executeCapture(nextState, captures);
-    }
-  }
-
-  return nextState;
-}
 
 function syncWinnerFromRoom(state: GameState, winnerNum: number | null): GameState {
   if (winnerNum == null) return state;
@@ -312,15 +246,11 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         await roomsApi.updatePlayerName(numericRoomId, myPlayer, authUser.username);
         // Associate user_id with the room for rated games
         try {
-          const token = localStorage.getItem('zertz_auth_token');
-          if (token) {
-            const API_BASE = import.meta.env.VITE_API_URL || '';
-            await fetch(`${API_BASE}/api/rooms/${numericRoomId}/join`, {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-              body: JSON.stringify({ playerIndex: myPlayer }),
-            });
-          }
+          await fetch(`${API_BASE}/api/rooms/${numericRoomId}/join`, {
+            method: 'PUT',
+            headers: authHeaders(),
+            body: JSON.stringify({ playerIndex: myPlayer }),
+          });
         } catch { /* ignore join errors */ }
       }
 

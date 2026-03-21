@@ -1,4 +1,4 @@
-const API_BASE = import.meta.env.VITE_API_URL || '';
+import { API_BASE, authHeaders } from './apiClient';
 
 export interface GlobalChatMessage {
   id: number;
@@ -21,15 +21,9 @@ export async function getGlobalChatMessages(afterId?: number): Promise<GlobalCha
 }
 
 export async function sendGlobalChatMessage(message: string): Promise<GlobalChatMessage> {
-  const token = localStorage.getItem('zertz_auth_token');
-  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
   const response = await fetch(`${API_BASE}/api/global-chat`, {
     method: 'POST',
-    headers,
+    headers: authHeaders(),
     body: JSON.stringify({ message }),
   });
 
