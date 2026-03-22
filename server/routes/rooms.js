@@ -62,7 +62,7 @@ router.post('/', optionalAuth, async (req, res) => {
     return;
   }
 
-  if (isTimed && (timeControlBaseMs <= 0 || timeControlIncrementMs < 0)) {
+  if (isTimed && (timeControlBaseMs <= 0 || (timeControlIncrementMs < 0 && timeControlIncrementMs !== -1))) {
     res.status(400).json({ error: 'Invalid time control values' });
     return;
   }
