@@ -6,7 +6,28 @@
       "Bash(node --check server/routes/challenges.js)",
       "Bash(timeout 5 node server/server.js)",
       "Bash(node --check server/server.js)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(docker --version)",
+      "Bash(docker ps:*)",
+      "Bash(docker-compose up:*)",
+      "Bash(node -e \":*)",
+      "Bash(curl -s http://localhost:5050/api/health)",
+      "Bash(curl -s -X POST http://localhost:5050/api/auth/register -H \"Content-Type: application/json\" -d '{\"\"username\"\":\"\"testuser99\"\",\"\"password\"\":\"\"Test@1234\"\"}')",
+      "Bash(docker-compose restart:*)",
+      "Bash(docker exec zertz-web-1 node -e \":*)",
+      "Bash(docker exec:*)",
+      "Bash(curl -s -X POST http://localhost:5050/api/auth/register -H 'Content-Type: application/json' -d '{\"\"username\"\":\"\"Kartoved24/\"\",\"\"password\"\":\"\"Zertz2024!\"\"}')",
+      "Bash(curl -s -X POST http://localhost:5050/api/auth/register -H \"Content-Type: application/json\" -d \"{\"\"username\"\":\"\"testlocal\"\",\"\"password\"\":\"\"Zertz2024!\"\"}\")",
+      "Bash(curl -s http://localhost:5050/api/players)",
+      "Bash(docker-compose down:*)",
+      "Bash(docker-compose build:*)",
+      "Bash(netstat -ano)",
+      "Bash(taskkill /PID 18480 /F)",
+      "Bash(cmd /c \"taskkill /PID 18480 /F\")",
+      "Bash(cmd /c \"taskkill /F /PID 18480\")",
+      "Bash(cmd /c \"taskkill /F /PID 18480 2>&1\")",
+      "Bash(powershell -Command \"Stop-Process -Id 18480 -Force\")",
+      "Bash(curl -s -X POST http://localhost:5050/api/auth/register -H \"Content-Type: application/json\" -d \"{\"\"username\"\":\"\"Kartoved24\"\",\"\"password\"\":\"\"Zertz2024!\"\"}\")"
     ]
   }
 }

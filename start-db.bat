@@ -1,0 +1,6 @@
+@echo off
+echo Starting PostgreSQL with Docker Compose...
+docker-compose up -d db
+echo Waiting for PostgreSQL to be ready...
+timeout /t 5
+echo PostgreSQL is ready on localhost:5432

@@ -1,4 +1,4 @@
-import { API_BASE, getToken, authHeaders } from './apiClient';
+import { API_BASE, getToken, authHeaders, jsonHeaders } from './apiClient';
 
 export interface User {
   id: number;
@@ -31,7 +31,7 @@ export interface PlayerInfo {
 export async function register(username: string, password: string): Promise<{ token: string; user: User }> {
   const response = await fetch(`${API_BASE}/api/auth/register`, {
     method: 'POST',
-    headers: authHeaders(),
+    headers: jsonHeaders(),
     body: JSON.stringify({ username, password }),
   });
 
@@ -45,7 +45,7 @@ export async function register(username: string, password: string): Promise<{ to
 export async function login(username: string, password: string): Promise<{ token: string; user: User }> {
   const response = await fetch(`${API_BASE}/api/auth/login`, {
     method: 'POST',
-    headers: authHeaders(),
+    headers: jsonHeaders(),
     body: JSON.stringify({ username, password }),
   });
 
