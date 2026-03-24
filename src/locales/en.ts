@@ -1,6 +1,6 @@
 export const en = {
   appSubtitle: 'Abstract strategy game',
-  versionFooter: 'v0.9.1',
+  versionFooter: 'v0.9.2',
   developedBy: 'Developed by Wood Romanov',
   profile: 'Profile',
   loginRegister: 'Login / Register',
@@ -245,4 +245,12 @@ export const en = {
   boardSizeLarge: 'Large',
   whatsNew: "What's new?",
   onlineRequiresAuth: 'An account is required for online play',
+  cancelGame: 'Annul',
+  gameCancelled: 'Game annulled',
+  cancelledStatus: 'Annulled',
+  viewGamesBtn: 'Games',
+  youAreSpectator: 'You are spectating',
+  archiveAllGames: 'All games archive',
+  watchGame: 'Watch',
+  loadArchive: 'Archive',
 };

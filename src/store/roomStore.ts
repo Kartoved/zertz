@@ -91,6 +91,7 @@ interface RoomStore {
   navigateToNode: (targetNode: GameNode) => void;
   setPlayerName: (player: 1 | 2, name: string) => Promise<void>;
   surrender: () => Promise<void>;
+  cancelGame: () => Promise<void>;
   
   reset: () => void;
 }
@@ -696,6 +697,25 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       await persistOnlineGame(roomId, newState, gameTree, playerNames, winType);
     } catch (err) {
       console.error('[roomStore.surrender] ERROR:', err);
+    } finally {
+      pendingMoveCount--;
+    }
+  },
+
+  cancelGame: async () => {
+    const { roomId, state, gameTree, playerNames } = get();
+    if (!roomId || state.winner || (state.moveNumber ?? 0) > 2) return;
+
+    pendingMoveCount++;
+    try {
+      await roomsApi.cancelGame(roomId);
+      const newState = cloneState(state);
+      newState.winner = 'cancelled';
+      const winType = 'cancelled';
+      set({ state: newState, winType });
+      await persistOnlineGame(roomId, newState, gameTree, playerNames, winType);
+    } catch (err) {
+      console.error('[roomStore.cancelGame] ERROR:', err);
     } finally {
       pendingMoveCount--;
     }

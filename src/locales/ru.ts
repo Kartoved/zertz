@@ -1,6 +1,6 @@
 export const ru = {
   appSubtitle: 'Абстрактная стратегическая игра',
-  versionFooter: 'v0.9.1',
+  versionFooter: 'v0.9.2',
   developedBy: 'Developed by Wood Romanov',
   profile: 'Профиль',
   loginRegister: 'Войти / Зарегистрироваться',
@@ -245,4 +245,12 @@ export const ru = {
   boardSizeLarge: 'Большая',
   whatsNew: 'Что нового?',
   onlineRequiresAuth: 'Для онлайн-игры необходима регистрация',
+  cancelGame: 'Аннулировать',
+  gameCancelled: 'Партия аннулирована',
+  cancelledStatus: 'Аннулирована',
+  viewGamesBtn: 'Партии',
+  youAreSpectator: 'Вы наблюдаете',
+  archiveAllGames: 'Архив всех партий',
+  watchGame: 'Смотреть',
+  loadArchive: 'Архив',
 };

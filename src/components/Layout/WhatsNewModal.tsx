@@ -12,6 +12,39 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.9.2',
+    date: '2026-03-24',
+    changes: {
+      ru: [
+        'Аннулирование партии до 3-го хода — без изменения рейтинга',
+        'Режим зрителя: переход по ссылке партии без авторизации',
+        'Зрители не могут писать в чат игроков',
+        'Вкладка "Архив всех партий" в просмотре партий',
+        'Кнопка "Партии" в профиле игрока — показывает его партии',
+        'Аннулированные партии отображаются корректно в истории',
+        'Версия обновлена до v0.9.2',
+      ],
+      en: [
+        'Game cancellation before move 3 — no rating change',
+        'Spectator mode: join any game by link without auth',
+        'Spectators cannot write in the players\' chat',
+        '"Game Archive" tab added to the games viewer',
+        '"Games" button in player profile — shows their games',
+        'Cancelled games displayed correctly in history',
+        'Version updated to v0.9.2',
+      ],
+      eo: [
+        'Nuligado de ludo antaŭ la 3a movo — sen ŝanĝo de rangotabelo',
+        'Spektanta reĝimo: aliĝu al iu ajn ludo per ligilo sen aŭtentikigo',
+        'Spektantoj ne povas skribi en la babilejo de ludantoj',
+        'Aldonis langeton "Arkivo de ĉiuj ludoj" en la ludvidilon',
+        'Butono "Ludoj" en profilo de ludanto — montras liajn ludojn',
+        'Nuligitaj ludoj estas montritaj ĝuste en historio',
+        'Versio ĝisdatigita al v0.9.2',
+      ],
+    },
+  },
+  {
     version: '0.9.1',
     date: '2026-03-24',
     changes: {

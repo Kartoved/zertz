@@ -74,6 +74,7 @@ export function RoomScreen() {
     clockP2Ms,
     clockRunningSince,
     surrender,
+    cancelGame,
   } = useRoomStore();
   const { user } = useAuthStore();
   const isAuthed = !!user;
@@ -127,10 +128,13 @@ export function RoomScreen() {
     return '';
   };
 
+  const isSpectator = !myPlayer;
+  const isCancelled = state.winner === 'cancelled';
   const safePlayerNames = playerNames || { player1: 'Player 1', player2: 'Player 2' };
   const safeCaptures = state.captures || { player1: { white: 0, gray: 0, black: 0 }, player2: { white: 0, gray: 0, black: 0 } };
-  const winnerName = state.winner === 'player1' ? safePlayerNames.player1 : safePlayerNames.player2;
-  const winnerWinType = state.winner ? (winType || (state.captures ? getWinType(state, state.winner) : null)) : null;
+  const winnerName = isCancelled ? '' : (state.winner === 'player1' ? safePlayerNames.player1 : safePlayerNames.player2);
+  const winnerWinType = state.winner && !isCancelled ? (winType || (state.captures ? getWinType(state, state.winner) : null)) : null;
+  const canCancel = !isSpectator && !state.winner && (state.moveNumber ?? 0) <= 2;
 
   const LOW_TIME_THRESHOLD_MS = 20 * 1000;
 
@@ -471,8 +475,15 @@ export function RoomScreen() {
             )}
           </div>
 
-          {/* Marble selector */}
-          {!state.winner && (
+          {/* Spectator badge */}
+          {isSpectator && (
+            <div className="col-span-1 sm:col-span-2 lg:col-span-1 px-3 py-2 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded-lg text-center text-sm text-yellow-700 dark:text-yellow-300 font-medium">
+              👁 {t.youAreSpectator}
+            </div>
+          )}
+
+          {/* Marble selector + action buttons (players only) */}
+          {!state.winner && !isSpectator && (
             <div className="p-3 bg-white dark:bg-gray-800 rounded-lg col-span-1 sm:col-span-2 lg:col-span-1">
               {state.phase === 'placement' && (
                 <>
@@ -488,7 +499,7 @@ export function RoomScreen() {
                 </>
               )}
               <div className={state.phase === 'placement' ? 'mt-3' : ''}>
-                <div className="flex gap-2">
+                <div className="flex gap-2 flex-wrap">
                   <button
                     type="button"
                     onClick={() => sendMessage('[UNDO_REQUEST]')}
@@ -497,6 +508,15 @@ export function RoomScreen() {
                   >
                     ↶ {t.undoMove}
                   </button>
+                  {canCancel && (
+                    <button
+                      type="button"
+                      onClick={() => cancelGame()}
+                      className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-900/70 transition-colors"
+                    >
+                      ✕ {t.cancelGame}
+                    </button>
+                  )}
                   <button
                     type="button"
                     onClick={() => setShowSurrenderConfirm(true)}
@@ -614,13 +634,24 @@ export function RoomScreen() {
       {state.winner && !winnerModalDismissed && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-6 text-center">
-            <div className="text-3xl font-bold text-green-700 dark:text-green-300 mb-2">
-              🏆 {winnerName}
-            </div>
-            <div className="text-gray-600 dark:text-gray-300 mb-1">{t.gameOver}</div>
-            <div className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-              {getWinTypeLabel(t, winnerWinType)}
-            </div>
+            {isCancelled ? (
+              <>
+                <div className="text-2xl font-bold text-gray-600 dark:text-gray-300 mb-2">
+                  ✕ {t.gameCancelled}
+                </div>
+                <div className="text-gray-500 dark:text-gray-400 mb-6">{t.cancelledStatus}</div>
+              </>
+            ) : (
+              <>
+                <div className="text-3xl font-bold text-green-700 dark:text-green-300 mb-2">
+                  🏆 {winnerName}
+                </div>
+                <div className="text-gray-600 dark:text-gray-300 mb-1">{t.gameOver}</div>
+                <div className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                  {getWinTypeLabel(t, winnerWinType)}
+                </div>
+              </>
+            )}
             <button
               onClick={() => setWinnerModalDismissed(true)}
               className="px-5 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold transition-colors"

@@ -132,32 +132,41 @@ export function ChatPanel({ inputBottomOffset = 0 }: ChatPanelProps) {
         <div ref={messagesEndRef} />
       </div>
 
-      <div
-        className="p-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
-        style={inputBottomOffset > 0 ? { position: 'sticky', bottom: `${inputBottomOffset}px`, zIndex: 10 } : undefined}
-      >
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={t.messagePlaceholder}
-            className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg 
-                       bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200
-                       focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            onClick={handleSend}
-            disabled={!text.trim()}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium
-                       hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed
-                       transition-colors"
-          >
-            →
-          </button>
+      {myPlayer !== null ? (
+        <div
+          className="p-3 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800"
+          style={inputBottomOffset > 0 ? { position: 'sticky', bottom: `${inputBottomOffset}px`, zIndex: 10 } : undefined}
+        >
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={t.messagePlaceholder}
+              className="flex-1 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg
+                         bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200
+                         focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <button
+              onClick={handleSend}
+              disabled={!text.trim()}
+              className="px-4 py-2 bg-blue-500 text-white rounded-lg text-sm font-medium
+                         hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed
+                         transition-colors"
+            >
+              →
+            </button>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div
+          className="p-3 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-center text-xs text-gray-400 dark:text-gray-500"
+          style={inputBottomOffset > 0 ? { position: 'sticky', bottom: `${inputBottomOffset}px`, zIndex: 10 } : undefined}
+        >
+          👁 {t.youAreSpectator}
+        </div>
+      )}
     </div>
   );
 }

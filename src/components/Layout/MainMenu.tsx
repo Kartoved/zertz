@@ -81,7 +81,13 @@ export default function MainMenu() {
 
   const handleLoadGame = async (gameId: string) => {
     const game = savedGames.find(g => g.id === gameId);
-    if (!game) return;
+
+    if (!game) {
+      // Archive game not in local savedGames — navigate directly as spectator
+      modals.setShowLoadDialog(false);
+      navigate(`/room/${gameId}`);
+      return;
+    }
 
     await loadSavedGame(gameId);
     modals.setShowLoadDialog(false);

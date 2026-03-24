@@ -84,6 +84,16 @@ export async function listGames(): Promise<SavedGameSummary[]> {
   }));
 }
 
+export async function listPublicGames(username?: string): Promise<SavedGameSummary[]> {
+  const url = username
+    ? `${API_BASE}/api/games/public?username=${encodeURIComponent(username)}`
+    : `${API_BASE}/api/games/public`;
+  const response = await fetch(url);
+  if (!response.ok) throw new Error('Failed to fetch public games');
+  const games = await safeJson<SavedGameSummary[]>(response);
+  return games;
+}
+
 export async function deleteGame(id: string): Promise<void> {
   const response = await fetch(`${API_BASE}/api/games/${id}`, { method: 'DELETE', headers: authHeaders(false) });
   if (!response.ok) {

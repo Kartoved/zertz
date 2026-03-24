@@ -1,6 +1,6 @@
 export const eo = {
   appSubtitle: 'Abstrakta strategia ludo',
-  versionFooter: 'v0.9.1',
+  versionFooter: 'v0.9.2',
   developedBy: 'Developed by Wood Romanov',
   profile: 'Profilo',
   loginRegister: 'Ensaluti / Registriĝi',
@@ -245,4 +245,12 @@ export const eo = {
   boardSizeLarge: 'Granda',
   whatsNew: 'Kio estas nova?',
   onlineRequiresAuth: 'Konto necesas por reta ludo',
+  cancelGame: 'Nuligi',
+  gameCancelled: 'Ludo nuligita',
+  cancelledStatus: 'Nuligita',
+  viewGamesBtn: 'Ludoj',
+  youAreSpectator: 'Vi spektas',
+  archiveAllGames: 'Arkivo de ĉiuj ludoj',
+  watchGame: 'Spekti',
+  loadArchive: 'Arkivo',
 };

@@ -27,6 +27,38 @@ router.get('/', authRequired, async (req, res) => {
   );
 });
 
+// Public game archive — returns recent online games, optionally filtered by username
+router.get('/public', async (req, res) => {
+  const { username } = req.query;
+  const params = [];
+  let whereClause = 'WHERE is_online = true';
+
+  if (username) {
+    whereClause += ' AND (player1_name = $1 OR player2_name = $1)';
+    params.push(username);
+  }
+
+  const result = await pool.query(
+    `SELECT id, player1_name, player2_name, updated_at, move_count, winner, win_type, board_size
+     FROM games
+     ${whereClause}
+     ORDER BY updated_at DESC
+     LIMIT 100`,
+    params
+  );
+
+  res.json(result.rows.map(row => ({
+    id: row.id,
+    playerNames: { player1: row.player1_name, player2: row.player2_name },
+    updatedAt: row.updated_at.getTime(),
+    moveCount: row.move_count,
+    winner: row.winner,
+    winType: row.win_type,
+    boardSize: row.board_size,
+    isOnline: true,
+  })));
+});
+
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
   const result = await pool.query('SELECT * FROM games WHERE id = $1', [id]);

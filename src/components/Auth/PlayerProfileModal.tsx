@@ -7,6 +7,7 @@ import CountryBadge from '../UI/CountryBadge';
 import { useI18n } from '../../i18n';
 import { createRootNode } from '../../utils/gameTreeUtils';
 import { serializeState, serializeTree } from '../../db/apiClient';
+import PlayerGamesModal from './PlayerGamesModal';
 
 interface PlayerProfileModalProps {
   playerId: number;
@@ -25,6 +26,7 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
   const [challengeRated, setChallengeRated] = useState(false);
   const [challengePlayer, setChallengePlayer] = useState<1 | 2 | 'random'>(1);
   const [challengeLoading, setChallengeLoading] = useState(false);
+  const [showPlayerGames, setShowPlayerGames] = useState(false);
 
   useEffect(() => {
     loadProfile();
@@ -177,30 +179,34 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
           )}
 
           {/* Actions */}
-          {!isMe && (
-            <div className="flex gap-2">
-              {user && (
-                <button
-                  onClick={handleFollow}
-                  className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
-                    profile.isFollowing
-                      ? 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-red-100 hover:text-red-600'
-                      : 'bg-blue-500 hover:bg-blue-600 text-white'
-                  }`}
-                >
-                  {profile.isFollowing ? t.unfollow : t.follow}
-                </button>
-              )}
-              {user && (
-                <button
-                  onClick={() => setShowChallenge(!showChallenge)}
-                  className="flex-1 py-2 px-4 bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-medium transition-colors"
-                >
-                  {t.challengeToGame}
-                </button>
-              )}
-            </div>
-          )}
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={() => setShowPlayerGames(true)}
+              className="flex-1 py-2 px-4 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-lg font-medium transition-colors"
+            >
+              📋 {t.viewGamesBtn}
+            </button>
+            {!isMe && user && (
+              <button
+                onClick={handleFollow}
+                className={`flex-1 py-2 px-4 rounded-lg font-medium transition-colors ${
+                  profile.isFollowing
+                    ? 'bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-white hover:bg-red-100 hover:text-red-600'
+                    : 'bg-blue-500 hover:bg-blue-600 text-white'
+                }`}
+              >
+                {profile.isFollowing ? t.unfollow : t.follow}
+              </button>
+            )}
+            {!isMe && user && (
+              <button
+                onClick={() => setShowChallenge(!showChallenge)}
+                className="flex-1 py-2 px-4 bg-purple-500 hover:bg-purple-600 text-white rounded-lg font-medium transition-colors"
+              >
+                {t.challengeToGame}
+              </button>
+            )}
+          </div>
 
           {/* Challenge settings */}
           {showChallenge && (
@@ -275,6 +281,9 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
           </div>
         )}
       </div>
+      {showPlayerGames && (
+        <PlayerGamesModal username={profile.username} onClose={() => setShowPlayerGames(false)} />
+      )}
     </div>
   );
 }

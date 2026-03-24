@@ -110,7 +110,31 @@ router.post('/', optionalAuth, async (req, res) => {
   }
 });
 
-// Get room by ID
+// Get active rooms for a specific player username (for spectating)
+router.get('/active/:username', async (req, res) => {
+  const { username } = req.params;
+  const result = await pool.query(
+    `SELECT id, board_size, player1_name, player2_name, updated_at
+     FROM rooms
+     WHERE winner IS NULL
+       AND user2_id IS NOT NULL
+       AND (player1_name = $1 OR player2_name = $1)
+     ORDER BY updated_at DESC
+     LIMIT 20`,
+    [username]
+  );
+  res.json(result.rows.map(r => ({
+    id: String(r.id),
+    playerNames: { player1: r.player1_name, player2: r.player2_name },
+    updatedAt: r.updated_at.getTime(),
+    moveCount: 0,
+    winner: null,
+    winType: null,
+    boardSize: r.board_size,
+    isOnline: true,
+  })));
+});
+
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
   try {
@@ -241,7 +265,7 @@ router.put('/:id/state', optionalAuth, async (req, res) => {
 
   const room = roomCheck.rows[0];
 
-  if (room.winner) {
+  if (room.winner !== null) {
     res.status(400).json({ error: 'Игра уже завершена' });
     return;
   }
@@ -361,8 +385,8 @@ router.put('/:id/state', optionalAuth, async (req, res) => {
 
   let ratingDelta = null;
 
-  // Glicko-2 rating update for rated games when winner is determined
-  if (nextWinner) {
+  // Glicko-2 rating update for rated games when winner is determined (not for cancelled games)
+  if (nextWinner && nextWinType !== 'cancelled') {
     try {
       const roomRow = await pool.query('SELECT rated, user1_id, user2_id FROM rooms WHERE id = $1', [id]);
       const room = roomRow.rows[0];
@@ -530,6 +554,58 @@ router.post('/:id/messages', async (req, res) => {
     moveNumber,
     createdAt: result.rows[0].created_at.getTime(),
   });
+});
+
+// Cancel game (annul) — unilateral, only before move 3, no rating change
+router.post('/:id/cancel', authRequired, async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id;
+
+  const roomResult = await pool.query(
+    'SELECT user1_id, user2_id, winner, state_json FROM rooms WHERE id = $1',
+    [id]
+  );
+  if (roomResult.rows.length === 0) {
+    res.status(404).json({ error: 'Room not found' });
+    return;
+  }
+
+  const room = roomResult.rows[0];
+
+  if (Number(room.user1_id) !== Number(userId) && Number(room.user2_id) !== Number(userId)) {
+    res.status(403).json({ error: 'Not a player in this room' });
+    return;
+  }
+
+  if (room.winner !== null) {
+    res.status(400).json({ error: 'Game already finished' });
+    return;
+  }
+
+  let stateData;
+  try {
+    stateData = JSON.parse(room.state_json);
+  } catch {
+    res.status(500).json({ error: 'Invalid state' });
+    return;
+  }
+
+  if ((stateData.moveNumber ?? 0) > 2) {
+    res.status(400).json({ error: 'Too many moves to cancel' });
+    return;
+  }
+
+  // Mark as cancelled: winner = 0 (no winner), win_type = 'cancelled'
+  // Update state_json to reflect winner = 'cancelled'
+  stateData.winner = 'cancelled';
+  const updatedStateJson = JSON.stringify(stateData);
+
+  await pool.query(
+    `UPDATE rooms SET winner = 0, win_type = 'cancelled', state_json = $2, updated_at = NOW() WHERE id = $1`,
+    [id, updatedStateJson]
+  );
+
+  res.json({ ok: true });
 });
 
 // Delete room

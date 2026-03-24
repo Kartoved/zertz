@@ -264,3 +264,29 @@ export async function deleteRoom(id: number | string): Promise<void> {
   const response = await fetch(`${API_BASE}/api/rooms/${id}`, { method: 'DELETE' });
   if (!response.ok) throw new Error('Failed to delete room');
 }
+
+export async function getActiveRoomsForPlayer(username: string): Promise<Array<{
+  id: string;
+  playerNames: { player1: string; player2: string };
+  updatedAt: number;
+  moveCount: number;
+  winner: null;
+  winType: null;
+  boardSize: 37 | 48 | 61;
+  isOnline: true;
+}>> {
+  const response = await fetch(`${API_BASE}/api/rooms/active/${encodeURIComponent(username)}`);
+  if (!response.ok) return [];
+  return response.json();
+}
+
+export async function cancelGame(id: number | string): Promise<void> {
+  const response = await fetch(`${API_BASE}/api/rooms/${id}/cancel`, {
+    method: 'POST',
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to cancel game');
+  }
+}
