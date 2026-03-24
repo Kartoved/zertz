@@ -12,6 +12,27 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.9.21',
+    date: '2026-03-24',
+    changes: {
+      ru: [
+        'PWA: приложение можно установить на телефон или компьютер',
+        'Новая иконка приложения',
+        'Версия обновлена до v0.9.21',
+      ],
+      en: [
+        'PWA: the app can now be installed on phone or desktop',
+        'New app icon',
+        'Version updated to v0.9.21',
+      ],
+      eo: [
+        'PWA: la aplikaĵo nun instaleblas sur telefono aŭ komputilo',
+        'Nova aplikaĵa ikono',
+        'Versio ĝisdatigita al v0.9.21',
+      ],
+    },
+  },
+  {
     version: '0.9.20',
     date: '2026-03-24',
     changes: {

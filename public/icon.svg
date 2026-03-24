@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="40%" r="60%">
+      <stop offset="0%" stop-color="#4f46e5"/>
+      <stop offset="100%" stop-color="#312e81"/>
+    </radialGradient>
+    <radialGradient id="white-marble" cx="35%" cy="30%" r="50%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#c7c7c7"/>
+    </radialGradient>
+    <radialGradient id="gray-marble" cx="35%" cy="30%" r="50%">
+      <stop offset="0%" stop-color="#b0b0b0"/>
+      <stop offset="100%" stop-color="#606060"/>
+    </radialGradient>
+    <radialGradient id="black-marble" cx="35%" cy="30%" r="50%">
+      <stop offset="0%" stop-color="#555555"/>
+      <stop offset="100%" stop-color="#111111"/>
+    </radialGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="3" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <!-- Hex ring pattern (simplified board) -->
+  <g stroke="#6366f1" stroke-width="2" fill="none" opacity="0.3">
+    <circle cx="256" cy="200" r="38"/>
+    <circle cx="190" cy="238" r="38"/>
+    <circle cx="322" cy="238" r="38"/>
+    <circle cx="158" cy="295" r="38"/>
+    <circle cx="256" cy="276" r="38"/>
+    <circle cx="354" cy="295" r="38"/>
+    <circle cx="190" cy="352" r="38"/>
+    <circle cx="322" cy="352" r="38"/>
+    <circle cx="256" cy="352" r="38"/>
+  </g>
+  <!-- Three marbles -->
+  <circle cx="190" cy="238" r="30" fill="url(#white-marble)" filter="url(#shadow)"/>
+  <circle cx="256" cy="276" r="30" fill="url(#gray-marble)" filter="url(#shadow)"/>
+  <circle cx="322" cy="238" r="30" fill="url(#black-marble)" filter="url(#shadow)"/>
+  <!-- ZERTZ text -->
+  <text x="256" y="460" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-weight="bold" font-size="72" fill="#ffffff" letter-spacing="8">ZERTZ</text>
+</svg>

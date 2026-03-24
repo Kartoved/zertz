@@ -31,7 +31,10 @@
       "Bash(find C:UserskartoYandexDiskcodingzertz -name *.test.* -o -name *.spec.* -o -name *test* -type f)",
       "Bash(grep -E \"\\\\.\\(ts|tsx|js\\)$|test|spec\")",
       "Bash(findstr :5050)",
-      "Bash(curl -s http://localhost:5050/api/global-chat)"
+      "Bash(curl -s http://localhost:5050/api/global-chat)",
+      "Bash(npm install:*)",
+      "Bash(npx sharp-cli:*)",
+      "Bash(npx vite:*)"
     ]
   }
 }
