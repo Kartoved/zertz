@@ -420,11 +420,14 @@ export default function MainMenu() {
               {([37, 48, 61] as const).map(size => (
                 <button
                   key={size}
-                  onClick={() => setSelectedBoardSize(size)}
+                  disabled={!user}
+                  onClick={() => user && setSelectedBoardSize(size)}
                   className={`py-3 rounded-xl font-bold bg-white dark:bg-gray-800 transition-colors border-2
-                    ${selectedBoardSize === size 
-                      ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 text-gray-900 dark:text-white shadow-sm' 
-                      : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    ${!user
+                      ? 'opacity-50 cursor-not-allowed border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500'
+                      : selectedBoardSize === size
+                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 text-gray-900 dark:text-white shadow-sm'
+                        : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
                     }`}
                 >
                   <div className="text-xl mb-1">

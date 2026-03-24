@@ -395,13 +395,13 @@ export function RoomScreen() {
             )}
             {ratingDelta && state.winner && rated && (
               <div className="text-xs mb-1">
-                <span className="text-gray-500">{ratingDelta?.player1?.before} → {ratingDelta?.player1?.after}</span>
+                <span className="text-gray-500 dark:text-gray-400">{ratingDelta?.player1?.before} → {ratingDelta?.player1?.after}</span>
                 <span className={`ml-1 font-bold ${(ratingDelta?.player1?.delta ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                   {(ratingDelta?.player1?.delta ?? 0) >= 0 ? '+' : ''}{ratingDelta?.player1?.delta}
                 </span>
               </div>
             )}
-            <div className="flex gap-2 text-xs lg:text-sm">
+            <div className="flex gap-2 text-xs lg:text-sm text-gray-800 dark:text-gray-200">
               <span>⚪ {safeCaptures.player1.white}</span>
               <span>🔘 {safeCaptures.player1.gray}</span>
               <span>⚫ {safeCaptures.player1.black}</span>
@@ -456,13 +456,13 @@ export function RoomScreen() {
             )}
             {ratingDelta && state.winner && rated && (
               <div className="text-xs mb-1">
-                <span className="text-gray-500">{ratingDelta?.player2?.before} → {ratingDelta?.player2?.after}</span>
+                <span className="text-gray-500 dark:text-gray-400">{ratingDelta?.player2?.before} → {ratingDelta?.player2?.after}</span>
                 <span className={`ml-1 font-bold ${(ratingDelta?.player2?.delta ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
                   {(ratingDelta?.player2?.delta ?? 0) >= 0 ? '+' : ''}{ratingDelta?.player2?.delta}
                 </span>
               </div>
             )}
-            <div className="flex gap-2 text-xs lg:text-sm">
+            <div className="flex gap-2 text-xs lg:text-sm text-gray-800 dark:text-gray-200">
               <span>⚪ {safeCaptures.player2.white}</span>
               <span>🔘 {safeCaptures.player2.gray}</span>
               <span>⚫ {safeCaptures.player2.black}</span>

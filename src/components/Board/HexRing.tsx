@@ -88,7 +88,7 @@ export default function HexRing({
   
   const outerRadius = size * 0.85;
   const innerRadius = size * (0.55 / 1.5);
-  const marbleRadius = size * 0.46;
+  const marbleRadius = size * 0.58;
 
   // Compound path (outer circle - inner circle) to create a true hole.
   const ringPath = `
@@ -121,36 +121,68 @@ export default function HexRing({
           <stop offset="100%" stopColor="#000000" />
         </radialGradient>
         {ring.marble && (
-          <radialGradient
-            id={`marble-gradient-${ring.id}`}
-            cx="35%"
-            cy="35%"
-            r="65%"
-            fx="30%"
-            fy="30%"
-          >
-            {ring.marble.color === 'white' && (
-              <>
-                <stop offset="0%" stopColor="#ffffff" />
-                <stop offset="60%" stopColor="#d1d5db" />
-                <stop offset="100%" stopColor="#9ca3af" />
-              </>
-            )}
-            {ring.marble.color === 'gray' && (
-              <>
-                <stop offset="0%" stopColor="#d1d5db" />
-                <stop offset="50%" stopColor="#9ca3af" />
-                <stop offset="100%" stopColor="#4b5563" />
-              </>
-            )}
-            {ring.marble.color === 'black' && (
-              <>
-                <stop offset="0%" stopColor="#6b7280" />
-                <stop offset="50%" stopColor="#374151" />
-                <stop offset="100%" stopColor="#111827" />
-              </>
-            )}
-          </radialGradient>
+          <>
+            <radialGradient
+              id={`marble-gradient-${ring.id}`}
+              cx="35%"
+              cy="35%"
+              r="65%"
+              fx="30%"
+              fy="30%"
+            >
+              {ring.marble.color === 'white' && (
+                <>
+                  <stop offset="0%" stopColor="#ffffff" />
+                  <stop offset="40%" stopColor="#f5f5f5" />
+                  <stop offset="80%" stopColor="#e0e0e0" />
+                  <stop offset="100%" stopColor="#c8c8c8" />
+                </>
+              )}
+              {ring.marble.color === 'gray' && (
+                <>
+                  <stop offset="0%" stopColor="#b8bcc4" />
+                  <stop offset="40%" stopColor="#8b919c" />
+                  <stop offset="80%" stopColor="#5c6370" />
+                  <stop offset="100%" stopColor="#3d4350" />
+                </>
+              )}
+              {ring.marble.color === 'black' && (
+                <>
+                  <stop offset="0%" stopColor="#6b7280" />
+                  <stop offset="50%" stopColor="#374151" />
+                  <stop offset="100%" stopColor="#111827" />
+                </>
+              )}
+            </radialGradient>
+            {/* Specular highlight */}
+            <radialGradient
+              id={`marble-highlight-${ring.id}`}
+              cx="30%"
+              cy="25%"
+              r="30%"
+              fx="28%"
+              fy="22%"
+            >
+              {ring.marble.color === 'white' && (
+                <>
+                  <stop offset="0%" stopColor="rgba(255,255,255,0.95)" />
+                  <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+                </>
+              )}
+              {ring.marble.color === 'gray' && (
+                <>
+                  <stop offset="0%" stopColor="rgba(255,255,255,0.6)" />
+                  <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+                </>
+              )}
+              {ring.marble.color === 'black' && (
+                <>
+                  <stop offset="0%" stopColor="rgba(255,255,255,0.35)" />
+                  <stop offset="100%" stopColor="rgba(255,255,255,0)" />
+                </>
+              )}
+            </radialGradient>
+          </>
         )}
       </defs>
       <path
@@ -164,21 +196,29 @@ export default function HexRing({
       
       {/* Marble (smaller than inner hole, sits on top of ring) */}
       {ring.marble && (
-        <circle
-          cx={0}
-          cy={0}
-          r={marbleRadius}
-          fill={`url(#marble-gradient-${ring.id})`}
-          stroke={
-            ring.marble.color === 'white' ? '#9ca3af' :
-            ring.marble.color === 'gray' ? '#4b5563' :
-            '#1f2937'
-          }
-          strokeWidth={1}
-          style={{
-            filter: 'drop-shadow(0 6px 6px rgba(0,0,0,0.6)) drop-shadow(0 2px 3px rgba(0,0,0,0.4))',
-          }}
-        />
+        <g style={{
+          filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.7)) drop-shadow(0 1px 3px rgba(0,0,0,0.5))',
+        }}>
+          <circle
+            cx={0}
+            cy={0}
+            r={marbleRadius}
+            fill={`url(#marble-gradient-${ring.id})`}
+            stroke={
+              ring.marble.color === 'white' ? '#b0b0b0' :
+              ring.marble.color === 'gray' ? '#3d4350' :
+              '#000000'
+            }
+            strokeWidth={1.5}
+          />
+          {/* Specular highlight overlay */}
+          <circle
+            cx={0}
+            cy={0}
+            r={marbleRadius}
+            fill={`url(#marble-highlight-${ring.id})`}
+          />
+        </g>
       )}
     </g>
   );

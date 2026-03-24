@@ -40,19 +40,19 @@ export default function GameStats({ compact = false, hideLabels = false }: GameS
       <div className={`flex gap-3 items-center ${containerFlex}`}>
         <span className={`flex items-center gap-1.5 ${textClass}`}>
           <div className={`${marbleClass} rounded-full bg-white border border-gray-300 shadow-sm`} />
-          <span className={caps.white >= WIN_CONDITIONS.white ? 'text-green-500 font-bold' : ''}>
+          <span className={caps.white >= WIN_CONDITIONS.white ? 'text-green-500 font-bold' : 'text-gray-800 dark:text-gray-200'}>
             {caps.white}
           </span>
         </span>
         <span className={`flex items-center gap-1.5 ${textClass}`}>
           <div className={`${marbleClass} rounded-full bg-gray-400 shadow-sm`} />
-          <span className={caps.gray >= WIN_CONDITIONS.gray ? 'text-green-500 font-bold' : ''}>
+          <span className={caps.gray >= WIN_CONDITIONS.gray ? 'text-green-500 font-bold' : 'text-gray-800 dark:text-gray-200'}>
             {caps.gray}
           </span>
         </span>
         <span className={`flex items-center gap-1.5 ${textClass}`}>
           <div className={`${marbleClass} rounded-full bg-gray-700 shadow-sm`} />
-          <span className={caps.black >= WIN_CONDITIONS.black ? 'text-green-500 font-bold' : ''}>
+          <span className={caps.black >= WIN_CONDITIONS.black ? 'text-green-500 font-bold' : 'text-gray-800 dark:text-gray-200'}>
             {caps.black}
           </span>
         </span>

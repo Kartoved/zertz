@@ -13,7 +13,7 @@ import { getWinTypeLabel, useI18n } from '../../i18n';
 
 export default function GameScreen() {
   const { t } = useI18n();
-  const { state, playerNames, newGame } = useGameStore();
+  const { state, playerNames, newGame, cancelGame } = useGameStore();
   const { toggleDarkMode, isDarkMode, setScreen } = useUIStore();
   const { user } = useAuthStore();
   const [showRematchDialog, setShowRematchDialog] = useState(false);
@@ -43,8 +43,9 @@ export default function GameScreen() {
   };
   
   const isGameOver = state.phase === 'gameOver';
-  const winType = state.winner ? getWinType(state, state.winner) : null;
-  const winnerName = state.winner === 'player1' ? playerNames.player1 : playerNames.player2;
+  const isCancelled = state.winner === 'cancelled';
+  const winType = state.winner && !isCancelled ? getWinType(state, state.winner) : null;
+  const winnerName = isCancelled ? '' : (state.winner === 'player1' ? playerNames.player1 : playerNames.player2);
   
   return (
     <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col overflow-x-hidden">
@@ -143,7 +144,7 @@ export default function GameScreen() {
             <div className="p-3 bg-white dark:bg-gray-800 rounded-lg col-span-1 sm:col-span-2 lg:col-span-1 shadow-sm">
               <MarbleSelector />
               <div className="mt-3">
-                <ControlPanel onSurrender={() => setShowSurrenderConfirm(true)} />
+                <ControlPanel onSurrender={() => setShowSurrenderConfirm(true)} onCancel={cancelGame} />
               </div>
             </div>
           )}
@@ -161,12 +162,23 @@ export default function GameScreen() {
       {isGameOver && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-6 text-center">
-            <div className="text-3xl font-bold text-green-700 dark:text-green-300 mb-2">
-              🎉 {winnerName}!
-            </div>
-            <div className="text-base text-gray-700 dark:text-gray-300 mb-6">
-              {winType ? getWinTypeLabel(t, winType) : t.winUnknown}
-            </div>
+            {isCancelled ? (
+              <>
+                <div className="text-2xl font-bold text-gray-600 dark:text-gray-300 mb-2">
+                  ✕ {t.gameCancelled}
+                </div>
+                <div className="text-gray-500 dark:text-gray-400 mb-6">{t.cancelledStatus}</div>
+              </>
+            ) : (
+              <>
+                <div className="text-3xl font-bold text-green-700 dark:text-green-300 mb-2">
+                  🎉 {winnerName}!
+                </div>
+                <div className="text-base text-gray-700 dark:text-gray-300 mb-6">
+                  {winType ? getWinTypeLabel(t, winType) : t.winUnknown}
+                </div>
+              </>
+            )}
 
             <div className="flex gap-2">
               <button

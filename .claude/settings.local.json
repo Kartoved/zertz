@@ -34,7 +34,23 @@
       "Bash(curl -s http://localhost:5050/api/global-chat)",
       "Bash(npm install:*)",
       "Bash(npx sharp-cli:*)",
-      "Bash(npx vite:*)"
+      "Bash(npx vite:*)",
+      "Bash(mv src/assets/white_opt.png src/assets/white.png)",
+      "Bash(mv src/assets/gray_opt.png src/assets/gray.png)",
+      "Bash(mv src/assets/black_opt.png src/assets/black.png)",
+      "Bash(ls -lh src/assets/*.png)",
+      "Bash(node -e \"const sharp = require\\(''sharp''\\); sharp\\(''src/assets/white.png''\\).metadata\\(\\).then\\(m => console.log\\(m\\)\\)\")",
+      "Bash(ls:*)",
+      "Bash(mv src/assets/white_tmp.png src/assets/white.png)",
+      "Bash(mv src/assets/gray_tmp.png src/assets/gray.png)",
+      "Bash(mv src/assets/black_tmp.png src/assets/black.png)",
+      "Bash(mv src/assets/white_out.png src/assets/white.png)",
+      "Bash(mv src/assets/gray_out.png src/assets/gray.png)",
+      "Bash(mv src/assets/black_out.png src/assets/black.png)",
+      "Bash(mv src/assets/white_new.png src/assets/white.png)",
+      "Bash(mv src/assets/gray_new.png src/assets/gray.png)",
+      "Bash(mv src/assets/black_new.png src/assets/black.png)",
+      "Bash(cd:*)"
     ]
   }
 }

@@ -54,6 +54,7 @@ interface GameStore {
   handleCapture: (capture: CaptureMove[]) => void;
   undo: () => void;
   surrender: () => void;
+  cancelGame: () => void;
   setPlayerNames: (player1: string, player2: string) => void;
   deleteBranchFrom: (nodeId: string) => void;
   loadSavedGame: (id: string) => Promise<void>;
@@ -323,6 +324,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
     set({
       state: newState,
       winType: 'surrender',
+    });
+    get().autoSave();
+  },
+
+  cancelGame: () => {
+    const { state } = get();
+    if (state.winner) return;
+    const newState = cloneState(state);
+    newState.winner = 'cancelled' as any;
+    newState.phase = 'gameOver';
+    set({
+      state: newState,
+      winType: 'cancelled',
     });
     get().autoSave();
   },

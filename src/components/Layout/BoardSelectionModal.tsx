@@ -23,22 +23,22 @@ export default function BoardSelectionModal({ onClose, onSelectBoard }: BoardSel
         <div className="p-4 space-y-3">
           <button
             onClick={() => onSelectBoard(37)}
-            className="w-full p-3 text-left bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 
-              dark:hover:bg-gray-600 rounded-lg transition-colors"
+            className="w-full p-3 text-left bg-gray-100 dark:bg-gray-700 hover:bg-gray-200
+              dark:hover:bg-gray-600 rounded-lg transition-colors text-gray-900 dark:text-white"
           >
             {t.board37}
           </button>
           <button
             onClick={() => onSelectBoard(48)}
-            className="w-full p-3 text-left bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 
-              dark:hover:bg-gray-600 rounded-lg transition-colors"
+            className="w-full p-3 text-left bg-gray-100 dark:bg-gray-700 hover:bg-gray-200
+              dark:hover:bg-gray-600 rounded-lg transition-colors text-gray-900 dark:text-white"
           >
             {t.board48}
           </button>
           <button
             onClick={() => onSelectBoard(61)}
-            className="w-full p-3 text-left bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 
-              dark:hover:bg-gray-600 rounded-lg transition-colors"
+            className="w-full p-3 text-left bg-gray-100 dark:bg-gray-700 hover:bg-gray-200
+              dark:hover:bg-gray-600 rounded-lg transition-colors text-gray-900 dark:text-white"
           >
             {t.board61}
           </button>
