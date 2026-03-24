@@ -345,10 +345,15 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     try {
       const newMessages = await roomsApi.getChatMessages(roomId, lastMessageId);
       if (newMessages.length > 0) {
-        set(s => ({
-          messages: [...s.messages, ...newMessages],
-          lastMessageId: newMessages[newMessages.length - 1].id,
-        }));
+        set(s => {
+          const existingIds = new Set(s.messages.map(m => m.id));
+          const unique = newMessages.filter(m => !existingIds.has(m.id));
+          if (unique.length === 0) return s;
+          return {
+            messages: [...s.messages, ...unique],
+            lastMessageId: newMessages[newMessages.length - 1].id,
+          };
+        });
       }
     } catch {
       // Ignore polling errors
@@ -361,10 +366,14 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
     try {
       const message = await roomsApi.sendChatMessage(roomId, myPlayer, text.trim(), state.moveNumber);
-      set(s => ({
-        messages: [...s.messages, message],
-        lastMessageId: message.id,
-      }));
+      // Add message optimistically but do NOT update lastMessageId.
+      // This prevents skipping messages from the opponent that may have IDs
+      // between the previous lastMessageId and the just-sent message's ID.
+      // pollMessages will discover the sent message and advance lastMessageId correctly.
+      set(s => {
+        if (s.messages.some(m => m.id === message.id)) return s;
+        return { messages: [...s.messages, message] };
+      });
     } catch {
       // Ignore send errors
     }

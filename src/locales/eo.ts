@@ -1,11 +1,11 @@
 export const eo = {
   appSubtitle: 'Abstrakta strategia ludo',
-  versionFooter: 'v1.0.2',
+  versionFooter: 'v0.9.1',
   developedBy: 'Developed by Wood Romanov',
   profile: 'Profilo',
   loginRegister: 'Ensaluti / Registriĝi',
   playLocal: 'Ludi loke',
-  loadGame: 'Ŝargi ludon',
+  loadGame: 'Vidi ludojn',
   rules: 'Reguloj',
   playOnline: 'Ludi rete',
   players: 'Ludantoj',
@@ -243,4 +243,6 @@ export const eo = {
   boardSizeSmall: 'Malgranda',
   boardSizeMedium: 'Meza',
   boardSizeLarge: 'Granda',
+  whatsNew: 'Kio estas nova?',
+  onlineRequiresAuth: 'Konto necesas por reta ludo',
 };

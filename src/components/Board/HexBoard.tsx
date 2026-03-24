@@ -1,4 +1,4 @@
-import { useState, useMemo, type WheelEvent } from 'react';
+import { useState, useMemo, useRef, type WheelEvent } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { hexToPixel } from '../../game/Board';
 import { getValidRemovableRings } from '../../game/Board';
@@ -27,6 +27,31 @@ export default function HexBoard(props: HexBoardProps = {}) {
   const selectedRingId = props.selectedRingId !== undefined ? props.selectedRingId : gameStore.selectedRingId;
   const highlightedCaptures = props.highlightedCaptures || gameStore.highlightedCaptures;
   const [zoom, setZoom] = useState(1);
+  const pinchRef = useRef<{ dist: number; zoom: number } | null>(null);
+
+  const getPinchDist = (touches: React.TouchList) => {
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent<SVGSVGElement>) => {
+    if (e.touches.length === 2) {
+      pinchRef.current = { dist: getPinchDist(e.touches), zoom };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<SVGSVGElement>) => {
+    if (e.touches.length === 2 && pinchRef.current) {
+      const scale = getPinchDist(e.touches) / pinchRef.current.dist;
+      const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, pinchRef.current.zoom * scale));
+      setZoom(newZoom);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    pinchRef.current = null;
+  };
   
   const { rings, positions, bounds } = useMemo(() => {
     const ringsArray = Array.from(state.rings.values()).filter(r => !r.isRemoved);
@@ -98,7 +123,11 @@ export default function HexBoard(props: HexBoardProps = {}) {
           // Camera zoom: change viewBox, keep geometry (spacing) intact
           viewBox={`${viewX} ${viewY} ${viewWidth} ${viewHeight}`}
           className="w-full h-[46vh] sm:h-[56vh] md:h-[64vh] lg:h-[80vh] max-h-[760px] cursor-move"
+          style={{ touchAction: 'none' }}
           onWheel={handleWheel}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
         >
           <g transform={`translate(${offsetX}, ${offsetY})`}>
             {rings.map(ring => {

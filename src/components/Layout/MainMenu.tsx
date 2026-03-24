@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUIStore, Language } from '../../store/uiStore';
 import { useGameStore } from '../../store/gameStore';
@@ -13,6 +13,7 @@ import GlobalChat from '../UI/GlobalChat';
 import { Settings, Users, Swords } from 'lucide-react';
 import LoadGameModal from './LoadGameModal';
 import RulesModal from './RulesModal';
+import WhatsNewModal from './WhatsNewModal';
 import BoardSelectionModal from './BoardSelectionModal';
 import SearchingMatchOverlay from './SearchingMatchOverlay';
 import OnlineChallengeModal from './OnlineChallengeModal';
@@ -29,10 +30,18 @@ export const FISCHER_PRESETS: Array<{ id: TimePresetId; baseMs: number; incremen
   { id: '7d', baseMs: 7 * 24 * 60 * 60 * 1000, incrementMs: -1 },
 ];
 
-const LANGUAGE_BUTTONS: Array<{ code: Language; icon: string; label: string }> = [
+const EsperantoFlag = () => (
+  <svg viewBox="0 0 20 14" className="w-5 h-4 inline-block" xmlns="http://www.w3.org/2000/svg">
+    <rect width="20" height="14" fill="#009000" />
+    <rect width="7" height="7" fill="white" />
+    <text x="3.5" y="4" fontSize="5.5" fill="#009000" textAnchor="middle" dominantBaseline="middle">★</text>
+  </svg>
+);
+
+const LANGUAGE_BUTTONS: Array<{ code: Language; icon: React.ReactNode; label: string }> = [
   { code: 'en', icon: '🇬🇧', label: 'English' },
   { code: 'ru', icon: '🇷🇺', label: 'Russian' },
-  { code: 'eo', icon: '🟢', label: 'Esperanto' },
+  { code: 'eo', icon: <EsperantoFlag />, label: 'Esperanto' },
 ];
 
 export const TIME_CONTROLS = [
@@ -85,6 +94,7 @@ export default function MainMenu() {
   };
 
   const [activeDropdown, setActiveDropdown] = useState<'play' | 'learning' | 'community' | 'settings' | null>(null);
+  const [showWhatsNewModal, setShowWhatsNewModal] = useState(false);
 
   // Close dropdowns when clicking outside
   useEffect(() => {
@@ -250,6 +260,14 @@ export default function MainMenu() {
                     {isDarkMode ? '☀️' : '🌙'}
                   </button>
                 </div>
+                <div className="px-2 pt-1 border-t border-gray-100 dark:border-gray-700">
+                  <button
+                    onClick={() => { setActiveDropdown(null); setShowWhatsNewModal(true); }}
+                    className="w-full text-left px-2 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
+                  >
+                    ✨ {t.whatsNew}
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -312,6 +330,12 @@ export default function MainMenu() {
                 {tab.label}
               </button>
             ))}
+          <button
+            disabled
+            className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 cursor-not-allowed"
+          >
+            {t.tasks} ({t.comingSoon})
+          </button>
           {!user && (
             <button
               onClick={() => {
@@ -364,7 +388,7 @@ export default function MainMenu() {
       </div>
 
       {/* ═══════ MAIN CONTENT: 3 columns ═══════ */}
-      <main className="flex-1 flex flex-col lg:flex-row gap-4 p-3 md:p-4 overflow-visible lg:overflow-y-auto max-w-[1400px] mx-auto w-full">
+      <main className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 p-3 md:p-4 overflow-y-auto max-w-[1400px] mx-auto w-full">
         {/* LEFT: Player profile card */}
         <aside className="hidden lg:flex w-full lg:w-72 flex-shrink-0 flex-col order-2 lg:order-1 gap-4 items-start">
           <div className="w-full">
@@ -456,7 +480,12 @@ export default function MainMenu() {
             <div className="mt-8 flex flex-col gap-3 items-center">
               <button
                 type="button"
-                className="w-full sm:w-2/3 lg:w-1/2 py-3.5 px-6 rounded-xl font-bold text-lg transition-all shadow-md hover:shadow-lg active:scale-95 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white"
+                disabled={!user}
+                className={`w-full sm:w-2/3 lg:w-1/2 py-3.5 px-6 rounded-xl font-bold text-lg transition-all shadow-md
+                  ${user
+                    ? 'hover:shadow-lg active:scale-95 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white'
+                    : 'opacity-50 cursor-not-allowed bg-gradient-to-r from-blue-500 to-indigo-600 text-white'
+                  }`}
                 onClick={() => startSearch(selectedBoardSize, selectedTimeControl, () => modals.setShowAuthModal(true))}
               >
                 {t.searchGame}
@@ -464,8 +493,14 @@ export default function MainMenu() {
 
               <button
                 type="button"
-                className="w-full sm:w-2/3 lg:w-1/2 py-3.5 px-6 rounded-xl font-bold text-lg transition-all shadow-md hover:shadow-lg active:scale-95 bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 hover:bg-gray-50 dark:hover:bg-gray-700"
+                disabled={!user}
+                className={`w-full sm:w-2/3 lg:w-1/2 py-3.5 px-6 rounded-xl font-bold text-lg transition-all shadow-md
+                  ${user
+                    ? 'hover:shadow-lg active:scale-95 bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 hover:bg-gray-50 dark:hover:bg-gray-700'
+                    : 'opacity-50 cursor-not-allowed bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800'
+                  }`}
                 onClick={() => {
+                  if (!user) return;
                   const tc = TIME_CONTROLS.find(c => c.id === selectedTimeControl);
                   if (!tc) return;
 
@@ -478,6 +513,12 @@ export default function MainMenu() {
               >
                 {t.playByLink}
               </button>
+
+              {!user && (
+                <p className="text-sm text-gray-500 dark:text-gray-400 text-center mt-1">
+                  🔒 {t.onlineRequiresAuth}
+                </p>
+              )}
             </div>
 
           </div>
@@ -494,7 +535,7 @@ export default function MainMenu() {
         </section>
 
         {/* RIGHT: Global chat */}
-        <aside className={`w-full lg:w-80 flex-shrink-0 flex-col order-3 ${mobileMainTab === 'chat' ? 'flex' : 'hidden lg:flex'}`}>
+        <aside className={`w-full lg:w-80 lg:flex-shrink-0 flex-col order-3 ${mobileMainTab === 'chat' ? 'flex flex-1 min-h-0' : 'hidden lg:flex'}`}>
           <GlobalChat />
         </aside>
       </main>
@@ -530,6 +571,7 @@ export default function MainMenu() {
       {modals.showChallengesModal && <ChallengesModal onClose={() => modals.setShowChallengesModal(false)} />}
 
       {modals.showRulesModal && <RulesModal onClose={() => modals.setShowRulesModal(false)} />}
+      {showWhatsNewModal && <WhatsNewModal onClose={() => setShowWhatsNewModal(false)} />}
     </div>
   );
 }

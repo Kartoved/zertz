@@ -1,11 +1,11 @@
 export const en = {
   appSubtitle: 'Abstract strategy game',
-  versionFooter: 'v1.0.2',
+  versionFooter: 'v0.9.1',
   developedBy: 'Developed by Wood Romanov',
   profile: 'Profile',
   loginRegister: 'Login / Register',
   playLocal: 'Play Local',
-  loadGame: 'Load Game',
+  loadGame: 'View Games',
   rules: 'Rules',
   playOnline: 'Play Online',
   players: 'Players',
@@ -243,4 +243,6 @@ export const en = {
   boardSizeSmall: 'Small',
   boardSizeMedium: 'Medium',
   boardSizeLarge: 'Large',
+  whatsNew: "What's new?",
+  onlineRequiresAuth: 'An account is required for online play',
 };
