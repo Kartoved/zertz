@@ -29,7 +29,9 @@
       "Bash(powershell -Command \"Stop-Process -Id 18480 -Force\")",
       "Bash(curl -s -X POST http://localhost:5050/api/auth/register -H \"Content-Type: application/json\" -d \"{\"\"username\"\":\"\"Kartoved24\"\",\"\"password\"\":\"\"Zertz2024!\"\"}\")",
       "Bash(find C:UserskartoYandexDiskcodingzertz -name *.test.* -o -name *.spec.* -o -name *test* -type f)",
-      "Bash(grep -E \"\\\\.\\(ts|tsx|js\\)$|test|spec\")"
+      "Bash(grep -E \"\\\\.\\(ts|tsx|js\\)$|test|spec\")",
+      "Bash(findstr :5050)",
+      "Bash(curl -s http://localhost:5050/api/global-chat)"
     ]
   }
 }
