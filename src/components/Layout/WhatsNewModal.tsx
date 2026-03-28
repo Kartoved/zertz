@@ -12,6 +12,36 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.9.23',
+    date: '2026-03-28',
+    changes: {
+      ru: [
+        'Исправлена нотация: нумерация колец теперь от нижнего кольца каждой вертикали',
+        'Нотация захватов: цвет шара, стартовая позиция, цепочка через ×, суффикс взятых шаров (+wgb)',
+        'Исправлен баг: кнопка "Аннулировать" больше не появляется при просмотре старых ходов в дереве',
+        'Исправлен баг: номер хода в чате показывался неправильно (+1 лишний)',
+        'Фиксированная высота чата — больше не растягивает страницу',
+        'Версия обновлена до v0.9.23',
+      ],
+      en: [
+        'Fixed notation: ring numbers now count from the bottom of each column',
+        'Capture notation: marble color, start position, chain with ×, captured marbles suffix (+wgb)',
+        'Fixed: "Cancel game" button no longer appears when viewing old moves in the tree',
+        'Fixed: move number in chat was shown incorrectly (off by one)',
+        'Chat panel now has fixed height — no longer stretches the page',
+        'Version updated to v0.9.23',
+      ],
+      eo: [
+        'Korektita notacio: ringaj nombroj nun kalkuliĝas de la malsupra ringo de ĉiu kolumno',
+        'Kaptura notacio: koloro de marmoro, startpozicio, ĉeno per ×, sufikso de kaptitaj marmoroj (+wgb)',
+        'Korektita: butono "Nuligi ludon" ne plu aperas dum rigardo de malnovaj movoj en la arbo',
+        'Korektita: movo-numero en babilejo montriĝis malĝuste (+1 ekstra)',
+        'Babiljfenestro havas nun fiksan alton — ne plu etendiĝas la paĝon',
+        'Versio ĝisdatigita al v0.9.23',
+      ],
+    },
+  },
+  {
     version: '0.9.22',
     date: '2026-03-28',
     changes: {

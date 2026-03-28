@@ -1,6 +1,6 @@
 export const en = {
   appSubtitle: 'Abstract strategy game',
-  versionFooter: 'v0.9.22',
+  versionFooter: 'v0.9.23',
   developedBy: 'Developed by Wood Romanov',
   profile: 'Profile',
   loginRegister: 'Login / Register',

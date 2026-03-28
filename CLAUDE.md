@@ -62,6 +62,7 @@ Express app with JWT auth middleware. All routes under `/api`, static `dist/` se
 | `/api/players` | `routes/players.js` | Profiles, leaderboard, follows |
 | `/api/games` | `routes/games.js` | Game history |
 | `/api/global-chat` | `routes/chat.js` | Global chat |
+| `/api/push` | `routes/push.js` | Web Push subscriptions (VAPID) |
 
 `server/db.js` owns the PostgreSQL pool and creates all tables on startup (idempotent).
 `server/utils/glicko2.js` — standalone Glicko-2 implementation.
@@ -76,5 +77,7 @@ Express app with JWT auth middleware. All routes under `/api`, static `dist/` se
 - **Win**: 4 white, 5 gray, 6 black, OR 3 of each color in captures
 
 **Board sizes** (axial hex, flat-top): 37 rings (7 rows), 48 rings (8 rows), 61 rings (9 rows). Coordinates precomputed in `Board.ts`.
+
+**Move notation**: `W b3` (placement), `Wb3 -c4` (placement + ring removal), `Wa4×c4×e5 +wg` (capture chain: marble color + start × each landing, suffix +colors of captured marbles). Column letters a–g left to right (by axial q), row numbers count from 1 at the bottom of each column. Implemented in `Board.ts:idToAlgebraic` and `GameEngine.ts:moveToNotation`.
 
 **Online sync** uses polling (no WebSockets). Game state and move tree are serialized to JSON columns (`state_json`, `tree_json`) in the `rooms` table.

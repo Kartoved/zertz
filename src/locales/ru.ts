@@ -1,6 +1,6 @@
 export const ru = {
   appSubtitle: 'Абстрактная стратегическая игра',
-  versionFooter: 'v0.9.22',
+  versionFooter: 'v0.9.23',
   developedBy: 'Developed by Wood Romanov',
   profile: 'Профиль',
   loginRegister: 'Войти / Зарегистрироваться',

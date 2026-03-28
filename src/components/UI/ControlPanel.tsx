@@ -12,7 +12,7 @@ export default function ControlPanel({ onSurrender, onCancel }: ControlPanelProp
   const { undo, currentNode, state } = useGameStore();
   const { setScreen } = useUIStore();
 
-  const canCancel = !state.winner && (state.moveNumber ?? 0) <= 2;
+  const canCancel = !state.winner && (state.moveNumber ?? 0) <= 2 && currentNode.children.length === 0;
 
   const handleSurrender = () => {
     if (onSurrender) {

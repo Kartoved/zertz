@@ -84,7 +84,7 @@ export function ChatPanel({ inputBottomOffset = 0 }: ChatPanelProps) {
                   <span className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
                     {msg.moveNumber !== undefined && (
                       <span className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
-                        {getMoveLabel(msg.moveNumber + 1)}
+                        {getMoveLabel(msg.moveNumber)}
                       </span>
                     )}
                     <span>{formatDate(msg.createdAt)} {formatTime(msg.createdAt)}</span>
