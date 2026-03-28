@@ -118,7 +118,6 @@ export default function GameScreen() {
                 {tab.label}
               </button>
             ))}
-            <MoveHistory />
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => {
@@ -154,7 +153,12 @@ export default function GameScreen() {
         <div className="flex-1 min-w-0 flex flex-col items-center justify-center p-2 lg:bg-white lg:dark:bg-gray-800 lg:rounded-xl shadow-sm">
           <HexBoard />
         </div>
-        
+
+        {/* Move history — mobile only, below board */}
+        <div className="lg:hidden p-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-x-auto">
+          <MoveHistory />
+        </div>
+
         {/* Empty right area to balance layout identical to online chat panel implicitly */}
         <div className="hidden lg:block lg:w-72 opacity-0 pointer-events-none"></div>
       </main>

@@ -318,7 +318,6 @@ export function RoomScreen() {
                 {tab.label}
               </button>
             ))}
-            <OnlineMoveHistory />
             <div className="flex flex-wrap gap-2">
               <button
                 onClick={() => {
@@ -352,7 +351,7 @@ export function RoomScreen() {
       {/* Main content */}
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-3 md:gap-4 p-2 md:p-4 max-w-7xl mx-auto w-full pb-28 sm:pb-24 lg:pb-4 overflow-y-auto">
         {/* Left panel - Players */}
-        <div className={`lg:w-64 lg:flex lg:flex-col gap-2 lg:gap-4 ${mobileTab === 'chat' ? 'hidden lg:flex' : 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1'} min-w-0`}>
+        <div className={`lg:w-64 lg:flex lg:flex-col gap-2 lg:gap-4 ${mobileTab === 'chat' ? 'hidden lg:flex' : 'grid grid-cols-2 lg:grid-cols-1'} min-w-0`}>
           {/* Player 1 */}
           <div className={`p-2 lg:p-3 rounded-lg ${
             state.currentPlayer === 'player1' && !state.winner
@@ -531,7 +530,7 @@ export function RoomScreen() {
         </div>
 
         {/* Center - Board */}
-        <div className={`flex-1 min-h-0 items-center justify-center min-h-[240px] sm:min-h-[320px] md:min-h-[400px] overflow-hidden ${mobileTab === 'chat' ? 'hidden lg:flex' : 'flex'}`}>
+        <div className={`flex-1 min-h-0 items-center justify-center min-h-[240px] sm:min-h-[320px] md:min-h-[400px] overflow-hidden ${mobileTab === 'chat' ? 'hidden lg:flex' : 'flex flex-col'}`}>
           <HexBoard
             state={state}
             onRingClick={handleRingClick}
@@ -539,6 +538,10 @@ export function RoomScreen() {
             highlightedCaptures={highlightedCaptures}
             validRemovableRings={validRemovableRings}
           />
+          {/* Move history — mobile only, below board */}
+          <div className={`lg:hidden w-full mt-2 p-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-x-auto ${mobileTab === 'chat' ? 'hidden' : ''}`}>
+            <OnlineMoveHistory />
+          </div>
         </div>
 
         <div className={`lg:hidden ${mobileTab === 'chat' ? 'flex-1 min-h-0 pb-20' : 'hidden'}`}>

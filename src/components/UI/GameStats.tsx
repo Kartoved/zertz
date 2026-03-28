@@ -60,21 +60,21 @@ export default function GameStats({ compact = false, hideLabels = false }: GameS
     );
   };
 
-  const containerClass = compact && !hideLabels
-    ? 'grid grid-cols-2 gap-2 p-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm'
-    : 'flex flex-col gap-3 p-3 bg-white dark:bg-gray-800 rounded-xl shadow-sm';
+  const containerClass = hideLabels
+    ? 'flex gap-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm'
+    : 'grid grid-cols-2 lg:grid-cols-1 gap-2 p-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm';
 
   const cardClass = (active: boolean) => {
-    const base = hideLabels 
+    const base = hideLabels
       ? 'flex justify-center items-center py-4 rounded-xl min-w-0'
-      : (compact ? 'flex flex-col gap-1 p-2 rounded-lg min-w-0' : 'flex justify-between items-center p-3 rounded-lg');
+      : 'flex flex-col gap-1 p-2 rounded-lg min-w-0';
     const activeClass = 'bg-blue-50 dark:bg-blue-900/40 ring-2 ring-blue-500 shadow-sm';
     const idleClass = 'bg-gray-50 dark:bg-gray-700/50';
     return `${base} ${active ? activeClass : idleClass} transition-all duration-200`;
   };
 
-  const nameClass = compact ? 'text-sm font-semibold text-gray-900 dark:text-white' : 'font-semibold text-gray-900 dark:text-white';
-  const captionClass = compact ? 'text-[11px] text-gray-500 dark:text-gray-400' : 'text-sm text-gray-500 dark:text-gray-400';
+  const nameClass = 'text-sm font-semibold text-gray-900 dark:text-white truncate';
+  const captionClass = 'text-[11px] text-gray-500 dark:text-gray-400';
 
   return (
     <div className={containerClass}>

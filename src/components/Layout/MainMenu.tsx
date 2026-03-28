@@ -20,6 +20,7 @@ import OnlineChallengeModal from './OnlineChallengeModal';
 import ActiveGamesWidget from './ActiveGamesWidget';
 import { useMainMenuModals, NavTab } from './useMainMenuModals';
 import { useMatchmaking } from './useMatchmaking';
+import MiniGamePreview from '../UI/MiniGamePreview';
 
 export type TimePresetId = '5+5' | '15+0' | '30+0' | '7d';
 
@@ -426,6 +427,27 @@ export default function MainMenu() {
 
         {/* CENTER: Time control modes */}
         <section className={`flex-1 flex flex-col min-w-0 order-1 lg:order-2 ${mobileMainTab !== 'play' ? 'hidden lg:flex' : ''}`}>
+          {/* Mobile: current games carousel */}
+          {currentGames.length > 0 && (
+            <div className="lg:hidden mb-3">
+              <div
+                className="flex gap-2 overflow-x-auto pb-1"
+                style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}
+              >
+                {currentGames.map(game => (
+                  <MiniGamePreview
+                    key={game.id}
+                    gameId={game.id}
+                    playerNames={game.playerNames}
+                    moveCount={game.moveCount}
+                    isOnline={game.isOnline}
+                    onClick={() => handleLoadGame(game.id)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 flex-1 flex flex-col overflow-y-auto">
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
               {t.selectBoard}
@@ -460,7 +482,7 @@ export default function MainMenu() {
 
             {/* Optional generic button for inviting (hidden as we use direct buttons now) */}
 
-            <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
               {TIME_CONTROLS.map((tc) => {
                 const label = t[tc.id as keyof typeof t] as string || tc.id;
                 const desc = t[`${tc.id}Desc` as keyof typeof t] as string || '';
@@ -475,7 +497,7 @@ export default function MainMenu() {
                       }
                       setSelectedTimeControl(tc.id);
                     }}
-                    className={`relative flex flex-col items-center justify-center p-6 rounded-2xl border-2 transition-all
+                    className={`relative flex flex-col items-center justify-center sm:p-6 p-2 rounded-2xl border-2 transition-all
                       ${(!tc.enabled || (!user && tc.preset !== null))
                         ? 'border-dashed border-gray-300 dark:border-gray-600 opacity-60 cursor-not-allowed bg-gray-50 dark:bg-gray-800'
                         : selectedTimeControl === tc.id
@@ -484,15 +506,15 @@ export default function MainMenu() {
                       }`}
                   >
                     {!tc.enabled && (
-                      <span className="absolute top-3 right-3 text-[10px] bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded-full uppercase tracking-wide font-semibold">
+                      <span className="absolute top-1 right-1 sm:top-3 sm:right-3 text-[9px] sm:text-[10px] bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded-full uppercase tracking-wide font-semibold">
                         {t.comingSoon}
                       </span>
                     )}
-                    <span className={`text-4xl mb-3 ${selectedTimeControl === tc.id ? 'scale-110' : ''} transition-transform`}>{tc.icon}</span>
-                    <span className="text-lg font-bold text-gray-900 dark:text-white uppercase tracking-wide">
+                    <span className={`sm:text-4xl text-2xl sm:mb-3 mb-1 ${selectedTimeControl === tc.id ? 'scale-110' : ''} transition-transform`}>{tc.icon}</span>
+                    <span className="sm:text-lg text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide">
                       {label}
                     </span>
-                    <span className="text-sm text-gray-500 dark:text-gray-400 mt-1 text-center font-medium">
+                    <span className="sm:text-sm text-xs text-gray-500 dark:text-gray-400 sm:mt-1 text-center font-medium">
                       {desc}
                     </span>
                   </button>
