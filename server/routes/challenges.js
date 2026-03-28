@@ -7,7 +7,7 @@ const router = Router();
 
 // Create a challenge (immediately creates a room)
 router.post('/', authRequired, async (req, res) => {
-  const { toUserId, boardSize = 37, rated = false, creatorPlayer = 1 } = req.body;
+  const { toUserId, boardSize = 37, rated = false, creatorPlayer = 1, timeControlBaseMs = null, timeControlIncrementMs = null } = req.body;
   const fromUserId = req.user.id;
 
   if (fromUserId === toUserId) {
@@ -40,11 +40,18 @@ router.post('/', authRequired, async (req, res) => {
     }
 
     const userCol = creatorPlayer === 1 ? 'user1_id' : 'user2_id';
+    const isTimed = timeControlBaseMs != null && timeControlIncrementMs != null;
     const roomResult = await pool.query(
-      `INSERT INTO rooms (board_size, creator_player, state_json, tree_json, rated, ${userCol})
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO rooms (board_size, creator_player, state_json, tree_json, rated, ${userCol},
+        time_control_base_ms, time_control_increment_ms, clock_p1_ms, clock_p2_ms)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        RETURNING id`,
-      [boardSize, creatorPlayer, stateJson, treeJson, rated, fromUserId]
+      [boardSize, creatorPlayer, stateJson, treeJson, rated, fromUserId,
+        isTimed ? timeControlBaseMs : null,
+        isTimed ? timeControlIncrementMs : null,
+        isTimed ? timeControlBaseMs : null,
+        isTimed ? timeControlBaseMs : null,
+      ]
     );
     const roomId = roomResult.rows[0].id;
 

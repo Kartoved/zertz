@@ -8,6 +8,7 @@ import { useI18n } from '../../i18n';
 import { createRootNode } from '../../utils/gameTreeUtils';
 import { serializeState, serializeTree } from '../../db/apiClient';
 import PlayerGamesModal from './PlayerGamesModal';
+import { TimePresetId, FISCHER_PRESETS, TIME_CONTROLS } from '../Layout/MainMenu';
 
 interface PlayerProfileModalProps {
   playerId: number;
@@ -25,6 +26,7 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
   const [challengeBoardSize, setChallengeBoardSize] = useState<37 | 48 | 61>(37);
   const [challengeRated, setChallengeRated] = useState(false);
   const [challengePlayer, setChallengePlayer] = useState<1 | 2 | 'random'>(1);
+  const [challengeTimePreset, setChallengeTimePreset] = useState<TimePresetId>('5+5');
   const [challengeLoading, setChallengeLoading] = useState(false);
   const [showPlayerGames, setShowPlayerGames] = useState(false);
 
@@ -72,13 +74,16 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
       const player = challengePlayer === 'random' ? (Math.random() < 0.5 ? 1 : 2) as 1 | 2 : challengePlayer;
       const initialState = createInitialState(challengeBoardSize);
       const rootNode = createRootNode();
+      const preset = FISCHER_PRESETS.find(p => p.id === challengeTimePreset) || FISCHER_PRESETS[0];
+      const timeControl = preset.baseMs > 0 ? { baseMs: preset.baseMs, incrementMs: preset.incrementMs } : null;
       const result = await createChallenge(
         profile.id,
         challengeBoardSize,
         challengeRated,
         player,
         serializeState(initialState),
-        serializeTree(rootNode)
+        serializeTree(rootNode),
+        timeControl
       );
       showToast(t.challengeSent);
       setShowChallenge(false);
@@ -245,6 +250,30 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
                     {p === 1 ? t.firstShort : p === 2 ? t.secondShort : t.random}
                   </button>
                 ))}
+              </div>
+
+              {/* Time control */}
+              <div>
+                <div className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">{t.selectTimeControl}</div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {FISCHER_PRESETS.map((preset) => {
+                    const labelText = TIME_CONTROLS.find(c => c.preset === preset.id)?.id;
+                    const labelKey = labelText ? t[labelText as keyof typeof t] as string : preset.id;
+                    return (
+                      <button
+                        key={preset.id}
+                        onClick={() => setChallengeTimePreset(preset.id)}
+                        className={`py-1.5 text-xs rounded-lg border-2 transition-colors ${
+                          challengeTimePreset === preset.id
+                            ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/40 font-medium text-gray-900 dark:text-white'
+                            : 'border-gray-200 dark:border-gray-600 text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        {labelKey} ({preset.id})
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Rated toggle */}

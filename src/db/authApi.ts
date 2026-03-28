@@ -194,14 +194,19 @@ export async function createChallenge(
   rated: boolean,
   creatorPlayer: 1 | 2,
   stateJson: string,
-  treeJson: string
+  treeJson: string,
+  timeControl?: { baseMs: number; incrementMs: number } | null
 ): Promise<{ id: number; roomId: number }> {
   if (!getToken()) throw new Error('Требуется авторизация');
 
   const response = await fetch(`${API_BASE}/api/challenges`, {
     method: 'POST',
     headers: authHeaders(),
-    body: JSON.stringify({ toUserId, boardSize, rated, creatorPlayer, stateJson, treeJson }),
+    body: JSON.stringify({
+      toUserId, boardSize, rated, creatorPlayer, stateJson, treeJson,
+      timeControlBaseMs: timeControl?.baseMs ?? null,
+      timeControlIncrementMs: timeControl?.incrementMs ?? null,
+    }),
   });
   const data = await response.json();
   if (!response.ok) throw new Error(data.error || 'Ошибка создания вызова');

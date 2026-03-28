@@ -100,7 +100,7 @@ interface RoomStore {
 let pendingMoveCount = 0;
 
 function syncWinnerFromRoom(state: GameState, winnerNum: number | null): GameState {
-  if (winnerNum == null) return state;
+  if (winnerNum == null || winnerNum === 0) return state; // 0 = cancelled, keep state_json winner
   const winnerPlayer: Player = winnerNum === 1 ? 'player1' : 'player2';
   if (state.winner === winnerPlayer) return state;
   const patched = cloneState(state);
