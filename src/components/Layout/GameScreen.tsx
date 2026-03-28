@@ -44,7 +44,7 @@ export default function GameScreen() {
   
   const isGameOver = state.phase === 'gameOver';
   const isCancelled = state.winner === 'cancelled';
-  const winType = state.winner && !isCancelled ? getWinType(state, state.winner) : null;
+  const winType = state.winner && !isCancelled ? getWinType(state, state.winner as import('../../game/types').Player) : null;
   const winnerName = isCancelled ? '' : (state.winner === 'player1' ? playerNames.player1 : playerNames.player2);
   
   return (

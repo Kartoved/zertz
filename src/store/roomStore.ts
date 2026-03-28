@@ -624,7 +624,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
       const newState = rebuildStateFromNode(parentNode, state.boardSize);
       const winner = newState.winner;
-      const winType = winner ? getWinType(newState, winner) : null;
+      const winType = winner && winner !== 'cancelled' ? getWinType(newState, winner) : null;
 
       set({
         state: newState,

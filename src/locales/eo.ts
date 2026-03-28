@@ -253,4 +253,8 @@ export const eo = {
   archiveAllGames: 'Arkivo de ĉiuj ludoj',
   watchGame: 'Spekti',
   loadArchive: 'Arkivo',
+  pushNotifications: 'Sciigoj',
+  pushEnable: 'Ŝalti sciigojn',
+  pushDisable: 'Malŝalti sciigojn',
+  pushNotSupported: 'Ne subtenata',
 };

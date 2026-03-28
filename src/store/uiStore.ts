@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { getPushPref, subscribeToPush, unsubscribeFromPush } from '../pushNotifications';
 
 type Screen = 'menu' | 'game' | 'history' | 'rules' | 'settings';
 export type Language = 'ru' | 'en' | 'eo';
@@ -17,13 +18,16 @@ interface UIStore {
   isDarkMode: boolean;
   showMoveHistory: boolean;
   language: Language;
-  
+  pushEnabled: boolean;
+  pushPending: boolean;
+
   setScreen: (screen: Screen) => void;
   openRules: () => void;
   toggleDarkMode: () => void;
   toggleMoveHistory: () => void;
   setLanguage: (language: Language) => void;
   cycleLanguage: () => void;
+  togglePush: () => void;
 }
 
 export const useUIStore = create<UIStore>((set) => ({
@@ -32,6 +36,8 @@ export const useUIStore = create<UIStore>((set) => ({
   isDarkMode: false,
   showMoveHistory: false,
   language: getInitialLanguage(),
+  pushEnabled: getPushPref(),
+  pushPending: false,
   
   setScreen: (screen: Screen) => set({ screen }),
 
@@ -60,5 +66,19 @@ export const useUIStore = create<UIStore>((set) => ({
     const next = order[(idx + 1) % order.length];
     localStorage.setItem(LANGUAGE_KEY, next);
     return { language: next };
+  }),
+
+  togglePush: () => set((state) => {
+    if (state.pushPending) return {};
+    if (state.pushEnabled) {
+      unsubscribeFromPush();
+      return { pushEnabled: false };
+    } else {
+      set({ pushPending: true });
+      subscribeToPush().then((ok) => {
+        set({ pushEnabled: ok, pushPending: false });
+      });
+      return {};
+    }
   }),
 }));

@@ -50,7 +50,9 @@
       "Bash(mv src/assets/white_new.png src/assets/white.png)",
       "Bash(mv src/assets/gray_new.png src/assets/gray.png)",
       "Bash(mv src/assets/black_new.png src/assets/black.png)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(node -e \"import\\(''web-push''\\).then\\(m => { const keys = m.default.generateVAPIDKeys\\(\\); console.log\\(''PUBLIC:'', keys.publicKey\\); console.log\\(''PRIVATE:'', keys.privateKey\\); }\\)\")",
+      "Bash(docker compose:*)"
     ]
   }
 }

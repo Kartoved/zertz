@@ -12,6 +12,7 @@ import matchmakingRouter from './routes/matchmaking.js';
 import roomsRouter from './routes/rooms.js';
 import chatRouter from './routes/chat.js';
 import gamesRouter from './routes/games.js';
+import pushRouter from './routes/push.js';
 
 dotenv.config();
 
@@ -35,6 +36,7 @@ app.use('/api/matchmake', matchmakingRouter);
 app.use('/api/rooms', roomsRouter);
 app.use('/api/global-chat', chatRouter);
 app.use('/api/games', gamesRouter);
+app.use('/api/push', pushRouter);
 
 // Serve static files
 const __filename = fileURLToPath(import.meta.url);

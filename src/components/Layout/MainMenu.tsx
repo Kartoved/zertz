@@ -53,7 +53,7 @@ export const TIME_CONTROLS = [
 
 export default function MainMenu() {
   const navigate = useNavigate();
-  const { setScreen, toggleDarkMode, isDarkMode, language, setLanguage } = useUIStore();
+  const { setScreen, toggleDarkMode, isDarkMode, language, setLanguage, pushEnabled, pushPending, togglePush } = useUIStore();
   const { t } = useI18n();
   const { newGame, savedGames, refreshSavedGames, loadSavedGame } = useGameStore();
 
@@ -266,6 +266,20 @@ export default function MainMenu() {
                     {isDarkMode ? '☀️' : '🌙'}
                   </button>
                 </div>
+                {'Notification' in window && (
+                  <div className="px-4 py-2 border-t border-gray-100 dark:border-gray-700 mt-1 flex justify-between items-center">
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      🔔 {pushEnabled ? t.pushDisable : t.pushEnable}
+                    </span>
+                    <button
+                      onClick={togglePush}
+                      disabled={pushPending}
+                      className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${pushEnabled ? 'bg-indigo-500' : 'bg-gray-300 dark:bg-gray-600'} ${pushPending ? 'opacity-50' : ''}`}
+                    >
+                      <span className={`inline-block h-3 w-3 transform rounded-full bg-white transition-transform ${pushEnabled ? 'translate-x-5' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                )}
                 <div className="px-2 pt-1 border-t border-gray-100 dark:border-gray-700">
                   <button
                     onClick={() => { setActiveDropdown(null); setShowWhatsNewModal(true); }}

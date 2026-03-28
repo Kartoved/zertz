@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../db.js';
 import { authRequired } from '../middleware/auth.js';
+import { sendPushToUser } from '../utils/pushNotifications.js';
 
 const router = Router();
 
@@ -59,6 +60,13 @@ router.post('/', authRequired, async (req, res) => {
        RETURNING id, created_at`,
       [fromUserId, toUserId, roomId, boardSize, rated]
     );
+
+    // Push notification to the challenged player
+    sendPushToUser(toUserId, {
+      type: 'challenge',
+      title: 'Zertz',
+      body: `${userRow.rows[0].username} вызывает тебя на партию!`,
+    });
 
     res.json({
       id: challengeResult.rows[0].id,

@@ -58,7 +58,7 @@ export interface GameState {
   };
   phase: 'placement' | 'ringRemoval' | 'capture' | 'gameOver';
   pendingPlacement: { ringId: string; marbleColor: MarbleColor } | null;
-  winner: Player | null;
+  winner: Player | 'cancelled' | null;
   moveNumber: number;
 }
 

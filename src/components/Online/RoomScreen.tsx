@@ -133,7 +133,7 @@ export function RoomScreen() {
   const safePlayerNames = playerNames || { player1: 'Player 1', player2: 'Player 2' };
   const safeCaptures = state.captures || { player1: { white: 0, gray: 0, black: 0 }, player2: { white: 0, gray: 0, black: 0 } };
   const winnerName = isCancelled ? '' : (state.winner === 'player1' ? safePlayerNames.player1 : safePlayerNames.player2);
-  const winnerWinType = state.winner && !isCancelled ? (winType || (state.captures ? getWinType(state, state.winner) : null)) : null;
+  const winnerWinType = state.winner && !isCancelled ? (winType || (state.captures ? getWinType(state, state.winner as import('../../game/types').Player) : null)) : null;
   const canCancel = !isSpectator && !state.winner && (state.moveNumber ?? 0) <= 2;
 
   const LOW_TIME_THRESHOLD_MS = 20 * 1000;

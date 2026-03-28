@@ -253,4 +253,8 @@ export const ru = {
   archiveAllGames: 'Архив всех партий',
   watchGame: 'Смотреть',
   loadArchive: 'Архив',
+  pushNotifications: 'Уведомления',
+  pushEnable: 'Включить уведомления',
+  pushDisable: 'Выключить уведомления',
+  pushNotSupported: 'Не поддерживается',
 };

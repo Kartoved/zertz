@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { pool } from '../db.js';
 import { authRequired, optionalAuth } from '../middleware/auth.js';
 import { glicko2Update } from '../utils/glicko2.js';
+import { sendPushToUser } from '../utils/pushNotifications.js';
 
 const router = Router();
 
@@ -433,6 +434,30 @@ router.put('/:id/state', optionalAuth, async (req, res) => {
       }
     } catch (err) {
       console.error('Glicko update error:', err);
+    }
+  }
+
+  // Push notification to the opponent (next player to move)
+  if (!nextWinner) {
+    try {
+      const opponentId = nextCurrentPlayer === 1 ? room.user1_id : room.user2_id;
+      if (opponentId) {
+        const roomInfo = await pool.query(
+          'SELECT player1_name, player2_name FROM rooms WHERE id = $1', [id]
+        );
+        if (roomInfo.rows.length > 0) {
+          const { player1_name, player2_name } = roomInfo.rows[0];
+          const moverName = playerIndex === 1 ? player1_name : player2_name;
+          sendPushToUser(opponentId, {
+            type: 'your_turn',
+            title: 'Zertz',
+            body: `${moverName} сделал ход — твоя очередь!`,
+            roomId: id,
+          });
+        }
+      }
+    } catch (err) {
+      console.error('push turn notify error:', err);
     }
   }
 

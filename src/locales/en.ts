@@ -253,4 +253,8 @@ export const en = {
   archiveAllGames: 'All games archive',
   watchGame: 'Watch',
   loadArchive: 'Archive',
+  pushNotifications: 'Notifications',
+  pushEnable: 'Enable notifications',
+  pushDisable: 'Disable notifications',
+  pushNotSupported: 'Not supported',
 };
