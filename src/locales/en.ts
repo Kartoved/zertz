@@ -1,6 +1,6 @@
 export const en = {
   appSubtitle: 'Abstract strategy game',
-  versionFooter: 'v0.9.21',
+  versionFooter: 'v0.9.22',
   developedBy: 'Developed by Wood Romanov',
   profile: 'Profile',
   loginRegister: 'Login / Register',
@@ -214,7 +214,7 @@ export const en = {
   guest: 'Guest',
   settings: 'Settings',
   language: 'Language',
-  playCorrespondence: 'Play correspondence',
+  playCorrespondence: 'Play async',
   selectTimeControl: 'Select time control',
   darkMode: 'Dark mode',
   lightMode: 'Light mode',

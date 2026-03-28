@@ -1,6 +1,6 @@
 export const eo = {
   appSubtitle: 'Abstrakta strategia ludo',
-  versionFooter: 'v0.9.21',
+  versionFooter: 'v0.9.22',
   developedBy: 'Developed by Wood Romanov',
   profile: 'Profilo',
   loginRegister: 'Ensaluti / Registriĝi',
@@ -214,7 +214,7 @@ export const eo = {
   guest: 'Gasto',
   settings: 'Agordoj',
   language: 'Lingvo',
-  playCorrespondence: 'Ludi koresponde',
+  playCorrespondence: 'Ludi asinkrone',
   selectTimeControl: 'Elektu tempkontrolon',
   darkMode: 'Malhela temo',
   lightMode: 'Hela temo',

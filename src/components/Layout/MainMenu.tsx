@@ -229,6 +229,27 @@ export default function MainMenu() {
             {modals.showMobileMenu ? '✕' : '☰'}
           </button>
 
+          {user && (
+            <>
+              {/* Friends/Players */}
+              <button
+                className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                title={t.friends}
+                onClick={() => modals.handleNavTab('players')}
+              >
+                <Users size={20} />
+              </button>
+              {/* Challenges */}
+              <button
+                className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                title={t.challenges}
+                onClick={() => modals.handleNavTab('challenges')}
+              >
+                <Swords size={20} />
+              </button>
+            </>
+          )}
+
           {/* Settings Icon (Language & Theme) */}
           <div className="relative nav-dropdown-container">
             <button
@@ -238,7 +259,7 @@ export default function MainMenu() {
             >
               <Settings size={20} />
             </button>
-            
+
             {activeDropdown === 'settings' && (
               <div className="absolute top-full right-0 mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-2 z-50">
                 <div className="px-4 py-2 text-xs font-bold text-gray-500 uppercase tracking-wider border-b border-gray-100 dark:border-gray-700 mb-1">
@@ -292,27 +313,6 @@ export default function MainMenu() {
               </div>
             )}
           </div>
-
-          {user && (
-            <>
-              {/* Friends (placeholder for now) */}
-              <button
-                className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                title={t.friends}
-                onClick={() => modals.handleNavTab('players')}
-              >
-                <Users size={20} />
-              </button>
-              {/* Challenges */}
-              <button
-                className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                title={t.challenges}
-                onClick={() => modals.handleNavTab('challenges')}
-              >
-                <Swords size={20} />
-              </button>
-            </>
-          )}
 
           {/* User avatar / login */}
           {user ? (
@@ -523,41 +523,40 @@ export default function MainMenu() {
             </div>
 
             <div className="mt-8 flex flex-col gap-3 items-center">
-              <button
-                type="button"
-                disabled={!user}
-                className={`w-full sm:w-2/3 lg:w-1/2 py-3.5 px-6 rounded-xl font-bold text-lg transition-all shadow-md
-                  ${user
-                    ? 'hover:shadow-lg active:scale-95 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white'
-                    : 'opacity-50 cursor-not-allowed bg-gradient-to-r from-blue-500 to-indigo-600 text-white'
-                  }`}
-                onClick={() => startSearch(selectedBoardSize, selectedTimeControl, () => modals.setShowAuthModal(true))}
-              >
-                {t.searchGame}
-              </button>
+              <div className="flex gap-2 w-full sm:w-2/3 lg:w-1/2">
+                <button
+                  type="button"
+                  disabled={!user}
+                  className={`flex-1 py-3.5 px-3 rounded-xl font-bold sm:text-lg text-base transition-all shadow-md
+                    ${user
+                      ? 'hover:shadow-lg active:scale-95 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white'
+                      : 'opacity-50 cursor-not-allowed bg-gradient-to-r from-blue-500 to-indigo-600 text-white'
+                    }`}
+                  onClick={() => startSearch(selectedBoardSize, selectedTimeControl, () => modals.setShowAuthModal(true))}
+                >
+                  {t.searchGame}
+                </button>
 
-              <button
-                type="button"
-                disabled={!user}
-                className={`w-full sm:w-2/3 lg:w-1/2 py-3.5 px-6 rounded-xl font-bold text-lg transition-all shadow-md
-                  ${user
-                    ? 'hover:shadow-lg active:scale-95 bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 hover:bg-gray-50 dark:hover:bg-gray-700'
-                    : 'opacity-50 cursor-not-allowed bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800'
-                  }`}
-                onClick={() => {
-                  if (!user) return;
-                  const tc = TIME_CONTROLS.find(c => c.id === selectedTimeControl);
-                  if (!tc) return;
-
-                  if (tc.preset !== null) {
-                    setSelectedPreset(tc.preset);
-                  }
-                  modals.setOnlineModalInitialStep('board');
-                  modals.setShowOnlineDialog(true);
-                }}
-              >
-                {t.playByLink}
-              </button>
+                <button
+                  type="button"
+                  disabled={!user}
+                  className={`flex-1 py-3.5 px-3 rounded-xl font-bold sm:text-lg text-base transition-all shadow-md
+                    ${user
+                      ? 'hover:shadow-lg active:scale-95 bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 hover:bg-gray-50 dark:hover:bg-gray-700'
+                      : 'opacity-50 cursor-not-allowed bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800'
+                    }`}
+                  onClick={() => {
+                    if (!user) return;
+                    const tc = TIME_CONTROLS.find(c => c.id === selectedTimeControl);
+                    if (!tc) return;
+                    if (tc.preset !== null) setSelectedPreset(tc.preset);
+                    modals.setOnlineModalInitialStep('board');
+                    modals.setShowOnlineDialog(true);
+                  }}
+                >
+                  {t.playByLink}
+                </button>
+              </div>
 
               {!user && (
                 <p className="text-sm text-gray-500 dark:text-gray-400 text-center mt-1">

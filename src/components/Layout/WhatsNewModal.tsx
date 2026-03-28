@@ -12,6 +12,48 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.9.22',
+    date: '2026-03-28',
+    changes: {
+      ru: [
+        'Пуш-уведомления: получайте уведомления о ходе соперника и вызовах (включить в настройках)',
+        'Исправлено: модал отменённой партии больше не показывает "победитель"',
+        'Временной контроль при вызове игрока через его профиль',
+        'Мобильный UX: временные режимы в сетке 2×2, удобнее на маленьких экранах',
+        'Мобильный UX: история ходов отображается под доской',
+        'Мобильный UX: карточки игроков рядом (горизонтально)',
+        'Мобильный UX: кнопки "Поиск игры" и "Сыграть по ссылке" на одной строке',
+        'Переименование "Заочная" → "Асинхронная" везде в интерфейсе',
+        'Новый порядок кнопок в шапке: гамбургер → игроки → вызовы → настройки → профиль',
+        'Версия обновлена до v0.9.22',
+      ],
+      en: [
+        'Push notifications: get notified when it\'s your turn or you receive a challenge (enable in settings)',
+        'Fixed: cancelled game modal no longer shows a winner',
+        'Time control selector when challenging a player via their profile card',
+        'Mobile UX: time control presets in a 2×2 grid for smaller screens',
+        'Mobile UX: move history shown below the board',
+        'Mobile UX: player cards displayed side-by-side',
+        'Mobile UX: "Search game" and "Play by link" buttons on one row',
+        'Renamed "Correspondence" to "Async" across the UI',
+        'Reordered header buttons: hamburger → players → challenges → settings → profile',
+        'Version updated to v0.9.22',
+      ],
+      eo: [
+        'Puŝ-sciigoj: ricevu sciigon kiam estas via vico aŭ vi ricevas defion (ŝaltu en agordoj)',
+        'Korektita: modalo de nuligita ludo ne plu montras venkanton',
+        'Elektilo de tempa kontrolo dum defiado de ludanto per lia profila karto',
+        'Portebla UX: tempaj antaŭagordaĵoj en krado 2×2 por malgrandaj ekranoj',
+        'Portebla UX: movhistorio montrata sub la tabulo',
+        'Portebla UX: ludant-kartoj flanke unu de la alia',
+        'Portebla UX: butonoj "Serĉi ludon" kaj "Ludi per ligilo" sur unu linio',
+        'Renomita "Koresponda" al "Asinkrona" en la interfaco',
+        'Reordigitaj kapliniaj butonoj: hamburgero → ludantoj → defioj → agordoj → profilo',
+        'Versio ĝisdatigita al v0.9.22',
+      ],
+    },
+  },
+  {
     version: '0.9.21',
     date: '2026-03-24',
     changes: {
