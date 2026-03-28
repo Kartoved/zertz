@@ -68,6 +68,8 @@ export function getAvailableCaptures(state: GameState): CaptureMove[] {
           from: ringId,
           to: behindId,
           captured: neighborId,
+          marbleColor: ring.marble.color,
+          capturedColor: neighbor.marble.color,
         });
       }
     }
@@ -108,6 +110,8 @@ export function getCaptureChains(
           from: currentRingId,
           to: behindId,
           captured: neighborId,
+          marbleColor: ring.marble!.color,
+          capturedColor: neighbor.marble.color,
         };
         
         const newState = cloneState(currentState);
@@ -331,11 +335,14 @@ export function getAvailableMoves(state: GameState): {
 export function moveToNotation(move: Move, boardSize: 37 | 48 | 61 = 37): string {
   if (move.type === 'capture') {
     const chain = [move.data, ...(move.data.chain || [])];
-    const fromRing = chain[0].from;
-    const fromAlg = idToAlgebraic(fromRing, boardSize);
-    const marble = 'B'; // Captures don't specify color, use first letter based on actual marble
+    const colorChar = chain[0].marbleColor ? chain[0].marbleColor[0].toUpperCase() : '?';
+    const fromAlg = idToAlgebraic(chain[0].from, boardSize);
     const positions = chain.map(c => idToAlgebraic(c.to, boardSize));
-    return `${marble}${fromAlg}-${positions.join('-')}`;
+    const capturedColors = chain
+      .map(c => c.capturedColor ? c.capturedColor[0].toLowerCase() : '')
+      .filter(Boolean);
+    const suffix = capturedColors.length > 0 ? ` +${capturedColors.join('')}` : '';
+    return `${colorChar}${fromAlg}×${positions.join('×')}${suffix}`;
   } else {
     const { marbleColor, ringId, removedRingId } = move.data;
     const colorChar = marbleColor[0].toUpperCase();

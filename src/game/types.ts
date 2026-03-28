@@ -17,6 +17,8 @@ export interface CaptureMove {
   from: string;
   to: string;
   captured: string;
+  marbleColor?: MarbleColor;
+  capturedColor?: MarbleColor;
   chain?: CaptureMove[];
 }
 

@@ -62,12 +62,27 @@ export function idToCoord(id: string): { q: number; r: number } {
   return { q, r };
 }
 
-// Convert axial coords to algebraic notation for display (a1, b2, etc.)
+// Precomputed max-r per column per board size (for column-relative row numbering)
+const maxRByColCache = new Map<BoardSize, Map<number, number>>();
+function getMaxRByCol(size: BoardSize): Map<number, number> {
+  if (maxRByColCache.has(size)) return maxRByColCache.get(size)!;
+  const map = new Map<number, number>();
+  for (const { q, r } of BOARD_COORDS_BY_SIZE[size]) {
+    const prev = map.get(q);
+    if (prev === undefined || r > prev) map.set(q, r);
+  }
+  maxRByColCache.set(size, map);
+  return map;
+}
+
+// Convert axial coords to algebraic notation (a1, b2, etc.)
+// Column letter: a = leftmost q. Row number: 1 = bottom of that column, counts upward.
 export function idToAlgebraic(id: string, boardSize: BoardSize = 37): string {
   const { q, r } = idToCoord(id);
-  const { minQ, maxR } = getBoardBounds(boardSize);
+  const { minQ } = getBoardBounds(boardSize);
   const col = String.fromCharCode(97 + (q - minQ));
-  const row = maxR + 1 - r;
+  const maxRInCol = getMaxRByCol(boardSize).get(q) ?? r;
+  const row = maxRInCol + 1 - r;
   return `${col}${row}`;
 }
 
