@@ -124,7 +124,7 @@ export default function MainMenu() {
   const currentGames = savedGames.filter(g => !g.winner);
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-900 dark:to-gray-800">
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-900 dark:to-gray-800">
       {/* ═══════ TOP NAV BAR ═══════ */}
       <header className="bg-white dark:bg-gray-800 shadow-md px-4 py-2 flex items-center justify-between relative z-30">
         {/* Logo */}
@@ -409,7 +409,7 @@ export default function MainMenu() {
       </div>
 
       {/* ═══════ MAIN CONTENT: 3 columns ═══════ */}
-      <main className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 p-3 md:p-4 overflow-y-auto max-w-[1400px] mx-auto w-full">
+      <main className="flex-1 min-h-0 flex flex-col lg:flex-row gap-4 p-3 md:p-4 overflow-y-auto lg:overflow-hidden max-w-[1400px] mx-auto w-full">
         {/* LEFT: Player profile card */}
         <aside className="hidden lg:flex w-full lg:w-72 flex-shrink-0 flex-col order-2 lg:order-1 gap-4 items-start">
           <div className="w-full">
@@ -579,7 +579,7 @@ export default function MainMenu() {
         </section>
 
         {/* RIGHT: Global chat */}
-        <aside className={`w-full lg:w-80 lg:flex-shrink-0 flex-col order-3 ${mobileMainTab === 'chat' ? 'flex flex-1 min-h-0' : 'hidden lg:flex'}`}>
+        <aside className={`w-full lg:w-80 lg:flex-shrink-0 flex-col min-h-0 order-3 ${mobileMainTab === 'chat' ? 'flex flex-1' : 'hidden lg:flex'}`}>
           <GlobalChat />
         </aside>
       </main>

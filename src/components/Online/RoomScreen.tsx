@@ -242,7 +242,7 @@ export function RoomScreen() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-100 dark:bg-gray-900 flex flex-col overflow-x-hidden">
+    <div className="min-h-screen lg:h-screen lg:overflow-hidden bg-gray-100 dark:bg-gray-900 flex flex-col overflow-x-hidden">
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 shadow-sm p-3 md:p-4">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
@@ -349,7 +349,7 @@ export function RoomScreen() {
       )}
 
       {/* Main content */}
-      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-3 md:gap-4 p-2 md:p-4 max-w-7xl mx-auto w-full pb-28 sm:pb-24 lg:pb-4 overflow-y-auto">
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-3 md:gap-4 p-2 md:p-4 max-w-7xl mx-auto w-full pb-28 sm:pb-24 lg:pb-4 overflow-y-auto lg:overflow-hidden">
         {/* Left panel - Players */}
         <div className={`lg:w-64 lg:flex lg:flex-col gap-2 lg:gap-4 ${mobileTab === 'chat' ? 'hidden lg:flex' : 'grid grid-cols-2 lg:grid-cols-1'} min-w-0`}>
           {/* Player 1 */}
@@ -563,7 +563,7 @@ export function RoomScreen() {
             {chatCollapsed ? '💬' : '→'}
           </button>
           {!chatCollapsed && (
-            <div className="flex-1 min-h-0 h-[500px] max-h-full overflow-hidden">
+            <div className="flex-1 min-h-0 overflow-hidden">
               <ChatPanel />
             </div>
           )}
