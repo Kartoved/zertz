@@ -152,6 +152,26 @@ async function ensureSchema() {
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_challenges_to ON challenges(to_user_id);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_challenges_from ON challenges(from_user_id);`);
 
+  // Add email column to users (safe to re-run)
+  await pool.query(`
+    DO $$ BEGIN
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS email TEXT UNIQUE;
+    EXCEPTION WHEN others THEN NULL;
+    END $$;
+  `);
+
+  // Magic link tokens table
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS magic_tokens (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      token TEXT NOT NULL UNIQUE,
+      expires_at TIMESTAMP NOT NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_magic_tokens_token ON magic_tokens(token);`);
+
   // Push subscriptions table
   await pool.query(`
     CREATE TABLE IF NOT EXISTS push_subscriptions (

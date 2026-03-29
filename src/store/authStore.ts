@@ -15,9 +15,10 @@ interface AuthStore {
   register: (username: string, password: string) => Promise<void>;
   logout: () => void;
   fetchMe: () => Promise<void>;
-  updateProfile: (updates: { quote?: string; country?: string; contactLink?: string; oldPassword?: string; newPassword?: string }) => Promise<void>;
+  updateProfile: (updates: { quote?: string; country?: string; contactLink?: string; email?: string; oldPassword?: string; newPassword?: string }) => Promise<void>;
   clearError: () => void;
   pollChallenges: () => Promise<void>;
+  loginWithToken: (token: string, user: authApi.User) => void;
 }
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
@@ -85,6 +86,11 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   clearError: () => set({ error: null }),
+
+  loginWithToken: (token: string, user: authApi.User) => {
+    localStorage.setItem(TOKEN_KEY, token);
+    set({ token, user });
+  },
 
   pollChallenges: async () => {
     const { token, user } = get();

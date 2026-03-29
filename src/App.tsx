@@ -5,6 +5,7 @@ import MainMenu from './components/Layout/MainMenu';
 import GameScreen from './components/Layout/GameScreen';
 import Rules from './components/Layout/Rules';
 import { RoomScreen } from './components/Online/RoomScreen';
+import MagicLinkPage from './components/Auth/MagicLinkPage';
 
 function LocalApp() {
   const { screen, initPush } = useUIStore();
@@ -28,6 +29,7 @@ function App() {
       <Routes>
         <Route path="/" element={<LocalApp />} />
         <Route path="/room/:roomId" element={<RoomScreen />} />
+        <Route path="/magic" element={<MagicLinkPage />} />
       </Routes>
     </BrowserRouter>
   );

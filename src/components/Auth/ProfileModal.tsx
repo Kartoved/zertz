@@ -22,6 +22,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newPassword2, setNewPassword2] = useState('');
+  const [emailInput, setEmailInput] = useState(user?.email || '');
   const [showPasswordSection, setShowPasswordSection] = useState(false);
   const [showPasswordText, setShowPasswordText] = useState(false);
   const [localError, setLocalError] = useState('');
@@ -43,7 +44,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
         return;
       }
 
-      await updateProfile({ quote, country, contactLink: trimmedContact });
+      await updateProfile({ quote, country, contactLink: trimmedContact, email: emailInput.trim() || undefined });
       setSuccessMsg(t.profileUpdated);
       setTimeout(() => setSuccessMsg(''), 2000);
       setIsEditingQuote(false);
@@ -202,6 +203,23 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
                 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
             />
             <div className="text-xs text-gray-400 text-right mt-0.5">{contactLink.length}/100</div>
+          </div>
+
+          {/* Email for magic link */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {t.emailLabel}
+              <span className="text-gray-400 font-normal text-xs ml-1">({t.emailOptionalHint})</span>
+            </label>
+            <input
+              type="email"
+              value={emailInput}
+              onChange={(e) => setEmailInput(e.target.value)}
+              placeholder={t.emailPlaceholder}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg
+                bg-white dark:bg-gray-700 text-gray-900 dark:text-white
+                focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            />
           </div>
 
           {/* Country */}

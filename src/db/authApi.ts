@@ -3,6 +3,7 @@ import { API_BASE, getToken, authHeaders, jsonHeaders } from './apiClient';
 export interface User {
   id: number;
   username: string;
+  email: string | null;
   quote: string;
   country: string;
   contactLink: string;
@@ -28,11 +29,11 @@ export interface PlayerInfo {
   createdAt: number;
 }
 
-export async function register(username: string, password: string): Promise<{ token: string; user: User }> {
+export async function register(username: string, password: string, email?: string): Promise<{ token: string; user: User }> {
   const response = await fetch(`${API_BASE}/api/auth/register`, {
     method: 'POST',
     headers: jsonHeaders(),
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username, password, email: email || undefined }),
   });
 
   const data = await response.json();
@@ -259,4 +260,21 @@ export async function getChallenges(): Promise<Challenge[]> {
   });
   if (!response.ok) return [];
   return response.json();
+}
+
+export async function requestMagicLink(email: string): Promise<void> {
+  const response = await fetch(`${API_BASE}/api/auth/magic-link/request`, {
+    method: 'POST',
+    headers: jsonHeaders(),
+    body: JSON.stringify({ email }),
+  });
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Ошибка отправки ссылки');
+}
+
+export async function verifyMagicToken(token: string): Promise<{ token: string; user: User }> {
+  const response = await fetch(`${API_BASE}/api/auth/magic-link/verify/${token}`);
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || 'Ссылка недействительна');
+  return data;
 }

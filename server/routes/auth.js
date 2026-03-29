@@ -1,15 +1,17 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
 import { pool } from '../db.js';
 import { authRequired, JWT_SECRET } from '../middleware/auth.js';
+import { sendEmail } from '../utils/mailer.js';
 
 const router = Router();
 
 const SPECIAL_CHARS = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/;
 
 router.post('/register', async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, email } = req.body;
 
   if (!username || !password) {
     res.status(400).json({ error: 'Укажите ник и пароль' });
@@ -39,10 +41,19 @@ router.post('/register', async (req, res) => {
       return;
     }
 
+    const emailValue = email ? email.toLowerCase().trim() : null;
+    if (emailValue) {
+      const emailExists = await pool.query('SELECT id FROM users WHERE email = $1', [emailValue]);
+      if (emailExists.rows.length > 0) {
+        res.status(409).json({ error: 'Этот email уже используется' });
+        return;
+      }
+    }
+
     const hash = await bcrypt.hash(password, 12);
     const result = await pool.query(
-      `INSERT INTO users (username, password_hash) VALUES ($1, $2) RETURNING id, username, quote, country, contact_link, rating, rating_rd, wins, losses, best_streak, current_streak, created_at`,
-      [trimmedName, hash]
+      `INSERT INTO users (username, password_hash, email) VALUES ($1, $2, $3) RETURNING id, username, email, quote, country, contact_link, rating, rating_rd, wins, losses, best_streak, current_streak, created_at`,
+      [trimmedName, hash, emailValue]
     );
 
     const user = result.rows[0];
@@ -53,6 +64,7 @@ router.post('/register', async (req, res) => {
       user: {
         id: user.id,
         username: user.username,
+        email: user.email || null,
         quote: user.quote,
         country: user.country,
         contactLink: user.contact_link,
@@ -100,6 +112,7 @@ router.post('/login', async (req, res) => {
       user: {
         id: user.id,
         username: user.username,
+        email: user.email || null,
         quote: user.quote,
         country: user.country,
         contactLink: user.contact_link,
@@ -121,7 +134,7 @@ router.post('/login', async (req, res) => {
 router.get('/me', authRequired, async (req, res) => {
   try {
     const result = await pool.query(
-      'SELECT id, username, quote, country, contact_link, rating, rating_rd, wins, losses, best_streak, current_streak, created_at FROM users WHERE id = $1',
+      'SELECT id, username, email, quote, country, contact_link, rating, rating_rd, wins, losses, best_streak, current_streak, created_at FROM users WHERE id = $1',
       [req.user.id]
     );
     if (result.rows.length === 0) {
@@ -132,6 +145,7 @@ router.get('/me', authRequired, async (req, res) => {
     res.json({
       id: u.id,
       username: u.username,
+      email: u.email || null,
       quote: u.quote,
       country: u.country,
       contactLink: u.contact_link,
@@ -150,7 +164,7 @@ router.get('/me', authRequired, async (req, res) => {
 });
 
 router.put('/profile', authRequired, async (req, res) => {
-  const { quote, country, contactLink, oldPassword, newPassword } = req.body;
+  const { quote, country, contactLink, email, oldPassword, newPassword } = req.body;
 
   try {
     if (newPassword !== undefined) {
@@ -185,15 +199,27 @@ router.put('/profile', authRequired, async (req, res) => {
     if (contactLink !== undefined) {
       await pool.query('UPDATE users SET contact_link = $2 WHERE id = $1', [req.user.id, String(contactLink).slice(0, 300)]);
     }
+    if (email !== undefined) {
+      const emailValue = email ? email.toLowerCase().trim() : null;
+      if (emailValue) {
+        const emailExists = await pool.query('SELECT id FROM users WHERE email = $1 AND id != $2', [emailValue, req.user.id]);
+        if (emailExists.rows.length > 0) {
+          res.status(409).json({ error: 'Этот email уже используется' });
+          return;
+        }
+      }
+      await pool.query('UPDATE users SET email = $2 WHERE id = $1', [req.user.id, emailValue]);
+    }
 
     const result = await pool.query(
-      'SELECT id, username, quote, country, contact_link, rating, rating_rd, wins, losses, best_streak, current_streak, created_at FROM users WHERE id = $1',
+      'SELECT id, username, email, quote, country, contact_link, rating, rating_rd, wins, losses, best_streak, current_streak, created_at FROM users WHERE id = $1',
       [req.user.id]
     );
     const u = result.rows[0];
     res.json({
       id: u.id,
       username: u.username,
+      email: u.email || null,
       quote: u.quote,
       country: u.country,
       contactLink: u.contact_link,
@@ -208,6 +234,108 @@ router.put('/profile', authRequired, async (req, res) => {
   } catch (err) {
     console.error('Update profile error:', err);
     res.status(500).json({ error: 'Ошибка обновления профиля' });
+  }
+});
+
+// POST /api/auth/magic-link/request — send magic link to email
+router.post('/magic-link/request', async (req, res) => {
+  const { email } = req.body;
+  if (!email) {
+    res.status(400).json({ error: 'Укажите email' });
+    return;
+  }
+
+  const emailLower = email.toLowerCase().trim();
+
+  try {
+    const result = await pool.query(
+      'SELECT id, username FROM users WHERE email = $1',
+      [emailLower]
+    );
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'Аккаунт с таким email не найден' });
+      return;
+    }
+
+    const user = result.rows[0];
+    const token = crypto.randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    // Invalidate previous tokens for this user
+    await pool.query('DELETE FROM magic_tokens WHERE user_id = $1', [user.id]);
+    await pool.query(
+      'INSERT INTO magic_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
+      [user.id, token, expiresAt]
+    );
+
+    const appUrl = process.env.APP_URL || 'http://localhost:5050';
+    const link = `${appUrl}/magic?token=${token}`;
+
+    await sendEmail({
+      to: emailLower,
+      subject: 'Вход в Zertz',
+      html: `
+        <p>Привет, ${user.username}!</p>
+        <p>Нажмите ссылку для входа (действует 1 час):</p>
+        <p><a href="${link}" style="font-size:16px;padding:10px 20px;background:#3b82f6;color:white;border-radius:8px;text-decoration:none;">Войти в Zertz</a></p>
+        <p style="color:#888;font-size:12px;">Если вы не запрашивали вход — просто проигнорируйте это письмо.</p>
+      `,
+    });
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Magic link request error:', err);
+    res.status(500).json({ error: 'Ошибка отправки ссылки' });
+  }
+});
+
+// GET /api/auth/magic-link/verify/:token — verify token and return JWT
+router.get('/magic-link/verify/:token', async (req, res) => {
+  const { token } = req.params;
+
+  try {
+    const result = await pool.query(
+      `SELECT mt.user_id, u.id, u.username, u.email, u.quote, u.country, u.contact_link,
+              u.rating, u.rating_rd, u.wins, u.losses, u.best_streak, u.current_streak, u.created_at
+       FROM magic_tokens mt
+       JOIN users u ON u.id = mt.user_id
+       WHERE mt.token = $1 AND mt.expires_at > NOW()`,
+      [token]
+    );
+
+    if (result.rows.length === 0) {
+      res.status(400).json({ error: 'Ссылка недействительна или истекла' });
+      return;
+    }
+
+    const u = result.rows[0];
+
+    // Invalidate used token
+    await pool.query('DELETE FROM magic_tokens WHERE token = $1', [token]);
+
+    const jwtToken = jwt.sign({ id: u.id, username: u.username }, JWT_SECRET, { expiresIn: '30d' });
+
+    res.json({
+      token: jwtToken,
+      user: {
+        id: u.id,
+        username: u.username,
+        email: u.email || null,
+        quote: u.quote,
+        country: u.country,
+        contactLink: u.contact_link,
+        rating: u.rating,
+        ratingRd: u.rating_rd,
+        wins: u.wins,
+        losses: u.losses,
+        bestStreak: u.best_streak,
+        currentStreak: u.current_streak,
+        createdAt: u.created_at.getTime(),
+      },
+    });
+  } catch (err) {
+    console.error('Magic link verify error:', err);
+    res.status(500).json({ error: 'Ошибка верификации ссылки' });
   }
 });
 
