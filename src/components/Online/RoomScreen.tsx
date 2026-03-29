@@ -547,8 +547,8 @@ export function RoomScreen() {
           </div>
         </div>
 
-        <div className={`lg:hidden ${mobileTab === 'chat' ? 'flex-1 min-h-0 pb-20' : 'hidden'}`}>
-          <div className="h-full min-h-[320px] bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+        <div className={`lg:hidden ${mobileTab === 'chat' ? 'block pb-20' : 'hidden'}`}>
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden" style={{ height: 'calc(100dvh - 140px)' }}>
             <ChatPanel inputBottomOffset={72} />
           </div>
         </div>

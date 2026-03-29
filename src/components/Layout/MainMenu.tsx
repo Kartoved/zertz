@@ -4,6 +4,7 @@ import { useUIStore, Language } from '../../store/uiStore';
 import { useGameStore } from '../../store/gameStore';
 import { useAuthStore } from '../../store/authStore';
 import { useI18n } from '../../i18n';
+import { APP_VERSION } from '../../version';
 import AuthModal from '../Auth/AuthModal';
 import ProfileModal from '../Auth/ProfileModal';
 import PlayersModal from '../Auth/PlayersModal';
@@ -575,7 +576,7 @@ export default function MainMenu() {
           {/* Footer */}
           <div className="mt-3 text-xs text-gray-400 dark:text-gray-500 text-center leading-5">
             <div>
-              <span>{t.versionFooter}</span>
+              <span>v{APP_VERSION}</span>
               <span className="mx-2">·</span>
               <span>{t.developedBy}</span>
             </div>
