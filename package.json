@@ -10,7 +10,9 @@
     "preview": "vite preview",
     "start": "node server/server.js",
     "railway:build": "npm run build",
-    "railway:start": "npm start"
+    "railway:start": "npm start",
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@types/react": "^18.2.43",
@@ -37,6 +39,7 @@
     "zustand": "^4.4.7"
   },
   "devDependencies": {
-    "vite-plugin-pwa": "^1.2.0"
+    "vite-plugin-pwa": "^1.2.0",
+    "vitest": "^2.0.0"
   }
 }
