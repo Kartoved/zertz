@@ -26,6 +26,7 @@ export interface PlacementMove {
   marbleColor: MarbleColor;
   ringId: string;
   removedRingId: string | null;
+  isolatedCaptures?: MarbleColor[];
 }
 
 export type Move = 

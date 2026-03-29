@@ -203,15 +203,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
     
     const pendingPlacement = state.pendingPlacement;
     const newState = cloneState(state);
-    const success = removeRing(newState, ringId);
-    
-    if (success) {
+    const isolated = removeRing(newState, ringId);
+
+    if (isolated !== false) {
       const move: Move = {
         type: 'placement',
         data: {
           marbleColor: pendingPlacement.marbleColor,
           ringId: pendingPlacement.ringId,
           removedRingId: ringId,
+          ...(isolated.length > 0 && { isolatedCaptures: isolated }),
         },
       };
       

@@ -12,6 +12,51 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.9.24',
+    date: '2026-03-29',
+    changes: {
+      ru: [
+        'Magic Link: вход по ссылке на email — без пароля, оба способа входа доступны одновременно',
+        'Email в профиле — привяжите почту для входа через Magic Link',
+        'Диалог «Сыграть / Наблюдать» при переходе по ссылке комнаты — теперь зрители не захватывают место случайно',
+        'Кликабельные никнеймы в глобальном чате — открывают профиль игрока',
+        'Иконка вызова становится красной с бейджем при входящих вызовах',
+        'Пуш-уведомления включены по умолчанию для новых пользователей',
+        'Нотация: захваты при изоляции теперь отображаются как суффикс +цвета (напр. Gb3 -c4 +w)',
+        'Исправлен скролл глобального чата при переходах между экранами',
+        'Исправлено: зрители не видят кнопки принять/отклонить анд',
+        'Юнит-тесты игрового движка: 54 теста покрывают всю логику',
+        'Версия обновлена до v0.9.24',
+      ],
+      en: [
+        'Magic Link: sign in via email link — no password needed, both login methods available simultaneously',
+        'Email in profile — add your email to enable Magic Link login',
+        'Join dialog when opening a room link — choose to play or watch, no more accidental seat claims',
+        'Clickable nicknames in global chat — opens the player\'s profile',
+        'Challenge icon turns red with a badge on incoming challenges',
+        'Push notifications enabled by default for new users',
+        'Notation: isolation captures now appear as a suffix +colors (e.g. Gb3 -c4 +w)',
+        'Fixed global chat scroll jumping when navigating between screens',
+        'Fixed: spectators no longer see undo accept/reject buttons',
+        'Game engine unit tests: 54 tests covering all game logic',
+        'Version updated to v0.9.24',
+      ],
+      eo: [
+        'Magic Link: ensalutu per retpoŝta ligilo — sen pasvorto, ambaŭ ensalutmetodoj disponeblaj samtempe',
+        'Retpoŝto en profilo — aldonu vian retpoŝton por ebligi ensaluton per Magic Link',
+        'Dialogo "Ludi / Spekti" dum malferma ĉambra ligilo — elektu rolon, ne plu akcidenta sidlokkaptado',
+        'Alklakeblaj kaŝnomoj en tutmonda babilejo — malfermas profilon de ludanto',
+        'Defia ikono ruĝiĝas kun insigno ĉe envenantaj defioj',
+        'Puŝ-sciigoj ŝaltitaj defaŭlte por novaj uzantoj',
+        'Notacio: izolitaj kapturoj nun aperas kiel sufikso +koloroj (ekz. Gb3 -c4 +w)',
+        'Korektita rulumado de tutmonda babilejo dum navigado inter ekranoj',
+        'Korektita: spektantoj ne plu vidas butonojn akcepti/rifuzi malfaro-peton',
+        'Unuotestoj de ludmotoro: 54 testoj kovras ĉiun ludan logikon',
+        'Versio ĝisdatigita al v0.9.24',
+      ],
+    },
+  },
+  {
     version: '0.9.23',
     date: '2026-03-28',
     changes: {

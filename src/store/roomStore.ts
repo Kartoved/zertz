@@ -512,13 +512,15 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     pendingMoveCount++;
     try {
       const newState = cloneState(state);
-      if (!removeRing(newState, ringId)) return;
+      const isolated = removeRing(newState, ringId);
+      if (isolated === false) return;
 
       playRemoveRingSound();
 
-      // Update the previous placement move with the removed ring
+      // Update the previous placement move with the removed ring and any isolation captures
       if (currentNode.move && currentNode.move.type === 'placement') {
         currentNode.move.data.removedRingId = ringId;
+        if (isolated.length > 0) currentNode.move.data.isolatedCaptures = isolated;
         currentNode.notation = moveToNotation(currentNode.move, state.boardSize);
       }
 

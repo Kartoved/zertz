@@ -203,23 +203,23 @@ export function placeMarble(
   return true;
 }
 
-export function removeRing(state: GameState, ringId: string): boolean {
+export function removeRing(state: GameState, ringId: string): MarbleColor[] | false {
   const validRings = getValidRemovableRings(state.rings);
   if (!validRings.includes(ringId)) return false;
-  
+
   const ring = state.rings.get(ringId);
   if (!ring) return false;
-  
+
   ring.isRemoved = true;
-  
-  handleIsolation(state);
-  
+
+  const isolated = handleIsolation(state);
+
   state.pendingPlacement = null;
   state.phase = 'placement';
   state.currentPlayer = state.currentPlayer === 'player1' ? 'player2' : 'player1';
   state.moveNumber++;
-  
-  return true;
+
+  return isolated;
 }
 
 export function skipRingRemoval(state: GameState): void {
@@ -232,34 +232,36 @@ export function skipRingRemoval(state: GameState): void {
   }
 }
 
-function handleIsolation(state: GameState): void {
+function handleIsolation(state: GameState): MarbleColor[] {
+  const captured: MarbleColor[] = [];
   const groups = getIsolatedGroups(state.rings);
-  
-  if (groups.length <= 1) return;
-  
+
+  if (groups.length <= 1) return captured;
+
   let mainGroupIndex = 0;
   let maxSize = 0;
-  
+
   for (let i = 0; i < groups.length; i++) {
     if (groups[i].length > maxSize) {
       maxSize = groups[i].length;
       mainGroupIndex = i;
     }
   }
-  
+
   for (let i = 0; i < groups.length; i++) {
     if (i === mainGroupIndex) continue;
-    
+
     const group = groups[i];
     const hasEmpty = group.some(id => {
       const ring = state.rings.get(id);
       return ring && !ring.marble;
     });
-    
+
     if (!hasEmpty) {
       for (const ringId of group) {
         const ring = state.rings.get(ringId);
         if (ring && ring.marble) {
+          captured.push(ring.marble.color);
           state.captures[state.currentPlayer][ring.marble.color]++;
           ring.marble = null;
         }
@@ -269,6 +271,8 @@ function handleIsolation(state: GameState): void {
       }
     }
   }
+
+  return captured;
 }
 
 export function checkWinCondition(state: GameState): Player | null {
@@ -344,14 +348,17 @@ export function moveToNotation(move: Move, boardSize: 37 | 48 | 61 = 37): string
     const suffix = capturedColors.length > 0 ? ` +${capturedColors.join('')}` : '';
     return `${colorChar}${fromAlg}×${positions.join('×')}${suffix}`;
   } else {
-    const { marbleColor, ringId, removedRingId } = move.data;
+    const { marbleColor, ringId, removedRingId, isolatedCaptures } = move.data;
     const colorChar = marbleColor[0].toUpperCase();
     const ringAlg = idToAlgebraic(ringId, boardSize);
+    const isolationSuffix = isolatedCaptures && isolatedCaptures.length > 0
+      ? ` +${isolatedCaptures.map(c => c[0].toLowerCase()).join('')}`
+      : '';
     if (removedRingId) {
       const removedAlg = idToAlgebraic(removedRingId, boardSize);
-      return `${colorChar}${ringAlg} -${removedAlg}`;
+      return `${colorChar}${ringAlg} -${removedAlg}${isolationSuffix}`;
     }
-    return `${colorChar}${ringAlg}`;
+    return `${colorChar}${ringAlg}${isolationSuffix}`;
   }
 }
 

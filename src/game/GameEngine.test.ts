@@ -10,7 +10,9 @@ import {
   getCaptureChains,
   checkWinCondition,
   hasAvailableCaptures,
+  moveToNotation,
 } from './GameEngine';
+import { MarbleColor } from './types';
 import { getValidRemovableRings } from './Board';
 import { GameState } from './types';
 
@@ -142,7 +144,7 @@ describe('removeRing', () => {
   });
 
   it('removes a valid free corner ring', () => {
-    expect(removeRing(state, '3,0')).toBe(true);
+    expect(removeRing(state, '3,0')).not.toBe(false);
     expect(state.rings.get('3,0')!.isRemoved).toBe(true);
   });
 
@@ -409,7 +411,7 @@ describe('isolation auto-capture', () => {
     // Put state in ringRemoval phase by placing elsewhere
     placeMarble(state, '-3,6', 'gray');
     // Remove a safe corner ring far from the isolated area
-    expect(removeRing(state, '0,6')).toBe(true);
+    expect(removeRing(state, '0,6')).not.toBe(false);
 
     // "3,0" should have been auto-captured for player1
     expect(state.rings.get('3,0')!.marble).toBeNull();
@@ -434,11 +436,49 @@ describe('isolation auto-capture', () => {
     // Trigger handleIsolation by placing + removing elsewhere
     placeMarble(state, '-3,6', 'gray');
     // Use an explicit safe ring to remove (opposite corner, unaffected by our setup)
-    expect(removeRing(state, '0,6')).toBe(true);
+    expect(removeRing(state, '0,6')).not.toBe(false);
 
     // "3,0" marble should NOT be captured — the group {"2,0", "3,0"} has empty "2,0"
     expect(state.rings.get('3,0')!.marble).not.toBeNull();
     expect(state.captures.player1.white).toBe(0);
+  });
+});
+
+// ─── isolation captures in notation ─────────────────────────────────────────
+
+describe('isolation captures in notation', () => {
+  it('notation includes +colors when ring removal causes isolation capture', () => {
+    const state = createInitialState();
+    state.rings.get('3,0')!.marble = { color: 'white' };
+    state.rings.get('2,0')!.isRemoved = true;
+    state.rings.get('2,1')!.isRemoved = true;
+    state.rings.get('3,1')!.isRemoved = true;
+
+    placeMarble(state, '-3,6', 'gray');
+    const isolated = removeRing(state, '0,6');
+
+    expect(isolated).not.toBe(false);
+    expect(isolated as MarbleColor[]).toContain('white');
+
+    const move: import('./types').Move = {
+      type: 'placement',
+      data: {
+        marbleColor: 'gray',
+        ringId: '-3,6',
+        removedRingId: '0,6',
+        isolatedCaptures: isolated as MarbleColor[],
+      },
+    };
+    const notation = moveToNotation(move, 37);
+    expect(notation).toContain('+w');
+  });
+
+  it('notation has no suffix when no isolation capture', () => {
+    const move: import('./types').Move = {
+      type: 'placement',
+      data: { marbleColor: 'gray', ringId: '0,3', removedRingId: '3,0' },
+    };
+    expect(moveToNotation(move, 37)).not.toContain('+');
   });
 });
 
