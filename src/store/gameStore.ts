@@ -9,16 +9,11 @@ import {
 import {
   createInitialState,
   cloneState,
-  placeMarble,
-  removeRing,
-  executeCapture,
   hasAvailableCaptures,
-  checkWinCondition,
-  skipRingRemoval,
   getCaptureChains,
-  getWinType,
 } from '../game/GameEngine';
 import { getValidRemovableRings } from '../game/Board';
+import { applyPlacement, applyRingRemoval, applyCapture } from '../utils/moveActions';
 import { saveGame, loadGame, listGames } from '../db/gamesStorage';
 import { playPlaceSound, playRemoveRingSound, playCaptureSound, playWinSound, playUndoSound } from '../utils/sounds';
 import { useAuthStore } from './authStore';
@@ -139,164 +134,65 @@ export const useGameStore = create<GameStore>((set, get) => ({
   handlePlacement: (ringId) => {
     const { state, selectedMarbleColor, currentNode } = get();
     if (!selectedMarbleColor) return;
-    
-    const newState = cloneState(state);
-    const success = placeMarble(newState, ringId, selectedMarbleColor);
-    
-    if (success) {
-      const validRemovable = getValidRemovableRings(newState.rings);
-      
-      if (validRemovable.length === 0) {
-        skipRingRemoval(newState);
-        
-        const move: Move = {
-          type: 'placement',
-          data: {
-            marbleColor: selectedMarbleColor,
-            ringId,
-            removedRingId: null,
-          },
-        };
-        
-        const newNode = addMoveToTree(
-          currentNode,
-          move,
-          state.currentPlayer,
-          state.moveNumber,
-          state.boardSize
-        );
-        
-        const winner = checkWinCondition(newState);
-        let nextWinType: string | null = null;
-        if (winner) {
-          newState.winner = winner;
-          newState.phase = 'gameOver';
-          nextWinType = getWinType(newState, winner);
-        }
-        
-        playPlaceSound();
-        if (winner) playWinSound();
-        
-        set({
-          state: newState,
-          currentNode: newNode,
-          selectedMarbleColor: null,
-          selectedRingId: null,
-          winType: nextWinType,
-        });
-        
-        // Auto-save after move
-        get().autoSave();
-      } else {
-        playPlaceSound();
-        set({
-          state: newState,
-          selectedMarbleColor: null,
-        });
-      }
+
+    const result = applyPlacement(state, ringId, selectedMarbleColor);
+    if (!result) return;
+
+    const { newState, move, winner, winType, needsRingRemoval } = result;
+    playPlaceSound();
+    if (winner) playWinSound();
+
+    if (!needsRingRemoval) {
+      const newNode = addMoveToTree(currentNode, move, state.currentPlayer, state.moveNumber, state.boardSize);
+      set({ state: newState, currentNode: newNode, selectedMarbleColor: null, selectedRingId: null, winType });
+      get().autoSave();
+    } else {
+      set({ state: newState, selectedMarbleColor: null });
     }
   },
   
   handleRingRemoval: (ringId) => {
     const { state, currentNode } = get();
     if (state.phase !== 'ringRemoval' || !state.pendingPlacement) return;
-    
-    const pendingPlacement = state.pendingPlacement;
-    const newState = cloneState(state);
-    const isolated = removeRing(newState, ringId);
 
-    if (isolated !== false) {
-      const move: Move = {
-        type: 'placement',
-        data: {
-          marbleColor: pendingPlacement.marbleColor,
-          ringId: pendingPlacement.ringId,
-          removedRingId: ringId,
-          ...(isolated.length > 0 && { isolatedCaptures: isolated }),
-        },
-      };
-      
-      const previousPlayer = state.currentPlayer;
-      const previousMoveNumber = state.moveNumber;
-      
-      const newNode = addMoveToTree(
-        currentNode,
-        move,
-        previousPlayer,
-        previousMoveNumber,
-        state.boardSize
-      );
-      
-      playRemoveRingSound();
-      
-      let nextWinType: string | null = null;
-      const winner = checkWinCondition(newState);
-      if (winner) {
-        newState.winner = winner;
-        newState.phase = 'gameOver';
-        nextWinType = getWinType(newState, winner);
-        playWinSound();
-      }
-      
-      set({
-        state: newState,
-        currentNode: newNode,
-        selectedRingId: null,
-        winType: nextWinType,
-      });
-      
-      // Auto-save after move
-      get().autoSave();
+    const pendingPlacement = state.pendingPlacement;
+    // In gameStore the full move (placement + ring) is added to tree here as one node
+    const move: Move = {
+      type: 'placement',
+      data: { marbleColor: pendingPlacement.marbleColor, ringId: pendingPlacement.ringId, removedRingId: ringId },
+    };
+    // Temporarily attach the move so applyRingRemoval can update notation
+    const tempNode = { ...currentNode, move };
+    const result = applyRingRemoval(state, tempNode, ringId);
+    if (!result) return;
+
+    const { newState, winner, winType } = result;
+    if (tempNode.move?.type === 'placement') {
+      move.data.isolatedCaptures = tempNode.move.data.isolatedCaptures;
     }
+
+    const newNode = addMoveToTree(currentNode, move, state.currentPlayer, state.moveNumber, state.boardSize);
+    // Copy updated notation from tempNode
+    newNode.notation = tempNode.notation || newNode.notation;
+
+    playRemoveRingSound();
+    if (winner) playWinSound();
+
+    set({ state: newState, currentNode: newNode, selectedRingId: null, winType });
+    get().autoSave();
   },
   
   handleCapture: (captures) => {
     const { state, currentNode } = get();
     if (captures.length === 0) return;
-    
-    const newState = cloneState(state);
-    const previousPlayer = state.currentPlayer;
-    const previousMoveNumber = state.moveNumber;
-    
-    executeCapture(newState, captures);
-    
-    const move: Move = {
-      type: 'capture',
-      data: {
-        ...captures[0],
-        chain: captures.slice(1),
-      },
-    };
-    
-    const newNode = addMoveToTree(
-      currentNode,
-      move,
-      previousPlayer,
-      previousMoveNumber,
-      state.boardSize
-    );
-    
+
+    const { newState, move, previousPlayer, previousMoveNumber, winner, winType } = applyCapture(state, captures);
+    const newNode = addMoveToTree(currentNode, move, previousPlayer, previousMoveNumber, state.boardSize);
+
     playCaptureSound();
-    
-    let nextWinType: string | null = null;
-    const winner = checkWinCondition(newState);
-    if (winner) {
-      newState.winner = winner;
-      newState.phase = 'gameOver';
-      nextWinType = getWinType(newState, winner);
-      playWinSound();
-    }
-    
-    set({
-      state: newState,
-      currentNode: newNode,
-      selectedRingId: null,
-      highlightedCaptures: [],
-      availableCaptureChains: [],
-      winType: nextWinType,
-    });
-    
-    // Auto-save after move
+    if (winner) playWinSound();
+
+    set({ state: newState, currentNode: newNode, selectedRingId: null, highlightedCaptures: [], availableCaptureChains: [], winType });
     get().autoSave();
   },
   
