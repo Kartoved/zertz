@@ -44,11 +44,14 @@ export function RoomScreen() {
     state,
     playerNames,
     myPlayer,
+    pendingPlayerChoice,
     user1Id,
     user2Id,
     isLoading,
     error,
     joinRoom,
+    claimSeat,
+    declineSeat,
     pollRoom,
     pollMessages,
     selectMarbleColor,
@@ -661,6 +664,34 @@ export function RoomScreen() {
             >
               {t.close}
             </button>
+          </div>
+        </div>
+      )}
+
+      {pendingPlayerChoice && (
+        <div className="fixed inset-0 bg-black/50 z-[80] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-sm w-full overflow-hidden">
+            <div className="p-5 text-center">
+              <div className="text-2xl mb-2">♟</div>
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-1">{t.joinSeatTitle}</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-300 mb-5">{t.joinSeatPrompt}</p>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={declineSeat}
+                  className="flex-1 py-2 px-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                >
+                  👁 {t.watchGame}
+                </button>
+                <button
+                  type="button"
+                  onClick={claimSeat}
+                  className="flex-1 py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold transition-colors"
+                >
+                  ▶ {t.joinAsPlayer}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

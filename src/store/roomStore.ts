@@ -77,7 +77,10 @@ interface RoomStore {
     rated?: boolean,
     timeControl?: FischerTimeControl | null
   ) => Promise<number>;
+  pendingPlayerChoice: 1 | 2 | null;
   joinRoom: (roomId: number | string) => Promise<boolean>;
+  claimSeat: () => Promise<void>;
+  declineSeat: () => void;
   pollRoom: () => Promise<void>;
   pollMessages: () => Promise<void>;
   sendMessage: (text: string) => Promise<void>;
@@ -157,6 +160,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
   messages: [],
   lastMessageId: 0,
+  pendingPlayerChoice: null,
 
   createRoom: async (boardSize, creatorPlayer = 1, rated = false, timeControl = null) => {
     set({ isLoading: true, error: null });
@@ -225,6 +229,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
       // Determine seat by authenticated room binding first.
       let myPlayer: 1 | 2 | null = null;
+      let pendingPlayerChoice: 1 | 2 | null = null;
 
       const authUser = useAuthStore.getState().user;
       const names = { ...room.playerNames };
@@ -234,11 +239,12 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         } else if (room.user2Id === authUser.id) {
           myPlayer = 2;
         } else if (room.user1Id == null) {
-          myPlayer = 1;
+          // Free seat — let user choose instead of auto-claiming
+          pendingPlayerChoice = 1;
         } else if (room.user2Id == null) {
-          myPlayer = 2;
+          // Free seat — let user choose instead of auto-claiming
+          pendingPlayerChoice = 2;
         }
-
       }
 
       if (authUser && myPlayer) {
@@ -260,6 +266,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       set({
         roomId: numericRoomId,
         myPlayer,
+        pendingPlayerChoice,
         creatorPlayer: room.creatorPlayer,
         user1Id: myPlayer === 1 && authUser ? authUser.id : room.user1Id,
         user2Id: myPlayer === 2 && authUser ? authUser.id : room.user2Id,
@@ -721,6 +728,37 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     }
   },
 
+  claimSeat: async () => {
+    const { roomId, pendingPlayerChoice, playerNames } = get();
+    const authUser = useAuthStore.getState().user;
+    if (!roomId || !pendingPlayerChoice || !authUser) return;
+
+    const names = { ...playerNames };
+    if (pendingPlayerChoice === 1) names.player1 = authUser.username;
+    else names.player2 = authUser.username;
+
+    await roomsApi.updatePlayerName(roomId, pendingPlayerChoice, authUser.username);
+    try {
+      await fetch(`${API_BASE}/api/rooms/${roomId}/join`, {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: JSON.stringify({ playerIndex: pendingPlayerChoice }),
+      });
+    } catch { /* ignore */ }
+
+    set({
+      myPlayer: pendingPlayerChoice,
+      pendingPlayerChoice: null,
+      playerNames: names,
+      user1Id: pendingPlayerChoice === 1 ? authUser.id : get().user1Id,
+      user2Id: pendingPlayerChoice === 2 ? authUser.id : get().user2Id,
+    });
+  },
+
+  declineSeat: () => {
+    set({ pendingPlayerChoice: null });
+  },
+
   reset: () => {
     const rootNode = createRootNode();
     set({
@@ -752,6 +790,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       clockRunningSince: null,
       messages: [],
       lastMessageId: 0,
+      pendingPlayerChoice: null,
     });
   },
 }));
