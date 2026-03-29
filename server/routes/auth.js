@@ -310,8 +310,8 @@ router.get('/magic-link/verify/:token', async (req, res) => {
 
     const u = result.rows[0];
 
-    // Invalidate used token
-    await pool.query('DELETE FROM magic_tokens WHERE token = $1', [token]);
+    // Invalidate used token and clean up expired tokens
+    await pool.query('DELETE FROM magic_tokens WHERE token = $1 OR expires_at <= NOW()', [token]);
 
     const jwtToken = jwt.sign({ id: u.id, username: u.username }, JWT_SECRET, { expiresIn: '30d' });
 

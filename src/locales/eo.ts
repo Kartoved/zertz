@@ -1,6 +1,5 @@
 export const eo = {
   appSubtitle: 'Abstrakta strategia ludo',
-  versionFooter: '',
   developedBy: 'Developed by Wood Romanov',
   profile: 'Profilo',
   loginRegister: 'Ensaluti / Registriĝi',
