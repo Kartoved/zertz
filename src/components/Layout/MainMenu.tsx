@@ -16,6 +16,7 @@ import LoadGameModal from './LoadGameModal';
 import RulesModal from './RulesModal';
 import WhatsNewModal from './WhatsNewModal';
 import BoardSelectionModal from './BoardSelectionModal';
+import BotGameModal from './BotGameModal';
 import SearchingMatchOverlay from './SearchingMatchOverlay';
 import OnlineChallengeModal from './OnlineChallengeModal';
 import ActiveGamesWidget from './ActiveGamesWidget';
@@ -57,7 +58,7 @@ export default function MainMenu() {
   const navigate = useNavigate();
   const { setScreen, toggleDarkMode, isDarkMode, language, setLanguage, pushEnabled, pushPending, togglePush } = useUIStore();
   const { t } = useI18n();
-  const { newGame, savedGames, refreshSavedGames, loadSavedGame } = useGameStore();
+  const { newGame, newBotGame, savedGames, refreshSavedGames, loadSavedGame } = useGameStore();
 
   const modals = useMainMenuModals();
   const { isSearchingMatch, cancelSearch, startSearch } = useMatchmaking();
@@ -79,6 +80,12 @@ export default function MainMenu() {
     newGame(boardSize);
     setScreen('game');
     modals.setShowBoardDialog(false);
+  };
+
+  const handleStartBotGame = (boardSize: 37 | 48 | 61, botPlayer: import('../../game/types').Player, level: import('../../ai/minimax').BotLevel) => {
+    newBotGame(boardSize, botPlayer, level);
+    setScreen('game');
+    modals.setShowBotDialog(false);
   };
 
   const handleLoadGame = async (gameId: string) => {
@@ -569,6 +576,27 @@ export default function MainMenu() {
                   🔒 {t.onlineRequiresAuth}
                 </p>
               )}
+
+              <div className="flex gap-2 w-full sm:w-2/3 lg:w-1/2">
+                <button
+                  type="button"
+                  onClick={() => modals.setShowBotDialog(true)}
+                  className="flex-1 py-2.5 px-3 rounded-xl font-semibold text-sm transition-all shadow-sm
+                    bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600
+                    text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600"
+                >
+                  🤖 {t.playVsBot}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => modals.setShowBoardDialog(true)}
+                  className="flex-1 py-2.5 px-3 rounded-xl font-semibold text-sm transition-all shadow-sm
+                    bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600
+                    text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600"
+                >
+                  👥 {t.playLocal}
+                </button>
+              </div>
             </div>
 
           </div>
@@ -603,6 +631,13 @@ export default function MainMenu() {
         <BoardSelectionModal
           onClose={() => modals.setShowBoardDialog(false)}
           onSelectBoard={handleSelectBoard}
+        />
+      )}
+
+      {modals.showBotDialog && (
+        <BotGameModal
+          onClose={() => modals.setShowBotDialog(false)}
+          onStart={handleStartBotGame}
         />
       )}
 

@@ -13,7 +13,7 @@ import { getWinTypeLabel, useI18n } from '../../i18n';
 
 export default function GameScreen() {
   const { t } = useI18n();
-  const { state, playerNames, newGame, cancelGame } = useGameStore();
+  const { state, playerNames, newGame, cancelGame, botPlayer, isBotThinking } = useGameStore();
   const { toggleDarkMode, isDarkMode, setScreen } = useUIStore();
   const { user } = useAuthStore();
   const [showRematchDialog, setShowRematchDialog] = useState(false);
@@ -141,7 +141,13 @@ export default function GameScreen() {
 
           {!isGameOver && (
             <div className="p-3 bg-white dark:bg-gray-800 rounded-lg col-span-1 sm:col-span-2 lg:col-span-1 shadow-sm">
-              <MarbleSelector />
+              {isBotThinking && botPlayer === state.currentPlayer ? (
+                <div className="flex items-center gap-2 py-2 text-sm text-indigo-600 dark:text-indigo-400 font-medium animate-pulse">
+                  🤖 {t.botThinking}
+                </div>
+              ) : (
+                <MarbleSelector />
+              )}
               <div className="mt-3">
                 <ControlPanel onSurrender={() => setShowSurrenderConfirm(true)} onCancel={cancelGame} />
               </div>

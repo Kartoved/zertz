@@ -5,6 +5,7 @@ import {
   CaptureMove,
   GameNode,
   Move,
+  Player,
 } from '../game/types';
 import {
   createInitialState,
@@ -12,7 +13,7 @@ import {
   hasAvailableCaptures,
   getCaptureChains,
 } from '../game/GameEngine';
-import { getValidRemovableRings } from '../game/Board';
+
 import { applyPlacement, applyRingRemoval, applyCapture } from '../utils/moveActions';
 import { saveGame, loadGame, listGames } from '../db/gamesStorage';
 import { playPlaceSound, playRemoveRingSound, playCaptureSound, playWinSound, playUndoSound } from '../utils/sounds';
@@ -26,6 +27,7 @@ import {
   isDescendant,
   formatGameId,
 } from '../utils/gameTreeUtils';
+import { BotLevel, BotMove } from '../ai/minimax';
 
 interface GameStore {
   state: GameState;
@@ -40,8 +42,15 @@ interface GameStore {
   savedGames: Array<{ id: string; playerNames: { player1: string; player2: string }; updatedAt: number; moveCount: number; winner: string | null; winType: string | null; boardSize: 37 | 48 | 61; isOnline: boolean }>;
   winType: string | null;
   isLoadedGame: boolean;
-  
+
+  // Bot
+  botPlayer: Player | null;
+  botLevel: BotLevel;
+  isBotThinking: boolean;
+
   newGame: (boardSize?: 37 | 48 | 61) => void;
+  newBotGame: (boardSize: 37 | 48 | 61, botPlayer: Player, level: BotLevel) => void;
+  triggerBotMove: () => void;
   selectMarbleColor: (color: MarbleColor | null) => void;
   selectRing: (ringId: string) => void;
   handlePlacement: (ringId: string) => void;
@@ -76,6 +85,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
   savedGames: [],
   winType: null,
   isLoadedGame: false,
+  botPlayer: null,
+  botLevel: 'medium',
+  isBotThinking: false,
   
   newGame: (boardSize = 37) => {
     const rootNode = createRootNode();
@@ -95,7 +107,42 @@ export const useGameStore = create<GameStore>((set, get) => ({
       gameId: newGameId,
       winType: null,
       isLoadedGame: false,
+      botPlayer: null,
+      isBotThinking: false,
     });
+  },
+
+  newBotGame: (boardSize, botPlayer, level) => {
+    const rootNode = createRootNode();
+    const newGameId = formatGameId(Date.now());
+    const authUser = useAuthStore.getState().user;
+    const defaults = getDefaultPlayerNames();
+    const player1Name = authUser ? authUser.username : defaults.player1;
+    const names = {
+      player1: botPlayer === 'player1' ? 'Bot' : player1Name,
+      player2: botPlayer === 'player2' ? 'Bot' : defaults.player2,
+    };
+    const initialState = createInitialState(boardSize);
+    set({
+      state: initialState,
+      gameTree: rootNode,
+      currentNode: rootNode,
+      selectedMarbleColor: null,
+      selectedRingId: null,
+      highlightedCaptures: [],
+      availableCaptureChains: [],
+      playerNames: names,
+      gameId: newGameId,
+      winType: null,
+      isLoadedGame: false,
+      botPlayer,
+      botLevel: level,
+      isBotThinking: false,
+    });
+    // If bot goes first, trigger immediately
+    if (initialState.currentPlayer === botPlayer) {
+      setTimeout(() => get().triggerBotMove(), 100);
+    }
   },
   
   selectMarbleColor: (color) => {
@@ -146,6 +193,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const newNode = addMoveToTree(currentNode, move, state.currentPlayer, state.moveNumber, state.boardSize);
       set({ state: newState, currentNode: newNode, selectedMarbleColor: null, selectedRingId: null, winType });
       get().autoSave();
+      if (!winner) setTimeout(() => get().triggerBotMove(), 0);
     } else {
       set({ state: newState, selectedMarbleColor: null });
     }
@@ -180,8 +228,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     set({ state: newState, currentNode: newNode, selectedRingId: null, winType });
     get().autoSave();
+    if (!winner) setTimeout(() => get().triggerBotMove(), 0);
   },
-  
+
   handleCapture: (captures) => {
     const { state, currentNode } = get();
     if (captures.length === 0) return;
@@ -194,6 +243,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     set({ state: newState, currentNode: newNode, selectedRingId: null, highlightedCaptures: [], availableCaptureChains: [], winType });
     get().autoSave();
+    if (!winner) setTimeout(() => get().triggerBotMove(), 0);
   },
   
   undo: () => {
@@ -311,6 +361,46 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
   },
   
+  triggerBotMove: () => {
+    const { state, botPlayer, botLevel, isBotThinking } = get();
+    if (!botPlayer || state.winner || isBotThinking) return;
+    if (state.currentPlayer !== botPlayer) return;
+    if (state.phase === 'ringRemoval') return;
+
+    set({ isBotThinking: true });
+
+    const worker = new Worker(new URL('../ai/worker.ts', import.meta.url), { type: 'module' });
+    worker.onmessage = (e: MessageEvent<{ move: BotMove }>) => {
+      worker.terminate();
+      set({ isBotThinking: false });
+
+      const { move } = e.data;
+      if (get().state.winner) return;
+
+      if (move.type === 'capture') {
+        get().handleCapture(move.chain);
+      } else {
+        // Set marble color so handlePlacement can read it, then place
+        set({ selectedMarbleColor: move.color });
+        get().handlePlacement(move.ringId);
+        // If ring removal is needed, handle it synchronously after state settles
+        if (move.removedRingId) {
+          const afterPlace = get().state;
+          if (afterPlace.phase === 'ringRemoval') {
+            get().handleRingRemoval(move.removedRingId);
+          }
+        }
+      }
+    };
+    worker.onerror = (err) => {
+      console.error('[Bot] worker error:', err);
+      worker.terminate();
+      set({ isBotThinking: false });
+    };
+
+    worker.postMessage({ state, botPlayer, level: botLevel });
+  },
+
   autoSave: async () => {
     const { state, gameTree, playerNames, gameId, winType } = get();
     await saveGame(gameId, state, gameTree, playerNames, winType, false);

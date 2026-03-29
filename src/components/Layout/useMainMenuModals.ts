@@ -11,6 +11,7 @@ export function useMainMenuModals() {
   const [showPlayersModal, setShowPlayersModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showChallengesModal, setShowChallengesModal] = useState(false);
+  const [showBotDialog, setShowBotDialog] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [onlineModalInitialStep, setOnlineModalInitialStep] = useState<'board' | 'link'>('board');
 
@@ -35,6 +36,7 @@ export function useMainMenuModals() {
     showPlayersModal, setShowPlayersModal,
     showRulesModal, setShowRulesModal,
     showChallengesModal, setShowChallengesModal,
+    showBotDialog, setShowBotDialog,
     showMobileMenu, setShowMobileMenu,
     onlineModalInitialStep, setOnlineModalInitialStep,
     handleNavTab,
