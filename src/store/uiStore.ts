@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { getPushPref, subscribeToPush, unsubscribeFromPush } from '../pushNotifications';
+import { getPushPref, subscribeToPush, unsubscribeFromPush, initPushIfFirstVisit } from '../pushNotifications';
 
 type Screen = 'menu' | 'game' | 'history' | 'rules' | 'settings';
 export type Language = 'ru' | 'en' | 'eo';
@@ -22,6 +22,7 @@ interface UIStore {
   pushPending: boolean;
 
   setScreen: (screen: Screen) => void;
+  initPush: () => void;
   openRules: () => void;
   toggleDarkMode: () => void;
   toggleMoveHistory: () => void;
@@ -67,6 +68,12 @@ export const useUIStore = create<UIStore>((set) => ({
     localStorage.setItem(LANGUAGE_KEY, next);
     return { language: next };
   }),
+
+  initPush: () => {
+    initPushIfFirstVisit().then((ok) => {
+      if (ok) set({ pushEnabled: true });
+    });
+  },
 
   togglePush: () => set((state) => {
     if (state.pushPending) return {};

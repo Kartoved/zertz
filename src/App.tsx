@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useUIStore } from './store/uiStore';
 import MainMenu from './components/Layout/MainMenu';
@@ -6,7 +7,11 @@ import Rules from './components/Layout/Rules';
 import { RoomScreen } from './components/Online/RoomScreen';
 
 function LocalApp() {
-  const { screen } = useUIStore();
+  const { screen, initPush } = useUIStore();
+
+  useEffect(() => {
+    initPush();
+  }, []);
   
   return (
     <>

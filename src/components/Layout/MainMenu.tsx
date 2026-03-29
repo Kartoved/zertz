@@ -66,7 +66,7 @@ export default function MainMenu() {
   const [selectedTimeControl, setSelectedTimeControl] = useState<'blitz' | 'rapid' | 'long' | 'correspondence'>('blitz');
   const [mobileMainTab, setMobileMainTab] = useState<'play' | 'chat'>('play');
 
-  const { user, fetchMe } = useAuthStore();
+  const { user, fetchMe, incomingChallengesCount } = useAuthStore();
   const boardLabels: Record<number, string> = { 37: t.board37, 48: t.board48, 61: t.board61 };
 
   useEffect(() => {
@@ -241,11 +241,16 @@ export default function MainMenu() {
               </button>
               {/* Challenges */}
               <button
-                className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                className={`relative p-2 rounded-lg transition-colors ${incomingChallengesCount > 0 ? 'text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
                 title={t.challenges}
                 onClick={() => modals.handleNavTab('challenges')}
               >
                 <Swords size={20} />
+                {incomingChallengesCount > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                    {incomingChallengesCount}
+                  </span>
+                )}
               </button>
             </>
           )}

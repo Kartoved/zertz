@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useI18n } from '../../i18n';
 import { useAuthStore } from '../../store/authStore';
 import { getGlobalChatMessages, sendGlobalChatMessage, GlobalChatMessage } from '../../db/globalChatApi';
+import PlayerProfileModal from '../Auth/PlayerProfileModal';
 
 const MAX_STORED_MESSAGES = 200;
 
@@ -12,6 +13,7 @@ export default function GlobalChat() {
   const [text, setText] = useState('');
   const [messages, setMessages] = useState<GlobalChatMessage[]>([]);
   const [lastMessageId, setLastMessageId] = useState(0);
+  const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -53,8 +55,14 @@ export default function GlobalChat() {
     return () => clearInterval(interval);
   }, [lastMessageId]);
 
+  const isInitialMount = useRef(true);
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (isInitialMount.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+      isInitialMount.current = false;
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
   const handleSend = () => {
@@ -89,6 +97,7 @@ export default function GlobalChat() {
   };
 
   return (
+    <>
     <div className="flex flex-col h-full bg-white dark:bg-gray-800 rounded-2xl shadow-md overflow-hidden">
       <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
         <h3 className="font-bold text-gray-800 dark:text-gray-200 text-sm uppercase tracking-wide">
@@ -111,9 +120,12 @@ export default function GlobalChat() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className={`text-xs font-semibold ${isMe ? 'text-teal-600 dark:text-teal-400' : 'text-gray-700 dark:text-gray-300'}`}>
+                    <button
+                      onClick={() => setSelectedUserId(msg.userId)}
+                      className={`text-xs font-semibold hover:underline ${isMe ? 'text-teal-600 dark:text-teal-400' : 'text-gray-700 dark:text-gray-300'}`}
+                    >
                       {msg.username}
-                    </span>
+                    </button>
                     <span className="text-xs text-gray-400 dark:text-gray-500">
                       {formatTime(msg.createdAt)}
                     </span>
@@ -159,5 +171,13 @@ export default function GlobalChat() {
         </div>
       </div>
     </div>
+
+    {selectedUserId !== null && (
+      <PlayerProfileModal
+        playerId={selectedUserId}
+        onClose={() => setSelectedUserId(null)}
+      />
+    )}
+    </>
   );
 }

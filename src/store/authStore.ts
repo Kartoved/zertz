@@ -9,6 +9,7 @@ interface AuthStore {
   token: string | null;
   isLoading: boolean;
   error: string | null;
+  incomingChallengesCount: number;
 
   login: (username: string, password: string) => Promise<void>;
   register: (username: string, password: string) => Promise<void>;
@@ -16,6 +17,7 @@ interface AuthStore {
   fetchMe: () => Promise<void>;
   updateProfile: (updates: { quote?: string; country?: string; contactLink?: string; oldPassword?: string; newPassword?: string }) => Promise<void>;
   clearError: () => void;
+  pollChallenges: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthStore>((set, get) => ({
@@ -23,6 +25,7 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   token: localStorage.getItem(TOKEN_KEY),
   isLoading: false,
   error: null,
+  incomingChallengesCount: 0,
 
   login: async (username, password) => {
     set({ isLoading: true, error: null });
@@ -82,10 +85,42 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
   },
 
   clearError: () => set({ error: null }),
+
+  pollChallenges: async () => {
+    const { token, user } = get();
+    if (!token || !user) return;
+    try {
+      const challenges = await authApi.getChallenges();
+      const incoming = challenges.filter((c: authApi.Challenge) => c.toUserId === user.id);
+      set({ incomingChallengesCount: incoming.length });
+    } catch {
+      // ignore
+    }
+  },
 }));
 
 // Auto-fetch user on app start if token exists
 const token = localStorage.getItem(TOKEN_KEY);
 if (token) {
-  useAuthStore.getState().fetchMe();
+  useAuthStore.getState().fetchMe().then(() => {
+    useAuthStore.getState().pollChallenges();
+  });
 }
+
+// Poll for incoming challenges every 15 seconds when logged in
+let challengePollInterval: ReturnType<typeof setInterval> | null = null;
+
+useAuthStore.subscribe((state, prev) => {
+  if (state.user && !prev.user) {
+    // User just logged in — start polling
+    challengePollInterval = setInterval(() => {
+      useAuthStore.getState().pollChallenges();
+    }, 15000);
+  } else if (!state.user && prev.user) {
+    // User logged out — stop polling
+    if (challengePollInterval !== null) {
+      clearInterval(challengePollInterval);
+      challengePollInterval = null;
+    }
+  }
+});

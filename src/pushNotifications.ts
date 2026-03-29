@@ -14,7 +14,16 @@ async function getVapidPublicKey(): Promise<string> {
 }
 
 export function getPushPref(): boolean {
-  return localStorage.getItem(PUSH_PREF_KEY) === 'true';
+  const val = localStorage.getItem(PUSH_PREF_KEY);
+  if (val === null) return true; // default: enabled for new users
+  return val === 'true';
+}
+
+export async function initPushIfFirstVisit(): Promise<boolean> {
+  if (localStorage.getItem(PUSH_PREF_KEY) !== null) return false; // user already made a choice
+  const ok = await subscribeToPush();
+  if (!ok) setPushPref(false);
+  return ok;
 }
 
 export function setPushPref(value: boolean): void {

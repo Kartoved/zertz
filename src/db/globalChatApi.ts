@@ -2,6 +2,7 @@ import { API_BASE, authHeaders } from './apiClient';
 
 export interface GlobalChatMessage {
   id: number;
+  userId: number;
   username: string;
   message: string;
   createdAt: number;

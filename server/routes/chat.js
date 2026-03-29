@@ -8,7 +8,7 @@ const router = Router();
 router.get('/', async (req, res) => {
   const { after } = req.query;
 
-  let query = 'SELECT id, username, message, created_at FROM global_chat_messages';
+  let query = 'SELECT id, user_id, username, message, created_at FROM global_chat_messages';
   const params = [];
 
   if (after) {
@@ -21,6 +21,7 @@ router.get('/', async (req, res) => {
   const result = await pool.query(query, params);
   res.json(result.rows.map((row) => ({
     id: row.id,
+    userId: row.user_id,
     username: row.username,
     message: row.message,
     createdAt: row.created_at.getTime(),
@@ -55,6 +56,7 @@ router.post('/', authRequired, async (req, res) => {
 
   res.json({
     id: result.rows[0].id,
+    userId,
     username,
     message: cleanMessage,
     createdAt: result.rows[0].created_at.getTime(),

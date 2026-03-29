@@ -21,8 +21,14 @@ export function ChatPanel({ inputBottomOffset = 0 }: ChatPanelProps) {
     sendMessage('[UNDO_REJECTED]');
   };
 
+  const isInitialMount = useRef(true);
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (isInitialMount.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
+      isInitialMount.current = false;
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages]);
 
   const handleSend = () => {
@@ -100,7 +106,7 @@ export function ChatPanel({ inputBottomOffset = 0 }: ChatPanelProps) {
                   {msg.message === '[UNDO_REQUEST]' ? (
                     <div>
                       <div className="font-semibold">{t.undoRequestChat || 'Requests undo'}</div>
-                      {!isMe && msg.moveNumber === state.moveNumber && !hasAnswer && !state.winner && (
+                      {!isMe && myPlayer !== null && msg.moveNumber === state.moveNumber && !hasAnswer && !state.winner && (
                         <div className="flex gap-2 mt-2">
                           <button
                             onClick={handleAcceptUndo}
