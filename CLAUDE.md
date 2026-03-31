@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What is this project
 
-Browser implementation of the ZERTZ board game (abstract strategy, GIPF Project). Supports local hot-seat and online multiplayer modes.
+Browser implementation of the ZERTZ board game (abstract strategy, GIPF Project). Supports local hot-seat, vs-bot, and online multiplayer modes. PWA-ready.
 
 ## Commands
 
@@ -19,13 +19,21 @@ npm run build        # tsc + vite build → dist/
 # Start production server
 npm start            # node server/server.js (serves dist/ as static files)
 
+# Tests
+npm run test         # Vitest (unit tests)
+npm run test:watch   # Vitest in watch mode
+
 # Local DB via Docker
 docker compose up -d  # starts postgres on port 5432
+
+# Deployment (Railway)
+npm run railway:build
+npm run railway:start
 ```
 
 Environment: copy `.env.example` → `.env`, set `JWT_SECRET`. Backend connects to Postgres via `DATABASE_URL` or individual `PG*` env vars.
 
-No automated test suite — Playwright is installed but test files haven't been written.
+Unit tests live in `src/game/GameEngine.test.ts` (Vitest). Playwright is installed but e2e test files haven't been written.
 
 ## Architecture overview
 
@@ -35,6 +43,12 @@ No automated test suite — Playwright is installed but test files haven't been 
 - `types.ts` — all core types (`GameState`, `Ring`, `Move`, `GameNode`, win conditions, reserves)
 - `Board.ts` — hex board geometry: axial coordinates (q,r), neighbor lookup, free-ring detection, isolation detection, SVG pixel conversion
 - `GameEngine.ts` — state machine: `placeMarble` → `removeRing` → `executeCapture` → win check; handles mandatory captures and isolation auto-capture
+- `GameEngine.test.ts` — Vitest unit tests for the engine
+
+**AI** (`src/ai/`) — bot opponent, runs in a Web Worker:
+- `minimax.ts` — minimax with alpha-beta pruning
+- `evaluate.ts` — position evaluation heuristic
+- `worker.ts` — Web Worker wrapper (keeps UI responsive during search)
 
 **State management** (`src/store/`) — Zustand:
 - `gameStore.ts` — local game (IndexedDB persistence, game tree navigation, undo)
@@ -47,6 +61,16 @@ No automated test suite — Playwright is installed but test files haven't been 
 - `*Api.ts` files — thin wrappers around each backend route group
 - `indexedDB.ts` + `gamesStorage.ts` — local game persistence
 
+**Utilities** (`src/utils/`):
+- `moveActions.ts` — shared move action helpers (used by gameStore and roomStore)
+- `sounds.ts` — sound effect playback
+- `country.ts` — country/locale utilities
+
+**Other frontend files**:
+- `pushNotifications.ts` — Web Push subscription management (client side)
+- `version.ts` — app version constant
+- `sw.js` — service worker (PWA caching)
+
 **Localization** (`src/locales/`) — TypeScript objects, three languages: `ru`, `en`, `eo`.
 
 ### Backend (`server/`)
@@ -55,7 +79,7 @@ Express app with JWT auth middleware. All routes under `/api`, static `dist/` se
 
 | Route prefix | File | Purpose |
 |---|---|---|
-| `/api/auth` | `routes/auth.js` | Register, login, profile |
+| `/api/auth` | `routes/auth.js` | Register, login, magic-link passwordless auth, profile |
 | `/api/rooms` | `routes/rooms.js` | Room CRUD, state sync, Glicko-2 rating update on finish |
 | `/api/matchmake` | `routes/matchmaking.js` | In-memory queue, adaptive rating tolerance |
 | `/api/challenges` | `routes/challenges.js` | Game invitations |
@@ -65,7 +89,11 @@ Express app with JWT auth middleware. All routes under `/api`, static `dist/` se
 | `/api/push` | `routes/push.js` | Web Push subscriptions (VAPID) |
 
 `server/db.js` owns the PostgreSQL pool and creates all tables on startup (idempotent).
-`server/utils/glicko2.js` — standalone Glicko-2 implementation.
+
+`server/utils/`:
+- `glicko2.js` — standalone Glicko-2 rating implementation
+- `mailer.js` — email sending (used for magic link auth)
+- `pushNotifications.js` — server-side Web Push delivery
 
 ### Game rules summary (for engine work)
 
