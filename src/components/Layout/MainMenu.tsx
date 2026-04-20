@@ -212,13 +212,48 @@ export default function MainMenu() {
               <span className="text-[10px] opacity-70">▼</span>
             </button>
             {activeDropdown === 'community' && (
-              <div className="absolute top-full left-0 mt-1 w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50">
+              <div className="absolute top-full left-0 mt-1 w-56 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg py-1 z-50">
                 <button
                   onClick={() => { modals.handleNavTab('players'); setActiveDropdown(null); }}
                   className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
                   {t.players}
                 </button>
+                <div className="border-t border-gray-200 dark:border-gray-700 my-1" />
+                <a
+                  href="https://t.me/iteracia_community"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setActiveDropdown(null)}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  <img src="/iteracia-logo.svg" alt="" className="w-5 h-5 rounded-sm flex-shrink-0" />
+                  Клуб Итерация
+                </a>
+                <a
+                  href="https://vk.com/zertz_game"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setActiveDropdown(null)}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="#0077FF">
+                    <path d="M15.07 2H8.93C3.33 2 2 3.33 2 8.93v6.14C2 20.67 3.33 22 8.93 22h6.14C20.67 22 22 20.67 22 15.07V8.93C22 3.33 20.67 2 15.07 2zm3.08 13.85h-1.6c-.6 0-.79-.48-1.87-1.57-1-.92-1.43-1.04-1.67-1.04-.34 0-.44.1-.44.57v1.43c0 .4-.13.65-1.17.65-1.74 0-3.66-1.05-5.01-3-2.04-2.86-2.6-5-2.6-5.43 0-.24.1-.46.57-.46h1.6c.43 0 .59.2.75.65.83 2.38 2.21 4.47 2.78 4.47.21 0 .31-.1.31-.65V9.27c-.07-1.17-.68-1.27-.68-1.69 0-.2.16-.4.42-.4h2.52c.36 0 .48.2.48.62v3.32c0 .36.16.48.26.48.21 0 .39-.12.77-.5 1.2-1.34 2.05-3.4 2.05-3.4.11-.24.31-.46.74-.46h1.6c.48 0 .59.25.48.59-.2.92-2.16 3.69-2.16 3.69-.17.28-.23.4 0 .72.17.24.72.72 1.09 1.15.67.77 1.18 1.41 1.32 1.85.13.43-.09.65-.54.65z"/>
+                  </svg>
+                  Сообщество ВК
+                </a>
+                <a
+                  href="https://discord.gg/CxQAQHS2Zk"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() => setActiveDropdown(null)}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="#5865F2">
+                    <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+                  </svg>
+                  Дискорд сообщество
+                </a>
               </div>
             )}
           </div>
@@ -370,6 +405,42 @@ export default function MainMenu() {
           >
             {t.tasks} ({t.comingSoon})
           </button>
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-2 space-y-2">
+            <a
+              href="https://t.me/iteracia_community"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => modals.setShowMobileMenu(false)}
+              className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700"
+            >
+              <img src="/iteracia-logo.svg" alt="" className="w-5 h-5 rounded-sm flex-shrink-0" />
+              Клуб Итерация
+            </a>
+            <a
+              href="https://vk.com/zertz_game"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => modals.setShowMobileMenu(false)}
+              className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700"
+            >
+              <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="#0077FF">
+                <path d="M15.07 2H8.93C3.33 2 2 3.33 2 8.93v6.14C2 20.67 3.33 22 8.93 22h6.14C20.67 22 22 20.67 22 15.07V8.93C22 3.33 20.67 2 15.07 2zm3.08 13.85h-1.6c-.6 0-.79-.48-1.87-1.57-1-.92-1.43-1.04-1.67-1.04-.34 0-.44.1-.44.57v1.43c0 .4-.13.65-1.17.65-1.74 0-3.66-1.05-5.01-3-2.04-2.86-2.6-5-2.6-5.43 0-.24.1-.46.57-.46h1.6c.43 0 .59.2.75.65.83 2.38 2.21 4.47 2.78 4.47.21 0 .31-.1.31-.65V9.27c-.07-1.17-.68-1.27-.68-1.69 0-.2.16-.4.42-.4h2.52c.36 0 .48.2.48.62v3.32c0 .36.16.48.26.48.21 0 .39-.12.77-.5 1.2-1.34 2.05-3.4 2.05-3.4.11-.24.31-.46.74-.46h1.6c.48 0 .59.25.48.59-.2.92-2.16 3.69-2.16 3.69-.17.28-.23.4 0 .72.17.24.72.72 1.09 1.15.67.77 1.18 1.41 1.32 1.85.13.43-.09.65-.54.65z"/>
+              </svg>
+              Сообщество ВК
+            </a>
+            <a
+              href="https://discord.gg/CxQAQHS2Zk"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => modals.setShowMobileMenu(false)}
+              className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-sm font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700"
+            >
+              <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="#5865F2">
+                <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028 14.09 14.09 0 0 0 1.226-1.994.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.03zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
+              </svg>
+              Дискорд сообщество
+            </a>
+          </div>
           {!user && (
             <button
               onClick={() => {
