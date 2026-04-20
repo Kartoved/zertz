@@ -241,7 +241,7 @@ router.get('/:id', async (req, res) => {
 // Update room state (after each move)
 router.put('/:id/state', optionalAuth, async (req, res) => {
   const { id } = req.params;
-  const { stateJson, treeJson, currentPlayer, winner, winType, playerIndex } = req.body;
+  const { stateJson, treeJson, currentPlayer, winner, winType, playerIndex, isUndo } = req.body;
 
   const roomCheck = await pool.query(
     `SELECT
@@ -302,7 +302,9 @@ router.put('/:id/state', optionalAuth, async (req, res) => {
     room.time_control_increment_ms != null &&
     room.clock_running_since != null;
 
-  if (isTimedGame) {
+  // For undo moves: preserve both clock values as-is; only restart clockRunningSince
+  // so the restored player's clock begins ticking from now (no time penalty for either side).
+  if (isTimedGame && !isUndo) {
     const nowMs = Date.now();
     const startedMs = new Date(room.clock_running_since).getTime();
     const elapsedMs = Math.max(0, nowMs - startedMs);

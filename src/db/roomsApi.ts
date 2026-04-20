@@ -138,7 +138,8 @@ export async function updateRoomState(
   currentPlayer: 1 | 2,
   winner: number | null,
   winType: string | null,
-  playerIndex?: 1 | 2
+  playerIndex?: 1 | 2,
+  isUndo?: boolean
 ): Promise<{ ratingDelta: RatingDelta | null }> {
   const response = await fetch(`${API_BASE}/api/rooms/${id}/state`, {
     method: 'PUT',
@@ -150,6 +151,7 @@ export async function updateRoomState(
       winner,
       winType,
       playerIndex,
+      isUndo: isUndo ?? false,
     }),
   });
 

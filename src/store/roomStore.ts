@@ -531,8 +531,19 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
     pendingMoveCount++;
     try {
-      const parentNode = currentNode.parent;
-      const idx = parentNode.children.indexOf(currentNode);
+      // Walk back to find the first node belonging to myPlayer in their current consecutive turn.
+      // A turn may span multiple tree nodes (e.g. placement node + one or more capture nodes).
+      let startOfTurn = currentNode;
+      while (
+        startOfTurn.parent &&
+        startOfTurn.parent.move !== null &&
+        startOfTurn.parent.player === myPlayerStr
+      ) {
+        startOfTurn = startOfTurn.parent;
+      }
+
+      const parentNode = startOfTurn.parent!;
+      const idx = parentNode.children.indexOf(startOfTurn);
       if (idx >= 0) {
         parentNode.children.splice(idx, 1);
       }
@@ -553,7 +564,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
       const winnerNum = winner === 'player1' ? 1 : winner === 'player2' ? 2 : null;
       const currentPlayerNum = newState.currentPlayer === 'player1' ? 1 : 2;
-      await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, winnerNum, winType, myPlayer);
+      // isUndo=true tells the backend to skip clock deduction — clocks must not change on undo
+      await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, winnerNum, winType, myPlayer, true);
       await persistOnlineGame(roomId, newState, gameTree, playerNames, winType);
     } catch (err) {
       console.error('[roomStore.undoLastMove] ERROR:', err);
