@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export type NavTab = 'playOnline' | 'playLocal' | 'loadGame' | 'rules' | 'players' | 'challenges';
+export type NavTab = 'playOnline' | 'playLocal' | 'loadGame' | 'rules' | 'players' | 'challenges' | 'lobby';
 
 export function useMainMenuModals() {
   const [showLoadDialog, setShowLoadDialog] = useState(false);
@@ -11,6 +11,7 @@ export function useMainMenuModals() {
   const [showPlayersModal, setShowPlayersModal] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showChallengesModal, setShowChallengesModal] = useState(false);
+  const [showLobbyModal, setShowLobbyModal] = useState(false);
   const [showBotDialog, setShowBotDialog] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
   const [onlineModalInitialStep, setOnlineModalInitialStep] = useState<'board' | 'link'>('board');
@@ -24,6 +25,7 @@ export function useMainMenuModals() {
       case 'rules': setShowRulesModal(true); break;
       case 'players': setShowPlayersModal(true); break;
       case 'challenges': setShowChallengesModal(true); break;
+      case 'lobby': setShowLobbyModal(true); break;
     }
   };
 
@@ -36,6 +38,7 @@ export function useMainMenuModals() {
     showPlayersModal, setShowPlayersModal,
     showRulesModal, setShowRulesModal,
     showChallengesModal, setShowChallengesModal,
+    showLobbyModal, setShowLobbyModal,
     showBotDialog, setShowBotDialog,
     showMobileMenu, setShowMobileMenu,
     onlineModalInitialStep, setOnlineModalInitialStep,

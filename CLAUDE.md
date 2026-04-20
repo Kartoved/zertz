@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What is this project
 
-Browser implementation of the ZERTZ board game (abstract strategy, GIPF Project). Supports local hot-seat, vs-bot, and online multiplayer modes. PWA-ready.
+Browser implementation of the ZERTZ board game (abstract strategy, GIPF Project). Supports local hot-seat, online multiplayer, and lobby modes. PWA-ready. Bot (vs-AI) mode is present in the codebase but disabled in the UI (marked "coming soon").
 
 ## Commands
 
@@ -55,6 +55,7 @@ Unit tests live in `src/game/GameEngine.test.ts` (Vitest). Playwright is install
 - `roomStore.ts` — online game (polls backend, syncs state/tree, manages clocks and chat)
 - `authStore.ts` — JWT session (stored in localStorage)
 - `uiStore.ts` — screen routing (`'menu' | 'game' | 'rules'`) and modal visibility
+- `lobbyStore.ts` — lobby slots (polls `/api/lobby` every 5s, create/join/cancel slot)
 
 **DB/API layer** (`src/db/`):
 - `apiClient.ts` — base fetch helpers + `serializeState`/`deserializeState` + `serializeTree`/`deserializeTree` (GameState ↔ JSON for API calls)
@@ -87,6 +88,7 @@ Express app with JWT auth middleware. All routes under `/api`, static `dist/` se
 | `/api/games` | `routes/games.js` | Game history |
 | `/api/global-chat` | `routes/chat.js` | Global chat |
 | `/api/push` | `routes/push.js` | Web Push subscriptions (VAPID) |
+| `/api/lobby` | `routes/lobby.js` | Public lobby slots (create/join/cancel, 10-min TTL) |
 
 `server/db.js` owns the PostgreSQL pool and creates all tables on startup (idempotent).
 

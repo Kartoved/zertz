@@ -185,6 +185,30 @@ async function ensureSchema() {
     );
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_push_user_id ON push_subscriptions(user_id);`);
+
+  // Lobby slots table — open game invitations visible to all players
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS lobby_slots (
+      id SERIAL PRIMARY KEY,
+      user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      username TEXT NOT NULL,
+      rating INTEGER NOT NULL DEFAULT 1500,
+      country TEXT NOT NULL DEFAULT '🌍',
+      board_size INTEGER NOT NULL DEFAULT 37,
+      time_control_id TEXT NOT NULL DEFAULT 'rapid',
+      time_control_base_ms BIGINT,
+      time_control_increment_ms BIGINT,
+      rated BOOLEAN NOT NULL DEFAULT true,
+      state_json TEXT NOT NULL,
+      tree_json TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'open',
+      room_id INTEGER REFERENCES rooms(id) ON DELETE SET NULL,
+      created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+      expires_at TIMESTAMP NOT NULL DEFAULT (NOW() + INTERVAL '10 minutes'),
+      UNIQUE(user_id)
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_lobby_expires ON lobby_slots(expires_at);`);
 }
 
 export { pool, ensureSchema };
