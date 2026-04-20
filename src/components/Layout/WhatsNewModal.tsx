@@ -1,4 +1,15 @@
 import { useI18n } from '../../i18n';
+import { APP_VERSION } from '../../version';
+
+const SEEN_VERSION_KEY = 'zertz_whats_new_seen';
+
+export function getUnseenVersion(): boolean {
+  return localStorage.getItem(SEEN_VERSION_KEY) !== APP_VERSION;
+}
+
+export function markVersionSeen(): void {
+  localStorage.setItem(SEEN_VERSION_KEY, APP_VERSION);
+}
 
 interface WhatsNewModalProps {
   onClose: () => void;
@@ -11,6 +22,36 @@ interface ChangelogEntry {
 }
 
 const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: '0.9.25',
+    date: '2026-04-20',
+    changes: {
+      ru: [
+        'Лобби — новая вкладка: создай открытую партию и жди любого соперника; список обновляется каждые 5 секунд',
+        'Создатель автоматически попадает в комнату, когда соперник принимает вызов из лобби',
+        'Ссылки на сообщества в меню «Комьюнити»: Клуб Итерация (Telegram), ВКонтакте, Дискорд',
+        'Кнопка «Игра против бота» временно скрыта — появится в следующих версиях',
+        'Что нового открывается автоматически при первом запуске после обновления',
+        'Версия обновлена до v0.9.25',
+      ],
+      en: [
+        'Lobby — new tab: create an open game and wait for any opponent; list refreshes every 5 seconds',
+        'Creator is automatically redirected to the room when an opponent accepts from the lobby',
+        'Community links in the menu: Iteracia Club (Telegram), VKontakte, Discord',
+        '"Play vs Bot" button temporarily hidden — coming in a future release',
+        'What\'s New opens automatically on first launch after an update',
+        'Version updated to v0.9.25',
+      ],
+      eo: [
+        'Lobiejo — nova langeto: kreu malfermaitan ludon kaj atendu iun ajn kontraŭulon; listo ĝisdatiĝas ĉiujn 5 sekundojn',
+        'Kreinto aŭtomate transiras al la ĉambro kiam kontraŭulo akceptas el la lobiejo',
+        'Komunumaj ligiloj en la menuo: Klubo Iteracia (Telegram), VKontakte, Diskord',
+        'Butono "Ludi kontraŭ roboto" provizore kaŝita — aperos en estontaj eldonoj',
+        'Kio estas nova malfermiĝas aŭtomate ĉe la unua lanĉo post ĝisdatigo',
+        'Versio ĝisdatigita al v0.9.25',
+      ],
+    },
+  },
   {
     version: '0.9.24',
     date: '2026-03-29',
@@ -226,10 +267,15 @@ const CHANGELOG: ChangelogEntry[] = [
 export default function WhatsNewModal({ onClose }: WhatsNewModalProps) {
   const { t, language } = useI18n();
 
+  const handleClose = () => {
+    markVersionSeen();
+    onClose();
+  };
+
   return (
     <div
       className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-      onClick={onClose}
+      onClick={handleClose}
     >
       <div
         className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[85vh] overflow-hidden flex flex-col"
@@ -238,7 +284,7 @@ export default function WhatsNewModal({ onClose }: WhatsNewModalProps) {
         <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">{t.whatsNew}</h2>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-xl leading-none"
           >
             ✕

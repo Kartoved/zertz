@@ -14,7 +14,7 @@ import GlobalChat from '../UI/GlobalChat';
 import { Settings, Users, Swords } from 'lucide-react';
 import LoadGameModal from './LoadGameModal';
 import RulesModal from './RulesModal';
-import WhatsNewModal from './WhatsNewModal';
+import WhatsNewModal, { getUnseenVersion } from './WhatsNewModal';
 import BoardSelectionModal from './BoardSelectionModal';
 import BotGameModal from './BotGameModal';
 import SearchingMatchOverlay from './SearchingMatchOverlay';
@@ -110,7 +110,7 @@ export default function MainMenu() {
   };
 
   const [activeDropdown, setActiveDropdown] = useState<'play' | 'learning' | 'community' | 'settings' | null>(null);
-  const [showWhatsNewModal, setShowWhatsNewModal] = useState(false);
+  const [showWhatsNewModal, setShowWhatsNewModal] = useState(() => getUnseenVersion());
 
   // Close dropdowns when clicking outside
   useEffect(() => {
