@@ -245,7 +245,7 @@ export function RoomScreen() {
   }
 
   return (
-    <div className="min-h-screen lg:h-screen lg:overflow-hidden bg-gray-100 dark:bg-gray-900 flex flex-col overflow-x-hidden">
+    <div className="h-screen h-[100dvh] overflow-hidden bg-gray-100 dark:bg-gray-900 flex flex-col overflow-x-hidden">
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 shadow-sm p-3 md:p-4">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">

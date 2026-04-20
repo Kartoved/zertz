@@ -132,7 +132,7 @@ export default function MainMenu() {
   const currentGames = savedGames.filter(g => !g.winner);
 
   return (
-    <div className="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-900 dark:to-gray-800">
+    <div className="h-screen h-[100dvh] overflow-hidden flex flex-col bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-900 dark:to-gray-800">
       {/* ═══════ TOP NAV BAR ═══════ */}
       <header className="bg-white dark:bg-gray-800 shadow-md px-4 py-2 flex items-center justify-between relative z-30">
         {/* Logo */}

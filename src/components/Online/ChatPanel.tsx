@@ -21,14 +21,9 @@ export function ChatPanel({ inputBottomOffset = 0 }: ChatPanelProps) {
     sendMessage('[UNDO_REJECTED]');
   };
 
-  const isInitialMount = useRef(true);
   useEffect(() => {
-    if (isInitialMount.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'instant' });
-      isInitialMount.current = false;
-    } else {
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
+    const container = messagesEndRef.current?.parentElement;
+    if (container) container.scrollTop = container.scrollHeight;
   }, [messages]);
 
   const handleSend = () => {
