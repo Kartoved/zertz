@@ -635,10 +635,11 @@ router.post('/:id/cancel', authRequired, async (req, res) => {
   res.json({ ok: true });
 });
 
-// Delete room
+// Delete room (and any linked saved game so it doesn't linger in "current games")
 router.delete('/:id', async (req, res) => {
   const { id } = req.params;
   await pool.query('DELETE FROM rooms WHERE id = $1', [id]);
+  await pool.query('DELETE FROM games WHERE id = $1', [String(id)]);
   res.json({ ok: true });
 });
 

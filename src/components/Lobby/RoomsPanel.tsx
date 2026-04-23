@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useI18n } from '../../i18n';
 import { useAuthStore } from '../../store/authStore';
 import { getPendingRooms, deleteRoom, PendingRoom } from '../../db/roomsApi';
+import { deleteGame } from '../../db/gamesStorage';
+import { useGameStore } from '../../store/gameStore';
 import { TIME_CONTROLS } from '../Layout/MainMenu';
 
 interface RoomsPanelProps {
@@ -31,6 +33,7 @@ export default function RoomsPanel({ onCreateGame, currentGames, onLoadGame }: R
   const { t } = useI18n();
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const { refreshSavedGames } = useGameStore();
 
   const [pendingRooms, setPendingRooms] = useState<PendingRoom[]>([]);
   const [copiedRoomId, setCopiedRoomId] = useState<number | null>(null);
@@ -61,10 +64,12 @@ export default function RoomsPanel({ onCreateGame, currentGames, onLoadGame }: R
     try {
       await deleteRoom(roomId);
       setPendingRooms(rs => rs.filter(r => r.id !== roomId));
+      await deleteGame(String(roomId)).catch(() => { /* ignore if not persisted yet */ });
+      await refreshSavedGames();
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [refreshSavedGames]);
 
   const onlineCurrent = currentGames.filter(g => g.isOnline);
 

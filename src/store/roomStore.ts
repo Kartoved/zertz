@@ -195,14 +195,6 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         lastMessageId: 0,
       });
 
-      await persistOnlineGame(
-        roomId,
-        initialState,
-        rootNode,
-        names,
-        null
-      );
-
       return roomId;
     } catch (err) {
       set({ error: getI18nFromStorage().t.createRoomError, isLoading: false });
