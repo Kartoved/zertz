@@ -23,6 +23,36 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.9.26',
+    date: '2026-04-24',
+    changes: {
+      ru: [
+        'Комнаты — главная вкладка: создай партию (через тот же диалог, что и «По ссылке») и жди соперника в списке',
+        'Ладдер — вторая вкладка: поиск по матчмейкингу, выбор доски и времени',
+        'Кнопка копирования ссылки прямо в карточке ожидающей комнаты (иконкой)',
+        'Текущие онлайн-партии отображаются в табе «Комнаты»',
+        'Счётчик ожидающих комнат на вкладке обновляется в реальном времени',
+        'Версия обновлена до v0.9.26',
+      ],
+      en: [
+        'Rooms — default tab: create a game (same dialog as "Play by Link") and wait for an opponent in the list',
+        'Ladder — second tab: matchmaking search, board and time control selection',
+        'Copy-link icon button directly on each waiting room card',
+        'Current online games shown in the Rooms tab',
+        'Waiting rooms counter on the tab updates in real time',
+        'Version updated to v0.9.26',
+      ],
+      eo: [
+        'Ĉambroj — ĉefa langeto: kreu ludon (sama dialogo kiel "Ludi per ligilo") kaj atendu kontraŭulon en la listo',
+        'Skaloj — dua langeto: serĉo per kontraŭulomatĉado, elekto de tabulo kaj tempa kontrolo',
+        'Kopiada ligila ikono-butono rekte sur la atendanta ĉambra karto',
+        'Aktualaj retaj ludoj montrataj en la langeto Ĉambroj',
+        'Kalkulilo de atendantaj ĉambroj sur la langeto ĝisdatiĝas en reala tempo',
+        'Versio ĝisdatigita al v0.9.26',
+      ],
+    },
+  },
+  {
     version: '0.9.25',
     date: '2026-04-20',
     changes: {

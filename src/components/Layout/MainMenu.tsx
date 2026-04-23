@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useUIStore, Language } from '../../store/uiStore';
 import { useGameStore } from '../../store/gameStore';
 import { useAuthStore } from '../../store/authStore';
+import { getPendingRooms } from '../../db/roomsApi';
 import { useI18n } from '../../i18n';
 import { APP_VERSION } from '../../version';
 import AuthModal from '../Auth/AuthModal';
@@ -23,7 +24,7 @@ import ActiveGamesWidget from './ActiveGamesWidget';
 import { useMainMenuModals, NavTab } from './useMainMenuModals';
 import { useMatchmaking } from './useMatchmaking';
 import MiniGamePreview from '../UI/MiniGamePreview';
-import LobbyScreen from '../Lobby/LobbyScreen';
+import RoomsPanel from '../Lobby/RoomsPanel';
 
 export type TimePresetId = '5+5' | '15+0' | '30+0' | '7d';
 
@@ -68,6 +69,8 @@ export default function MainMenu() {
   const [selectedPreset, setSelectedPreset] = useState<TimePresetId>('5+5');
   const [selectedTimeControl, setSelectedTimeControl] = useState<'blitz' | 'rapid' | 'long' | 'correspondence'>('blitz');
   const [mobileMainTab, setMobileMainTab] = useState<'play' | 'chat'>('play');
+  const [centerTab, setCenterTab] = useState<'ladder' | 'rooms'>('rooms');
+  const [pendingRoomsCount, setPendingRoomsCount] = useState(0);
 
   const { user, fetchMe, incomingChallengesCount } = useAuthStore();
   const boardLabels: Record<number, string> = { 37: t.board37, 48: t.board48, 61: t.board61 };
@@ -76,6 +79,20 @@ export default function MainMenu() {
     refreshSavedGames();
     fetchMe();
   }, [refreshSavedGames, fetchMe, user?.id]);
+
+  useEffect(() => {
+    if (!user) { setPendingRoomsCount(0); return; }
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const rooms = await getPendingRooms();
+        if (!cancelled) setPendingRoomsCount(rooms.length);
+      } catch { /* ignore */ }
+    };
+    refresh();
+    const id = setInterval(refresh, 5000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [user?.id]);
 
   const handleSelectBoard = (boardSize: 37 | 48 | 61) => {
     newGame(boardSize);
@@ -201,16 +218,6 @@ export default function MainMenu() {
               </div>
             )}
           </div>
-
-          {/* LOBBY */}
-          <button
-            onClick={() => { modals.handleNavTab('lobby'); setActiveDropdown(null); }}
-            className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors
-              text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700
-              hover:text-gray-900 dark:hover:text-white uppercase tracking-wide"
-          >
-            {t.lobby}
-          </button>
 
           {/* COMMUNITY */}
           <div className="relative group">
@@ -545,6 +552,56 @@ export default function MainMenu() {
           )}
 
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 flex-1 flex flex-col overflow-y-auto">
+            {/* Center tabs */}
+            <div className="grid grid-cols-2 bg-gray-100 dark:bg-gray-700 rounded-xl p-1 mb-5">
+              <button
+                type="button"
+                onClick={() => setCenterTab('rooms')}
+                className={`py-2 text-sm font-semibold rounded-lg transition-colors ${
+                  centerTab === 'rooms'
+                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                }`}
+              >
+                {t.tabRooms}
+                {pendingRoomsCount > 0 && (
+                  <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full font-semibold ${
+                    centerTab === 'rooms'
+                      ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300'
+                      : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300'
+                  }`}>
+                    {pendingRoomsCount}
+                  </span>
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setCenterTab('ladder')}
+                className={`py-2 text-sm font-semibold rounded-lg transition-colors ${
+                  centerTab === 'ladder'
+                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
+                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                }`}
+              >
+                {t.tabLadder}
+              </button>
+            </div>
+
+            {centerTab === 'rooms' && (
+              <RoomsPanel
+                onCreateGame={() => {
+                  const tc = TIME_CONTROLS.find(c => c.id === selectedTimeControl);
+                  if (tc && tc.preset !== null) setSelectedPreset(tc.preset);
+                  modals.setOnlineModalInitialStep('board');
+                  modals.setShowOnlineDialog(true);
+                }}
+                currentGames={currentGames}
+                onLoadGame={handleLoadGame}
+              />
+            )}
+
+            {centerTab === 'ladder' && (
+              <>
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
               {t.selectBoard}
             </h2>
@@ -618,69 +675,71 @@ export default function MainMenu() {
               })}
             </div>
 
-            <div className="mt-8 flex flex-col gap-3 items-center">
-              <div className="flex gap-2 w-full sm:w-2/3 lg:w-1/2">
-                <button
-                  type="button"
-                  disabled={!user}
-                  className={`flex-1 py-3.5 px-3 rounded-xl font-bold sm:text-lg text-base transition-all shadow-md
-                    ${user
-                      ? 'hover:shadow-lg active:scale-95 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white'
-                      : 'opacity-50 cursor-not-allowed bg-gradient-to-r from-blue-500 to-indigo-600 text-white'
-                    }`}
-                  onClick={() => startSearch(selectedBoardSize, selectedTimeControl, () => modals.setShowAuthModal(true))}
-                >
-                  {t.searchGame}
-                </button>
+            <div className="mt-6 flex flex-col gap-3 items-center">
+                <div className="flex gap-2 w-full sm:w-2/3 lg:w-1/2">
+                  <button
+                    type="button"
+                    disabled={!user}
+                    className={`flex-1 py-3.5 px-3 rounded-xl font-bold sm:text-lg text-base transition-all shadow-md
+                      ${user
+                        ? 'hover:shadow-lg active:scale-95 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white'
+                        : 'opacity-50 cursor-not-allowed bg-gradient-to-r from-blue-500 to-indigo-600 text-white'
+                      }`}
+                    onClick={() => startSearch(selectedBoardSize, selectedTimeControl, () => modals.setShowAuthModal(true))}
+                  >
+                    {t.searchGame}
+                  </button>
 
-                <button
-                  type="button"
-                  disabled={!user}
-                  className={`flex-1 py-3.5 px-3 rounded-xl font-bold sm:text-lg text-base transition-all shadow-md
-                    ${user
-                      ? 'hover:shadow-lg active:scale-95 bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 hover:bg-gray-50 dark:hover:bg-gray-700'
-                      : 'opacity-50 cursor-not-allowed bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800'
-                    }`}
-                  onClick={() => {
-                    if (!user) return;
-                    const tc = TIME_CONTROLS.find(c => c.id === selectedTimeControl);
-                    if (!tc) return;
-                    if (tc.preset !== null) setSelectedPreset(tc.preset);
-                    modals.setOnlineModalInitialStep('board');
-                    modals.setShowOnlineDialog(true);
-                  }}
-                >
-                  {t.playByLink}
-                </button>
+                  <button
+                    type="button"
+                    disabled={!user}
+                    className={`flex-1 py-3.5 px-3 rounded-xl font-bold sm:text-lg text-base transition-all shadow-md
+                      ${user
+                        ? 'hover:shadow-lg active:scale-95 bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 hover:bg-gray-50 dark:hover:bg-gray-700'
+                        : 'opacity-50 cursor-not-allowed bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800'
+                      }`}
+                    onClick={() => {
+                      if (!user) return;
+                      const tc = TIME_CONTROLS.find(c => c.id === selectedTimeControl);
+                      if (!tc) return;
+                      if (tc.preset !== null) setSelectedPreset(tc.preset);
+                      modals.setOnlineModalInitialStep('board');
+                      modals.setShowOnlineDialog(true);
+                    }}
+                  >
+                    {t.playByLink}
+                  </button>
+                </div>
+
+                {!user && (
+                  <p className="text-sm text-gray-500 dark:text-gray-400 text-center mt-1">
+                    🔒 {t.onlineRequiresAuth}
+                  </p>
+                )}
+
+                <div className="flex gap-2 w-full sm:w-2/3 lg:w-1/2">
+                  <button
+                    type="button"
+                    disabled
+                    className="flex-1 py-2.5 px-3 rounded-xl font-semibold text-sm shadow-sm
+                      bg-gray-100 dark:bg-gray-700 opacity-50 cursor-not-allowed
+                      text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-600"
+                  >
+                    🤖 {t.playVsBot} <span className="text-xs font-normal">({t.comingSoon})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => modals.setShowBoardDialog(true)}
+                    className="flex-1 py-2.5 px-3 rounded-xl font-semibold text-sm transition-all shadow-sm
+                      bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600
+                      text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600"
+                  >
+                    👥 {t.playLocal}
+                  </button>
+                </div>
               </div>
-
-              {!user && (
-                <p className="text-sm text-gray-500 dark:text-gray-400 text-center mt-1">
-                  🔒 {t.onlineRequiresAuth}
-                </p>
-              )}
-
-              <div className="flex gap-2 w-full sm:w-2/3 lg:w-1/2">
-                <button
-                  type="button"
-                  disabled
-                  className="flex-1 py-2.5 px-3 rounded-xl font-semibold text-sm shadow-sm
-                    bg-gray-100 dark:bg-gray-700 opacity-50 cursor-not-allowed
-                    text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-600"
-                >
-                  🤖 {t.playVsBot} <span className="text-xs font-normal">({t.comingSoon})</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => modals.setShowBoardDialog(true)}
-                  className="flex-1 py-2.5 px-3 rounded-xl font-semibold text-sm transition-all shadow-sm
-                    bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600
-                    text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600"
-                >
-                  👥 {t.playLocal}
-                </button>
-              </div>
-            </div>
+              </>
+            )}
 
           </div>
 
@@ -737,9 +796,8 @@ export default function MainMenu() {
       {modals.showProfileModal && <ProfileModal onClose={() => modals.setShowProfileModal(false)} />}
       {modals.showPlayersModal && <PlayersModal onClose={() => modals.setShowPlayersModal(false)} />}
       {modals.showChallengesModal && <ChallengesModal onClose={() => modals.setShowChallengesModal(false)} />}
-      {modals.showLobbyModal && <LobbyScreen onClose={() => modals.setShowLobbyModal(false)} />}
 
-      {modals.showRulesModal && <RulesModal onClose={() => modals.setShowRulesModal(false)} />}
+{modals.showRulesModal && <RulesModal onClose={() => modals.setShowRulesModal(false)} />}
       {showWhatsNewModal && <WhatsNewModal onClose={() => setShowWhatsNewModal(false)} />}
     </div>
   );
