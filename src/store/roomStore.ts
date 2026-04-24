@@ -422,7 +422,12 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       if (!result) return;
 
       const { newState, move, winner, winType, needsRingRemoval } = result;
-      if (hasAvailableCaptures(newState)) newState.phase = 'capture';
+      // Only promote to 'capture' if turn already passed to opponent (phase='placement').
+      // If player still owes a ring removal (phase='ringRemoval'), do NOT override —
+      // the forced capture belongs to the opponent after ring removal completes.
+      if (newState.phase === 'placement' && hasAvailableCaptures(newState)) {
+        newState.phase = 'capture';
+      }
 
       playPlaceSound();
       if (winner) playWinSound();
@@ -464,7 +469,10 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       if (!result) return;
 
       const { newState, winner, winType } = result;
-      if (hasAvailableCaptures(newState)) newState.phase = 'capture';
+      // After ring removal the turn has passed; only set 'capture' if still in play.
+      if (newState.phase === 'placement' && hasAvailableCaptures(newState)) {
+        newState.phase = 'capture';
+      }
 
       playRemoveRingSound();
       if (winner) playWinSound();
@@ -493,8 +501,10 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     pendingMoveCount++;
     try {
       const { newState, move, previousPlayer, previousMoveNumber, winner, winType } = applyCapture(state, captures);
-      if (hasAvailableCaptures(newState)) newState.phase = 'capture';
-      else newState.phase = 'placement';
+      // Don't override 'gameOver' when the capture ended the game.
+      if (newState.phase !== 'gameOver') {
+        newState.phase = hasAvailableCaptures(newState) ? 'capture' : 'placement';
+      }
 
       const newNode = addMoveToTree(currentNode, move, previousPlayer, previousMoveNumber, state.boardSize);
 
