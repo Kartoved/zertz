@@ -287,6 +287,7 @@ export const ru = {
   loginToPlay: 'Войдите, чтобы создавать и принимать игры',
   tabLadder: 'Ладдер',
   tabRooms: 'Комнаты',
+  openRooms: 'Открытые комнаты',
   lobby: 'Лобби',
   lobbyEmpty: 'Нет открытых комнат — создай первым!',
   lobbyCreate: 'Создать игру',

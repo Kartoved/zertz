@@ -287,6 +287,7 @@ export const en = {
   loginToPlay: 'Log in to create and join games',
   tabLadder: 'Ladder',
   tabRooms: 'Rooms',
+  openRooms: 'Open rooms',
   lobby: 'Lobby',
   lobbyEmpty: 'No open rooms — create one first!',
   lobbyCreate: 'Create Game',

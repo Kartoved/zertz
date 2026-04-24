@@ -287,6 +287,7 @@ export const eo = {
   loginToPlay: 'Ensalutu por krei kaj aliĝi al ludoj',
   tabLadder: 'Skaloj',
   tabRooms: 'Ĉambroj',
+  openRooms: 'Malfermitaj ĉambroj',
   lobby: 'Lobiejo',
   lobbyEmpty: 'Neniuj malfermitaj ĉambroj — kreu unue!',
   lobbyCreate: 'Krei ludon',

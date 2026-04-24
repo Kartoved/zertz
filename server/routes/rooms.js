@@ -37,6 +37,34 @@ router.get('/pending', authRequired, async (req, res) => {
   }
 });
 
+// Public list of all rooms waiting for an opponent (no auth required)
+router.get('/open', async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, board_size, creator_player, player1_name, player2_name, rated,
+              time_control_base_ms, time_control_increment_ms, created_at
+       FROM rooms
+       WHERE winner IS NULL AND user2_id IS NULL
+       ORDER BY created_at DESC
+       LIMIT 50`
+    );
+    res.json(result.rows.map(r => ({
+      id: r.id,
+      boardSize: r.board_size,
+      creatorPlayer: r.creator_player,
+      player1Name: r.player1_name,
+      player2Name: r.player2_name,
+      rated: r.rated || false,
+      timeControlBaseMs: r.time_control_base_ms,
+      timeControlIncrementMs: r.time_control_increment_ms,
+      createdAt: r.created_at.getTime(),
+    })));
+  } catch (err) {
+    console.error('Get open rooms error:', err);
+    res.status(500).json({ error: 'Failed to get open rooms' });
+  }
+});
+
 // Create a new room
 router.post('/', optionalAuth, async (req, res) => {
   const {

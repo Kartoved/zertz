@@ -262,6 +262,12 @@ export async function getPendingRooms(): Promise<PendingRoom[]> {
   return response.json();
 }
 
+export async function getOpenRooms(): Promise<PendingRoom[]> {
+  const response = await fetch(`${API_BASE}/api/rooms/open`);
+  if (!response.ok) return [];
+  return response.json();
+}
+
 export async function deleteRoom(id: number | string): Promise<void> {
   const response = await fetch(`${API_BASE}/api/rooms/${id}`, { method: 'DELETE' });
   if (!response.ok) throw new Error('Failed to delete room');
