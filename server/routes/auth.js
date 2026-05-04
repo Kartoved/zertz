@@ -14,30 +14,30 @@ router.post('/register', async (req, res) => {
   const { username, password, email } = req.body;
 
   if (!username || !password) {
-    res.status(400).json({ error: 'Укажите ник и пароль' });
+    res.status(400).json({ error: 'fillAllFields' });
     return;
   }
 
   const trimmedName = username.trim();
   if (trimmedName.length < 2 || trimmedName.length > 24) {
-    res.status(400).json({ error: 'Ник должен быть от 2 до 24 символов' });
+    res.status(400).json({ error: 'nicknameRangeError' });
     return;
   }
 
   if (password.length < 8) {
-    res.status(400).json({ error: 'Пароль должен быть не менее 8 символов' });
+    res.status(400).json({ error: 'passwordLengthError' });
     return;
   }
 
   if (!SPECIAL_CHARS.test(password)) {
-    res.status(400).json({ error: 'Пароль должен содержать хотя бы один спецсимвол' });
+    res.status(400).json({ error: 'passwordCharError' });
     return;
   }
 
   try {
     const existing = await pool.query('SELECT id FROM users WHERE LOWER(username) = LOWER($1)', [trimmedName]);
     if (existing.rows.length > 0) {
-      res.status(409).json({ error: 'Ник уже занят' });
+      res.status(409).json({ error: 'nicknameTaken' });
       return;
     }
 
@@ -45,7 +45,7 @@ router.post('/register', async (req, res) => {
     if (emailValue) {
       const emailExists = await pool.query('SELECT id FROM users WHERE email = $1', [emailValue]);
       if (emailExists.rows.length > 0) {
-        res.status(409).json({ error: 'Этот email уже используется' });
+        res.status(409).json({ error: 'emailAlreadyTaken' });
         return;
       }
     }
@@ -79,7 +79,7 @@ router.post('/register', async (req, res) => {
     });
   } catch (err) {
     console.error('Register error:', err);
-    res.status(500).json({ error: 'Ошибка регистрации' });
+    res.status(500).json({ error: 'serverError' });
   }
 });
 
@@ -87,21 +87,21 @@ router.post('/login', async (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
-    res.status(400).json({ error: 'Укажите ник и пароль' });
+    res.status(400).json({ error: 'fillAllFields' });
     return;
   }
 
   try {
     const result = await pool.query('SELECT * FROM users WHERE LOWER(username) = LOWER($1)', [username.trim()]);
     if (result.rows.length === 0) {
-      res.status(401).json({ error: 'Неверный ник или пароль' });
+      res.status(401).json({ error: 'invalidCredentials' });
       return;
     }
 
     const user = result.rows[0];
     const valid = await bcrypt.compare(password, user.password_hash);
     if (!valid) {
-      res.status(401).json({ error: 'Неверный ник или пароль' });
+      res.status(401).json({ error: 'invalidCredentials' });
       return;
     }
 
@@ -127,7 +127,7 @@ router.post('/login', async (req, res) => {
     });
   } catch (err) {
     console.error('Login error:', err);
-    res.status(500).json({ error: 'Ошибка входа' });
+    res.status(500).json({ error: 'serverError' });
   }
 });
 
@@ -138,7 +138,7 @@ router.get('/me', authRequired, async (req, res) => {
       [req.user.id]
     );
     if (result.rows.length === 0) {
-      res.status(404).json({ error: 'Пользователь не найден' });
+      res.status(404).json({ error: 'serverError' });
       return;
     }
     const u = result.rows[0];
@@ -159,7 +159,7 @@ router.get('/me', authRequired, async (req, res) => {
     });
   } catch (err) {
     console.error('Get me error:', err);
-    res.status(500).json({ error: 'Ошибка получения профиля' });
+    res.status(500).json({ error: 'serverError' });
   }
 });
 
@@ -169,21 +169,21 @@ router.put('/profile', authRequired, async (req, res) => {
   try {
     if (newPassword !== undefined) {
       if (!oldPassword) {
-        res.status(400).json({ error: 'Укажите текущий пароль' });
+        res.status(400).json({ error: 'fillAllPasswordFields' });
         return;
       }
       if (newPassword.length < 8) {
-        res.status(400).json({ error: 'Новый пароль должен быть не менее 8 символов' });
+        res.status(400).json({ error: 'newPasswordLengthError' });
         return;
       }
       if (!SPECIAL_CHARS.test(newPassword)) {
-        res.status(400).json({ error: 'Новый пароль должен содержать хотя бы один спецсимвол' });
+        res.status(400).json({ error: 'newPasswordCharError' });
         return;
       }
       const userRow = await pool.query('SELECT password_hash FROM users WHERE id = $1', [req.user.id]);
       const valid = await bcrypt.compare(oldPassword, userRow.rows[0].password_hash);
       if (!valid) {
-        res.status(401).json({ error: 'Неверный текущий пароль' });
+        res.status(401).json({ error: 'wrongCurrentPassword' });
         return;
       }
       const hash = await bcrypt.hash(newPassword, 12);
@@ -204,7 +204,7 @@ router.put('/profile', authRequired, async (req, res) => {
       if (emailValue) {
         const emailExists = await pool.query('SELECT id FROM users WHERE email = $1 AND id != $2', [emailValue, req.user.id]);
         if (emailExists.rows.length > 0) {
-          res.status(409).json({ error: 'Этот email уже используется' });
+          res.status(409).json({ error: 'emailAlreadyTaken' });
           return;
         }
       }
@@ -233,7 +233,7 @@ router.put('/profile', authRequired, async (req, res) => {
     });
   } catch (err) {
     console.error('Update profile error:', err);
-    res.status(500).json({ error: 'Ошибка обновления профиля' });
+    res.status(500).json({ error: 'serverError' });
   }
 });
 
@@ -241,7 +241,7 @@ router.put('/profile', authRequired, async (req, res) => {
 router.post('/magic-link/request', async (req, res) => {
   const { email } = req.body;
   if (!email) {
-    res.status(400).json({ error: 'Укажите email' });
+    res.status(400).json({ error: 'fillAllFields' });
     return;
   }
 
@@ -253,7 +253,7 @@ router.post('/magic-link/request', async (req, res) => {
       [emailLower]
     );
     if (result.rows.length === 0) {
-      res.status(404).json({ error: 'Аккаунт с таким email не найден' });
+      res.status(404).json({ error: 'magicLinkEmailNotFound' });
       return;
     }
 
@@ -285,7 +285,7 @@ router.post('/magic-link/request', async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error('Magic link request error:', err);
-    res.status(500).json({ error: 'Ошибка отправки ссылки' });
+    res.status(500).json({ error: 'serverError' });
   }
 });
 
@@ -304,7 +304,7 @@ router.get('/magic-link/verify/:token', async (req, res) => {
     );
 
     if (result.rows.length === 0) {
-      res.status(400).json({ error: 'Ссылка недействительна или истекла' });
+      res.status(400).json({ error: 'magicLinkError' });
       return;
     }
 
@@ -335,7 +335,7 @@ router.get('/magic-link/verify/:token', async (req, res) => {
     });
   } catch (err) {
     console.error('Magic link verify error:', err);
-    res.status(500).json({ error: 'Ошибка верификации ссылки' });
+    res.status(500).json({ error: 'serverError' });
   }
 });
 

@@ -296,4 +296,12 @@ export const eo = {
   lobbyWaiting: 'Atendante kontraŭulon...',
   lobbyRated: 'Taksita',
   lobbyUnrated: 'Netaksita',
+  iteraciaClub: 'Iteracia-klubo',
+  vkCommunity: 'VK-komunumo',
+  discordCommunity: 'Discord-komunumo',
+  nicknameTaken: 'Ĉi tiu kromnomo jam estas uzata',
+  emailAlreadyTaken: 'Ĉi tiu retpoŝto jam estas uzata',
+  invalidCredentials: 'Nevalida kromnomo aŭ pasvorto',
+  wrongCurrentPassword: 'Neĝusta aktuala pasvorto',
+  serverError: 'Servila eraro',
 };

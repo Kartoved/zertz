@@ -49,7 +49,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
       setTimeout(() => setSuccessMsg(''), 2000);
       setIsEditingQuote(false);
     } catch (err: any) {
-      setLocalError(err.message);
+      setLocalError((t as Record<string, string>)[err.message] || err.message);
     }
   };
 
@@ -81,7 +81,7 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
       setSuccessMsg(t.passwordChanged);
       setTimeout(() => setSuccessMsg(''), 2000);
     } catch (err: any) {
-      setLocalError(err.message);
+      setLocalError((t as Record<string, string>)[err.message] || err.message);
     }
   };
 

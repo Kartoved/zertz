@@ -296,4 +296,12 @@ export const en = {
   lobbyWaiting: 'Waiting for opponent...',
   lobbyRated: 'Rated',
   lobbyUnrated: 'Unrated',
+  iteraciaClub: 'Iteracia Club',
+  vkCommunity: 'VK Community',
+  discordCommunity: 'Discord Community',
+  nicknameTaken: 'This nickname is already taken',
+  emailAlreadyTaken: 'This email is already in use',
+  invalidCredentials: 'Invalid nickname or password',
+  wrongCurrentPassword: 'Incorrect current password',
+  serverError: 'Server error',
 };

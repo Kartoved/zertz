@@ -38,7 +38,7 @@ export async function register(username: string, password: string, email?: strin
 
   const data = await response.json();
   if (!response.ok) {
-    throw new Error(data.error || 'Ошибка регистрации');
+    throw new Error(data.error || 'serverError');
   }
   return data;
 }
@@ -52,7 +52,7 @@ export async function login(username: string, password: string): Promise<{ token
 
   const data = await response.json();
   if (!response.ok) {
-    throw new Error(data.error || 'Ошибка входа');
+    throw new Error(data.error || 'serverError');
   }
   return data;
 }
@@ -64,7 +64,7 @@ export async function getMe(token: string): Promise<User> {
 
   const data = await response.json();
   if (!response.ok) {
-    throw new Error(data.error || 'Ошибка получения профиля');
+    throw new Error(data.error || 'serverError');
   }
   return data;
 }
@@ -81,7 +81,7 @@ export async function updateProfile(
 
   const data = await response.json();
   if (!response.ok) {
-    throw new Error(data.error || 'Ошибка обновления профиля');
+    throw new Error(data.error || 'serverError');
   }
   return data;
 }
@@ -90,7 +90,7 @@ export async function getPlayers(sort = 'rating', order = 'desc'): Promise<Playe
   const response = await fetch(`${API_BASE}/api/players?sort=${sort}&order=${order}`);
 
   if (!response.ok) {
-    throw new Error('Ошибка получения списка игроков');
+    throw new Error('serverError');
   }
   return response.json();
 }
@@ -118,14 +118,14 @@ export interface PlayerProfile {
 export async function getPlayerProfile(playerId: number): Promise<PlayerProfile> {
   const response = await fetch(`${API_BASE}/api/players/${playerId}`, { headers: authHeaders(false) });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Ошибка получения профиля игрока');
+  if (!response.ok) throw new Error(data.error || 'serverError');
   return data;
 }
 
 // ==================== Follows ====================
 
 export async function followUser(userId: number): Promise<void> {
-  if (!getToken()) throw new Error('Требуется авторизация');
+  if (!getToken()) throw new Error('serverError');
 
   const response = await fetch(`${API_BASE}/api/follows/${userId}`, {
     method: 'POST',
@@ -133,12 +133,12 @@ export async function followUser(userId: number): Promise<void> {
   });
   if (!response.ok) {
     const data = await response.json();
-    throw new Error(data.error || 'Ошибка подписки');
+    throw new Error(data.error || 'serverError');
   }
 }
 
 export async function unfollowUser(userId: number): Promise<void> {
-  if (!getToken()) throw new Error('Требуется авторизация');
+  if (!getToken()) throw new Error('serverError');
 
   const response = await fetch(`${API_BASE}/api/follows/${userId}`, {
     method: 'DELETE',
@@ -146,17 +146,17 @@ export async function unfollowUser(userId: number): Promise<void> {
   });
   if (!response.ok) {
     const data = await response.json();
-    throw new Error(data.error || 'Ошибка отписки');
+    throw new Error(data.error || 'serverError');
   }
 }
 
 export async function getFollowing(): Promise<PlayerInfo[]> {
-  if (!getToken()) throw new Error('Требуется авторизация');
+  if (!getToken()) throw new Error('serverError');
 
   const response = await fetch(`${API_BASE}/api/follows`, {
     headers: authHeaders(),
   });
-  if (!response.ok) throw new Error('Ошибка получения подписок');
+  if (!response.ok) throw new Error('serverError');
   return response.json();
 }
 
@@ -198,7 +198,7 @@ export async function createChallenge(
   treeJson: string,
   timeControl?: { baseMs: number; incrementMs: number } | null
 ): Promise<{ id: number; roomId: number }> {
-  if (!getToken()) throw new Error('Требуется авторизация');
+  if (!getToken()) throw new Error('serverError');
 
   const response = await fetch(`${API_BASE}/api/challenges`, {
     method: 'POST',
@@ -210,12 +210,12 @@ export async function createChallenge(
     }),
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Ошибка создания вызова');
+  if (!response.ok) throw new Error(data.error || 'serverError');
   return data;
 }
 
 export async function cancelChallenge(challengeId: number): Promise<void> {
-  if (!getToken()) throw new Error('Требуется авторизация');
+  if (!getToken()) throw new Error('serverError');
 
   const response = await fetch(`${API_BASE}/api/challenges/${challengeId}`, {
     method: 'DELETE',
@@ -223,24 +223,24 @@ export async function cancelChallenge(challengeId: number): Promise<void> {
   });
   if (!response.ok) {
     const data = await response.json();
-    throw new Error(data.error || 'Ошибка отмены вызова');
+    throw new Error(data.error || 'serverError');
   }
 }
 
 export async function acceptChallenge(challengeId: number): Promise<{ roomId: number }> {
-  if (!getToken()) throw new Error('Требуется авторизация');
+  if (!getToken()) throw new Error('serverError');
 
   const response = await fetch(`${API_BASE}/api/challenges/${challengeId}/accept`, {
     method: 'PUT',
     headers: authHeaders(),
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Ошибка принятия вызова');
+  if (!response.ok) throw new Error(data.error || 'serverError');
   return data;
 }
 
 export async function declineChallenge(challengeId: number): Promise<void> {
-  if (!getToken()) throw new Error('Требуется авторизация');
+  if (!getToken()) throw new Error('serverError');
 
   const response = await fetch(`${API_BASE}/api/challenges/${challengeId}/decline`, {
     method: 'PUT',
@@ -248,7 +248,7 @@ export async function declineChallenge(challengeId: number): Promise<void> {
   });
   if (!response.ok) {
     const data = await response.json();
-    throw new Error(data.error || 'Ошибка отклонения вызова');
+    throw new Error(data.error || 'serverError');
   }
 }
 
@@ -269,12 +269,12 @@ export async function requestMagicLink(email: string): Promise<void> {
     body: JSON.stringify({ email }),
   });
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Ошибка отправки ссылки');
+  if (!response.ok) throw new Error(data.error || 'serverError');
 }
 
 export async function verifyMagicToken(token: string): Promise<{ token: string; user: User }> {
   const response = await fetch(`${API_BASE}/api/auth/magic-link/verify/${token}`);
   const data = await response.json();
-  if (!response.ok) throw new Error(data.error || 'Ссылка недействительна');
+  if (!response.ok) throw new Error(data.error || 'magicLinkError');
   return data;
 }

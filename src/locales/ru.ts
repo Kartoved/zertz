@@ -296,4 +296,12 @@ export const ru = {
   lobbyWaiting: 'Ожидаем соперника...',
   lobbyRated: 'Рейтинговая',
   lobbyUnrated: 'Нерейтинговая',
+  iteraciaClub: 'Клуб Итерация',
+  vkCommunity: 'Сообщество ВК',
+  discordCommunity: 'Дискорд сообщество',
+  nicknameTaken: 'Ник уже занят',
+  emailAlreadyTaken: 'Этот email уже используется',
+  invalidCredentials: 'Неверный ник или пароль',
+  wrongCurrentPassword: 'Неверный текущий пароль',
+  serverError: 'Ошибка сервера',
 };

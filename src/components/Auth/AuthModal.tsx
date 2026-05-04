@@ -37,7 +37,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
       await login(username.trim(), password);
       onClose();
     } catch (err: any) {
-      setLocalError(err.message);
+      setLocalError((t as Record<string, string>)[err.message] || err.message);
     }
   };
 
@@ -67,7 +67,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
       await register(username.trim(), password, email.trim() || undefined);
       onClose();
     } catch (err: any) {
-      setLocalError(err.message);
+      setLocalError((t as Record<string, string>)[err.message] || err.message);
     }
   };
 
@@ -79,7 +79,7 @@ export default function AuthModal({ onClose }: AuthModalProps) {
       await requestMagicLink(magicEmail.trim());
       setMagicSent(true);
     } catch (err: any) {
-      setMagicError(err.message);
+      setMagicError((t as Record<string, string>)[err.message] || err.message);
     } finally {
       setMagicLoading(false);
     }
