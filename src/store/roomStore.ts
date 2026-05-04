@@ -302,7 +302,11 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       // Re-read lastUpdated after fetch to avoid stale comparison
       const { lastUpdated } = get();
       if (room.updatedAt > lastUpdated) {
+        const prevWinner = get().state.winner;
         const syncedState = syncWinnerFromRoom(room.state, room.winner);
+        if (syncedState.winner && !prevWinner && get().rated) {
+          useAuthStore.getState().fetchMe();
+        }
 
         set({
           state: syncedState,
@@ -440,6 +444,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         const currentPlayerNum = newState.currentPlayer === 'player1' ? 1 : 2;
         const res = await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, winnerNum, winType, myPlayer || undefined);
         if (res.ratingDelta) set({ ratingDelta: res.ratingDelta });
+        if (winner && get().rated) useAuthStore.getState().fetchMe();
         await persistOnlineGame(roomId, newState, gameTree, playerNames, winType);
       } else {
         const currentPlayerNum = state.currentPlayer === 'player1' ? 1 : 2;
@@ -483,6 +488,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       const currentPlayerNum = newState.currentPlayer === 'player1' ? 1 : 2;
       const res = await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, winnerNum, winType, myPlayer || undefined);
       if (res.ratingDelta) set({ ratingDelta: res.ratingDelta });
+      if (winner && get().rated) useAuthStore.getState().fetchMe();
       await persistOnlineGame(roomId, newState, gameTree, playerNames, winType);
     } catch (err) {
       console.error('[roomStore.handleRingRemoval] ERROR:', err);
@@ -517,6 +523,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       const currentPlayerNum = newState.currentPlayer === 'player1' ? 1 : 2;
       const res = await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, winnerNum, winType, myPlayer || undefined);
       if (res.ratingDelta) set({ ratingDelta: res.ratingDelta });
+      if (winner && get().rated) useAuthStore.getState().fetchMe();
       await persistOnlineGame(roomId, newState, gameTree, playerNames, winType);
     } catch (err) {
       console.error('[roomStore.handleCapture] ERROR:', err);
