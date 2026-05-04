@@ -1,27 +1,30 @@
 import { create } from 'zustand';
-import { GameState, GameNode, MarbleColor, CaptureMove, Player } from '../game/types';
+import { GameState, GameNode, MarbleColor, CaptureMove, Player, PreMoveVariant, PreMoveStep } from '../game/types';
 import {
   createInitialState,
   cloneState,
   hasAvailableCaptures,
   getCaptureChains,
   getWinType,
+  checkWinCondition,
 } from '../game/GameEngine';
 import { getValidRemovableRings } from '../game/Board';
 import { applyPlacement, applyRingRemoval, applyCapture } from '../utils/moveActions';
 import * as roomsApi from '../db/roomsApi';
 import { ChatMessage, FischerTimeControl, RatingDelta } from '../db/roomsApi';
+import * as premovesApi from '../db/premovesApi';
 import * as gamesStorage from '../db/gamesStorage';
 import { playPlaceSound, playRemoveRingSound, playCaptureSound, playWinSound } from '../utils/sounds';
 import { useAuthStore } from './authStore';
 import { getI18nFromStorage } from '../i18n';
-import { API_BASE, authHeaders } from '../db/apiClient';
+import { API_BASE, authHeaders, serializeState, serializeTree, deserializeTree } from '../db/apiClient';
 import {
   getDefaultPlayerNames,
   createRootNode,
   addMoveToTree,
   rebuildStateFromNode,
   findDeepestMainLine,
+  findNodeAndParent,
 } from '../utils/gameTreeUtils';
 
 interface RoomStore {
@@ -65,6 +68,14 @@ interface RoomStore {
   messages: ChatMessage[];
   lastMessageId: number;
 
+  // Analysis mode (for correspondence games — explore positions and plan pre-moves)
+  isAnalyzing: boolean;
+  analysisState: GameState | null;
+  analysisGameTree: GameNode | null;
+  analysisCurrentNode: GameNode | null;
+  analysisStartNodeId: string | null;
+  premoves: PreMoveVariant[];
+
   // Actions
   createRoom: (
     boardSize: 37 | 48 | 61,
@@ -90,7 +101,23 @@ interface RoomStore {
   setPlayerName: (player: 1 | 2, name: string) => Promise<void>;
   surrender: () => Promise<void>;
   cancelGame: () => Promise<void>;
-  
+
+  // Analysis actions
+  enterAnalysis: () => void;
+  exitAnalysis: () => void;
+  analysisSelectMarbleColor: (color: MarbleColor | null) => void;
+  analysisSelectRing: (ringId: string | null) => void;
+  analysisHandlePlacement: (ringId: string) => void;
+  analysisHandleRingRemoval: (ringId: string) => void;
+  analysisHandleCapture: (captures: CaptureMove[]) => void;
+  analysisNavigateToNode: (targetNode: GameNode) => void;
+
+  // Pre-moves actions
+  loadPremoves: () => Promise<void>;
+  addCurrentVariantAsPremove: () => Promise<void>;
+  deletePremoveVariant: (id: string) => Promise<void>;
+  clearPremoves: () => Promise<void>;
+
   reset: () => void;
 }
 
@@ -156,6 +183,13 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   messages: [],
   lastMessageId: 0,
   pendingPlayerChoice: null,
+
+  isAnalyzing: false,
+  analysisState: null,
+  analysisGameTree: null,
+  analysisCurrentNode: null,
+  analysisStartNodeId: null,
+  premoves: [],
 
   createRoom: async (boardSize, creatorPlayer = 1, rated = false, timeControl = null) => {
     set({ isLoading: true, error: null });
@@ -283,6 +317,14 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         messages,
         lastMessageId: messages.length > 0 ? messages[messages.length - 1].id : 0,
       });
+
+      // Load this player's pre-moves (no-op if not in any seat)
+      if (myPlayer) {
+        try {
+          const variants = await premovesApi.getPremoves(numericRoomId);
+          set({ premoves: variants });
+        } catch { /* ignore */ }
+      }
 
       return true;
     } catch (err) {
@@ -688,6 +730,230 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     set({ pendingPlayerChoice: null });
   },
 
+  // ==================== Analysis mode ====================
+
+  enterAnalysis: () => {
+    const { state, gameTree, currentNode, isAnalyzing } = get();
+    if (isAnalyzing) return;
+    // Deep-clone the live tree so analysis branches don't pollute the live game.
+    const clonedTree = deserializeTree(serializeTree(gameTree));
+    const found = findNodeAndParent(clonedTree, currentNode.id);
+    const startNode = found ? found.node : clonedTree;
+    set({
+      isAnalyzing: true,
+      analysisState: cloneState(state),
+      analysisGameTree: clonedTree,
+      analysisCurrentNode: startNode,
+      analysisStartNodeId: startNode.id,
+      selectedMarbleColor: null,
+      selectedRingId: null,
+      highlightedCaptures: [],
+      availableCaptureChains: [],
+    });
+  },
+
+  exitAnalysis: () => {
+    set({
+      isAnalyzing: false,
+      analysisState: null,
+      analysisGameTree: null,
+      analysisCurrentNode: null,
+      analysisStartNodeId: null,
+      selectedMarbleColor: null,
+      selectedRingId: null,
+      highlightedCaptures: [],
+      availableCaptureChains: [],
+    });
+  },
+
+  analysisSelectMarbleColor: (color) => {
+    set({ selectedMarbleColor: color, selectedRingId: null, highlightedCaptures: [], availableCaptureChains: [] });
+  },
+
+  analysisSelectRing: (ringId) => {
+    const { analysisState } = get();
+    if (!analysisState) return;
+    if (!ringId) {
+      set({ selectedRingId: null, highlightedCaptures: [], availableCaptureChains: [] });
+      return;
+    }
+    const ring = analysisState.rings.get(ringId);
+    if (!ring || ring.isRemoved) return;
+
+    if (analysisState.phase === 'capture' && ring.marble) {
+      const chains = getCaptureChains(analysisState, ringId);
+      if (chains.length > 0) {
+        set({
+          selectedRingId: ringId,
+          highlightedCaptures: chains.flat(),
+          availableCaptureChains: chains,
+        });
+      }
+    } else if (analysisState.phase === 'placement' && !ring.marble) {
+      set({ selectedRingId: ringId, highlightedCaptures: [] });
+    }
+  },
+
+  analysisHandlePlacement: (ringId) => {
+    const { analysisState, analysisCurrentNode, selectedMarbleColor } = get();
+    if (!analysisState || !analysisCurrentNode || !selectedMarbleColor) return;
+
+    const result = applyPlacement(analysisState, ringId, selectedMarbleColor);
+    if (!result) return;
+
+    const { newState, move } = result;
+    if (newState.phase === 'placement' && hasAvailableCaptures(newState)) {
+      newState.phase = 'capture';
+    }
+
+    const newNode = addMoveToTree(analysisCurrentNode, move, analysisState.currentPlayer, analysisState.moveNumber, analysisState.boardSize);
+    set({
+      analysisState: newState,
+      analysisCurrentNode: newNode,
+      selectedMarbleColor: null,
+      selectedRingId: null,
+      highlightedCaptures: [],
+      availableCaptureChains: [],
+    });
+  },
+
+  analysisHandleRingRemoval: (ringId) => {
+    const { analysisState, analysisCurrentNode } = get();
+    if (!analysisState || !analysisCurrentNode) return;
+    const validRings = getValidRemovableRings(analysisState.rings);
+    if (!validRings.includes(ringId)) return;
+
+    const result = applyRingRemoval(analysisState, analysisCurrentNode, ringId);
+    if (!result) return;
+
+    const { newState } = result;
+    if (newState.phase === 'placement' && hasAvailableCaptures(newState)) {
+      newState.phase = 'capture';
+    }
+
+    set({
+      analysisState: newState,
+      selectedRingId: null,
+      highlightedCaptures: [],
+      availableCaptureChains: [],
+    });
+  },
+
+  analysisHandleCapture: (captures) => {
+    const { analysisState, analysisCurrentNode } = get();
+    if (!analysisState || !analysisCurrentNode) return;
+
+    const { newState, move, previousPlayer, previousMoveNumber } = applyCapture(analysisState, captures);
+    if (newState.phase !== 'gameOver') {
+      newState.phase = hasAvailableCaptures(newState) ? 'capture' : 'placement';
+    }
+
+    const newNode = addMoveToTree(analysisCurrentNode, move, previousPlayer, previousMoveNumber, analysisState.boardSize);
+    set({
+      analysisState: newState,
+      analysisCurrentNode: newNode,
+      selectedRingId: null,
+      highlightedCaptures: [],
+      availableCaptureChains: [],
+    });
+  },
+
+  analysisNavigateToNode: (targetNode) => {
+    const { analysisState } = get();
+    if (!analysisState) return;
+    const newState = rebuildStateFromNode(targetNode, analysisState.boardSize);
+    set({
+      analysisState: newState,
+      analysisCurrentNode: targetNode,
+      selectedMarbleColor: null,
+      selectedRingId: null,
+      highlightedCaptures: [],
+      availableCaptureChains: [],
+    });
+  },
+
+  // ==================== Pre-moves ====================
+
+  loadPremoves: async () => {
+    const { roomId } = get();
+    if (!roomId) return;
+    try {
+      const variants = await premovesApi.getPremoves(roomId);
+      set({ premoves: variants });
+    } catch {
+      // ignore
+    }
+  },
+
+  addCurrentVariantAsPremove: async () => {
+    const { roomId, analysisGameTree, analysisCurrentNode, analysisStartNodeId, premoves, state } = get();
+    if (!roomId || !analysisGameTree || !analysisCurrentNode || !analysisStartNodeId) return;
+
+    // Walk from analysisCurrentNode up to (but excluding) the start anchor.
+    const path: GameNode[] = [];
+    let node: GameNode | null = analysisCurrentNode;
+    while (node && node.id !== analysisStartNodeId) {
+      path.unshift(node);
+      node = node.parent;
+    }
+    if (!node || path.length === 0) return; // anchor not found or empty line
+
+    const sequence: PreMoveStep[] = [];
+    for (const moveNode of path) {
+      if (!moveNode.move) continue;
+      const stepState = rebuildStateFromNode(moveNode, state.boardSize);
+      const winner = checkWinCondition(stepState);
+      const winType = winner ? getWinType(stepState, winner) : null;
+      sequence.push({
+        move: moveNode.move,
+        notation: moveNode.notation,
+        player: moveNode.player,
+        newStateJson: serializeState(stepState),
+        newCurrentPlayer: stepState.currentPlayer === 'player1' ? 1 : 2,
+        newWinner: winner === 'player1' ? 1 : winner === 'player2' ? 2 : null,
+        newWinType: winType,
+      });
+    }
+    if (sequence.length === 0) return;
+
+    const newVariant: PreMoveVariant = {
+      id: `v-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      sequence,
+    };
+    const updated = [...premoves, newVariant];
+    set({ premoves: updated });
+    try {
+      await premovesApi.setPremoves(roomId, updated);
+    } catch {
+      // revert on error
+      set({ premoves });
+    }
+  },
+
+  deletePremoveVariant: async (id) => {
+    const { roomId, premoves } = get();
+    if (!roomId) return;
+    const updated = premoves.filter(v => v.id !== id);
+    if (updated.length === premoves.length) return;
+    set({ premoves: updated });
+    try {
+      await premovesApi.setPremoves(roomId, updated);
+    } catch {
+      set({ premoves });
+    }
+  },
+
+  clearPremoves: async () => {
+    const { roomId, premoves } = get();
+    if (!roomId || premoves.length === 0) return;
+    set({ premoves: [] });
+    try {
+      await premovesApi.setPremoves(roomId, []);
+    } catch {
+      set({ premoves });
+    }
+  },
+
   reset: () => {
     const rootNode = createRootNode();
     set({
@@ -720,6 +986,12 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       messages: [],
       lastMessageId: 0,
       pendingPlayerChoice: null,
+      isAnalyzing: false,
+      analysisState: null,
+      analysisGameTree: null,
+      analysisCurrentNode: null,
+      analysisStartNodeId: null,
+      premoves: [],
     });
   },
 }));
