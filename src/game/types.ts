@@ -81,3 +81,27 @@ export const WIN_CONDITIONS = {
   black: 6,
   allColors: 3,
 };
+
+// Conditional pre-moves for correspondence games.
+// A variant is a sequence of moves alternating expected-opponent / my-response.
+// `sequence[0]` is what I expect the opponent to play next from the live position.
+// `sequence[1]` is the move I want auto-played in response. And so on for chains.
+export interface PreMoveStep {
+  move: Move;
+  notation: string;
+  player: Player;          // who makes this move (player1 or player2)
+  newStateJson: string;    // serialized GameState AFTER this move
+  newCurrentPlayer: 1 | 2; // whose turn AFTER this move
+  newWinner: number | null;
+  newWinType: string | null;
+}
+
+export interface PreMoveVariant {
+  id: string;
+  sequence: PreMoveStep[];
+}
+
+export interface PreMovesByPlayer {
+  player1: PreMoveVariant[];
+  player2: PreMoveVariant[];
+}

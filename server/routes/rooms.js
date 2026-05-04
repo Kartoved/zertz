@@ -671,4 +671,95 @@ router.delete('/:id', async (req, res) => {
   res.json({ ok: true });
 });
 
+// ==================== Conditional pre-moves ====================
+// Pre-moves are alternating sequences of (expected opponent move, my response).
+// Stored per player as JSON: { player1: Variant[], player2: Variant[] }
+// Only the player who owns a slot can read/write their own pre-moves.
+
+function emptyPremoves() {
+  return { player1: [], player2: [] };
+}
+
+function parsePremoves(json) {
+  try {
+    const parsed = JSON.parse(json || '{}');
+    return {
+      player1: Array.isArray(parsed.player1) ? parsed.player1 : [],
+      player2: Array.isArray(parsed.player2) ? parsed.player2 : [],
+    };
+  } catch {
+    return emptyPremoves();
+  }
+}
+
+// GET pre-moves for the authenticated user
+router.get('/:id/premoves', authRequired, async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id;
+
+  const result = await pool.query(
+    'SELECT user1_id, user2_id, premoves_json FROM rooms WHERE id = $1',
+    [id]
+  );
+  if (result.rows.length === 0) {
+    res.status(404).json({ error: 'Room not found' });
+    return;
+  }
+
+  const room = result.rows[0];
+  const myPlayer =
+    Number(room.user1_id) === Number(userId) ? 1 :
+    Number(room.user2_id) === Number(userId) ? 2 : null;
+
+  if (!myPlayer) {
+    res.status(403).json({ error: 'Not a player in this room' });
+    return;
+  }
+
+  const all = parsePremoves(room.premoves_json);
+  res.json({ variants: myPlayer === 1 ? all.player1 : all.player2 });
+});
+
+// PUT pre-moves for the authenticated user (replaces all variants)
+router.put('/:id/premoves', authRequired, async (req, res) => {
+  const { id } = req.params;
+  const userId = req.user.id;
+  const { variants } = req.body;
+
+  if (!Array.isArray(variants)) {
+    res.status(400).json({ error: 'variants must be an array' });
+    return;
+  }
+
+  const result = await pool.query(
+    'SELECT user1_id, user2_id, premoves_json FROM rooms WHERE id = $1',
+    [id]
+  );
+  if (result.rows.length === 0) {
+    res.status(404).json({ error: 'Room not found' });
+    return;
+  }
+
+  const room = result.rows[0];
+  const myPlayer =
+    Number(room.user1_id) === Number(userId) ? 1 :
+    Number(room.user2_id) === Number(userId) ? 2 : null;
+
+  if (!myPlayer) {
+    res.status(403).json({ error: 'Not a player in this room' });
+    return;
+  }
+
+  const all = parsePremoves(room.premoves_json);
+  if (myPlayer === 1) all.player1 = variants;
+  else all.player2 = variants;
+
+  await pool.query(
+    'UPDATE rooms SET premoves_json = $2 WHERE id = $1',
+    [id, JSON.stringify(all)]
+  );
+
+  res.json({ ok: true });
+});
+
 export default router;
