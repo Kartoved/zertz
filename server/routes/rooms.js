@@ -467,17 +467,32 @@ router.put('/:id/state', optionalAuth, async (req, res) => {
     }
   }
 
-  // Push notification to the opponent (next player to move)
+  // Try to auto-execute a conditional pre-move for the player whose turn just started.
+  // Only runs for correspondence games (incrementMs === -1) and when the live move
+  // didn't end the game.
+  let autoTriggered = false;
+  if (!nextWinner && nextCurrentPlayer && playerIndex) {
+    try {
+      autoTriggered = await tryAutoExecutePremove(id, nextCurrentPlayer, playerIndex);
+    } catch (err) {
+      console.error('Premove auto-execute error:', err);
+    }
+  }
+
+  // Push notification to the opponent (next player to move).
+  // If a pre-move auto-fired, the "next player to move" is now the original mover —
+  // notify them instead.
   if (!nextWinner) {
     try {
-      const opponentId = nextCurrentPlayer === 1 ? room.user1_id : room.user2_id;
-      if (opponentId) {
-        const roomInfo = await pool.query(
-          'SELECT player1_name, player2_name FROM rooms WHERE id = $1', [id]
-        );
-        if (roomInfo.rows.length > 0) {
-          const { player1_name, player2_name } = roomInfo.rows[0];
-          const moverName = playerIndex === 1 ? player1_name : player2_name;
+      // Re-read current_player after possible auto-execute
+      const nowRow = await pool.query('SELECT current_player, player1_name, player2_name FROM rooms WHERE id = $1', [id]);
+      if (nowRow.rows.length > 0) {
+        const { current_player, player1_name, player2_name } = nowRow.rows[0];
+        const opponentId = current_player === 1 ? room.user1_id : room.user2_id;
+        if (opponentId) {
+          const moverName = autoTriggered
+            ? (current_player === 1 ? player2_name : player1_name)
+            : (playerIndex === 1 ? player1_name : player2_name);
           sendPushToUser(opponentId, {
             type: 'your_turn',
             title: 'Zertz',
@@ -493,6 +508,159 @@ router.put('/:id/state', optionalAuth, async (req, res) => {
 
   res.json({ ok: true, ratingDelta });
 });
+
+// ==================== Pre-move auto-execution ====================
+
+function movesEqual(a, b) {
+  if (!a || !b || a.type !== b.type) return false;
+  if (a.type === 'placement') {
+    return a.data.marbleColor === b.data.marbleColor
+      && a.data.ringId === b.data.ringId
+      && (a.data.removedRingId ?? null) === (b.data.removedRingId ?? null);
+  }
+  if (a.type === 'capture') {
+    if (a.data.from !== b.data.from || a.data.to !== b.data.to || a.data.captured !== b.data.captured) {
+      return false;
+    }
+    const aChain = a.data.chain || [];
+    const bChain = b.data.chain || [];
+    if (aChain.length !== bChain.length) return false;
+    for (let i = 0; i < aChain.length; i++) {
+      if (aChain[i].from !== bChain[i].from || aChain[i].to !== bChain[i].to || aChain[i].captured !== bChain[i].captured) {
+        return false;
+      }
+    }
+    return true;
+  }
+  return false;
+}
+
+function findDeepestMainLineNode(node) {
+  if (!node || !Array.isArray(node.children) || node.children.length === 0) return node;
+  return findDeepestMainLineNode(node.children[0]);
+}
+
+// Returns true if a pre-move was auto-triggered (and the room state changed).
+async function tryAutoExecutePremove(roomId, ownerPlayer, opponentPlayer) {
+  const result = await pool.query(
+    `SELECT premoves_json, tree_json, time_control_increment_ms, time_control_base_ms,
+            clock_p1_ms, clock_p2_ms, user1_id, user2_id
+     FROM rooms WHERE id = $1`,
+    [roomId]
+  );
+  if (result.rows.length === 0) return false;
+  const room = result.rows[0];
+
+  // Only correspondence games (clock resets each turn).
+  const incrementMs = Number(room.time_control_increment_ms);
+  if (incrementMs !== -1) return false;
+
+  let premoves;
+  try {
+    premoves = JSON.parse(room.premoves_json || '{}');
+  } catch {
+    return false;
+  }
+  if (!premoves || typeof premoves !== 'object') return false;
+  premoves.player1 = Array.isArray(premoves.player1) ? premoves.player1 : [];
+  premoves.player2 = Array.isArray(premoves.player2) ? premoves.player2 : [];
+
+  const variants = ownerPlayer === 1 ? premoves.player1 : premoves.player2;
+  if (variants.length === 0) return false;
+
+  // Extract the just-played move from the tree (last node in the main line).
+  let tree;
+  try {
+    tree = JSON.parse(room.tree_json);
+  } catch {
+    return false;
+  }
+  const lastNode = findDeepestMainLineNode(tree);
+  if (!lastNode || !lastNode.move) return false;
+
+  // Find a variant whose first step matches the just-played move.
+  let matchedIdx = -1;
+  for (let i = 0; i < variants.length; i++) {
+    const seq = variants[i].sequence;
+    if (!Array.isArray(seq) || seq.length < 2) continue;
+    if (movesEqual(seq[0].move, lastNode.move)) {
+      matchedIdx = i;
+      break;
+    }
+  }
+
+  if (matchedIdx === -1) {
+    // No variant matched — invalidate all variants of the owner (their plan is off-track).
+    if (ownerPlayer === 1) premoves.player1 = [];
+    else premoves.player2 = [];
+    await pool.query('UPDATE rooms SET premoves_json = $2 WHERE id = $1', [roomId, JSON.stringify(premoves)]);
+    return false;
+  }
+
+  const matched = variants[matchedIdx];
+  const responseStep = matched.sequence[1];
+
+  // Refuse to auto-trigger a winning response — keep Glicko/rating updates on the
+  // user's explicit move path.
+  if (responseStep.newWinner != null) {
+    if (ownerPlayer === 1) premoves.player1 = [];
+    else premoves.player2 = [];
+    await pool.query('UPDATE rooms SET premoves_json = $2 WHERE id = $1', [roomId, JSON.stringify(premoves)]);
+    return false;
+  }
+
+  // Append a new node for the response under lastNode.
+  const responseNode = {
+    id: `auto-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    moveNumber: (lastNode.moveNumber ?? 0) + 1,
+    player: responseStep.player,
+    move: responseStep.move,
+    notation: responseStep.notation,
+    children: [],
+    parent: null,
+    isMainLine: lastNode.children.length === 0,
+  };
+  if (!Array.isArray(lastNode.children)) lastNode.children = [];
+  lastNode.children.push(responseNode);
+
+  // Advance the matched variant by 2; drop other variants (now off-track).
+  const remaining = matched.sequence.slice(2);
+  const newVariants = remaining.length > 0 ? [{ id: matched.id, sequence: remaining }] : [];
+  if (ownerPlayer === 1) premoves.player1 = newVariants;
+  else premoves.player2 = newVariants;
+
+  // Clock: in correspondence, the moving player's clock resets to base for next turn.
+  // After the auto-response, the OPPONENT moves next, so their clock resets.
+  const baseMs = Number(room.time_control_base_ms);
+  let nextClockP1 = room.clock_p1_ms == null ? baseMs : Number(room.clock_p1_ms);
+  let nextClockP2 = room.clock_p2_ms == null ? baseMs : Number(room.clock_p2_ms);
+  if (opponentPlayer === 1) nextClockP1 = baseMs;
+  else nextClockP2 = baseMs;
+
+  await pool.query(
+    `UPDATE rooms SET
+       state_json = $2,
+       tree_json = $3,
+       current_player = $4,
+       clock_p1_ms = $5,
+       clock_p2_ms = $6,
+       clock_running_since = NOW(),
+       premoves_json = $7,
+       updated_at = NOW()
+     WHERE id = $1`,
+    [
+      roomId,
+      responseStep.newStateJson,
+      JSON.stringify(tree),
+      responseStep.newCurrentPlayer,
+      nextClockP1,
+      nextClockP2,
+      JSON.stringify(premoves),
+    ]
+  );
+
+  return true;
+}
 
 // Update player name
 router.put('/:id/players/:index', async (req, res) => {

@@ -73,11 +73,26 @@ export function RoomScreen() {
     ratingDelta,
     winType,
     timeControlBaseMs,
+    timeControlIncrementMs,
     clockP1Ms,
     clockP2Ms,
     clockRunningSince,
     surrender,
     cancelGame,
+    isAnalyzing,
+    analysisState,
+    analysisStartNodeId,
+    analysisCurrentNode,
+    enterAnalysis,
+    exitAnalysis,
+    analysisSelectMarbleColor,
+    analysisSelectRing,
+    analysisHandlePlacement,
+    analysisHandleRingRemoval,
+    analysisHandleCapture,
+    premoves,
+    addCurrentVariantAsPremove,
+    deletePremoveVariant,
   } = useRoomStore();
   const { user } = useAuthStore();
   const isAuthed = !!user;
@@ -171,38 +186,72 @@ export function RoomScreen() {
   const p1ClockMs = getDisplayClockMs('player1');
   const p2ClockMs = getDisplayClockMs('player2');
 
-  const validRemovableRings = state.phase === 'ringRemoval' 
-    ? getValidRemovableRings(state.rings) 
+  // In analysis mode, the board mirrors `analysisState`; otherwise the live state.
+  const boardState = isAnalyzing && analysisState ? analysisState : state;
+  // Correspondence games are marked with incrementMs === -1 (clock resets each turn).
+  const isCorrespondence = timeControlIncrementMs === -1;
+
+  // The first move in the analysis line must belong to the opponent for the variant
+  // to be auto-triggerable. We walk from analysisCurrentNode up to the start anchor,
+  // collecting moves; the chronologically first one is checked against myPlayer.
+  const analysisPathLength = (() => {
+    if (!isAnalyzing || !analysisCurrentNode || !analysisStartNodeId) return 0;
+    let n = 0;
+    let node = analysisCurrentNode;
+    while (node && node.id !== analysisStartNodeId) {
+      n++;
+      if (!node.parent) return 0;
+      node = node.parent;
+    }
+    return n;
+  })();
+  const analysisFirstMoveBy: 1 | 2 | null = (() => {
+    if (analysisPathLength === 0 || !analysisCurrentNode || !analysisStartNodeId) return null;
+    let node = analysisCurrentNode;
+    while (node.parent && node.parent.id !== analysisStartNodeId) {
+      node = node.parent;
+    }
+    return node.player === 'player1' ? 1 : 2;
+  })();
+  const analysisHasMoves = analysisPathLength >= 2;
+  const analysisStartsWithOpponent = !!myPlayer && analysisFirstMoveBy !== null && analysisFirstMoveBy !== myPlayer;
+  const canSaveCurrentVariant = isAnalyzing && analysisHasMoves && analysisStartsWithOpponent;
+  const effectiveSelectMarbleColor = isAnalyzing ? analysisSelectMarbleColor : selectMarbleColor;
+  const effectiveSelectRing = isAnalyzing ? analysisSelectRing : selectRing;
+  const effectiveHandlePlacement = isAnalyzing ? analysisHandlePlacement : handlePlacement;
+  const effectiveHandleRingRemoval = isAnalyzing ? analysisHandleRingRemoval : handleRingRemoval;
+  const effectiveHandleCapture = isAnalyzing ? analysisHandleCapture : handleCapture;
+
+  const validRemovableRings = boardState.phase === 'ringRemoval'
+    ? getValidRemovableRings(boardState.rings)
     : [];
 
   const handleRingClick = (ringId: string) => {
-    console.log('[RoomScreen.handleRingClick]', { ringId, phase: state.phase, selectedMarbleColor, winner: state.winner });
-    if (state.winner) return;
+    if (boardState.winner) return;
 
-    const ring = state.rings.get(ringId);
+    const ring = boardState.rings.get(ringId);
     if (!ring || ring.isRemoved) return;
 
-    if (state.phase === 'ringRemoval') {
+    if (boardState.phase === 'ringRemoval') {
       if (validRemovableRings.includes(ringId)) {
-        handleRingRemoval(ringId);
+        effectiveHandleRingRemoval(ringId);
       }
-    } else if (state.phase === 'capture') {
+    } else if (boardState.phase === 'capture') {
       if (selectedRingId && highlightedCaptures.some(c => c.to === ringId)) {
         const chain = availableCaptureChains.find(chain =>
           chain.some(c => c.to === ringId)
         );
         if (chain) {
-          handleCapture(chain);
+          effectiveHandleCapture(chain);
         }
       } else if (ring.marble) {
-        selectRing(ringId);
+        effectiveSelectRing(ringId);
       }
-    } else if (state.phase === 'placement') {
+    } else if (boardState.phase === 'placement') {
       if (!ring.marble && selectedMarbleColor) {
-        console.log('[RoomScreen] calling handlePlacement', ringId);
-        handlePlacement(ringId);
+        effectiveHandlePlacement(ringId);
       } else if (!ring.marble) {
-        selectRing(ringId);
+        effectiveSelectRing(ringId);
       }
     }
   };
@@ -487,46 +536,125 @@ export function RoomScreen() {
           {/* Marble selector + action buttons (players only) */}
           {!state.winner && !isSpectator && (
             <div className="p-3 bg-white dark:bg-gray-800 rounded-lg col-span-1 sm:col-span-2 lg:col-span-1">
-              {state.phase === 'placement' && (
+              {isAnalyzing && (
+                <div className="mb-3 px-2 py-1.5 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-xs font-semibold text-center">
+                  🔬 {t.analysisMode}
+                </div>
+              )}
+              {boardState.phase === 'placement' && (
                 <>
                   <MarbleSelector
-                    reserve={state.reserve}
+                    reserve={boardState.reserve}
                     selectedColor={selectedMarbleColor}
-                    onSelect={selectMarbleColor}
-                    captures={state.captures[state.currentPlayer]}
-                    phase={state.phase}
-                    currentPlayer={state.currentPlayer}
-                    stateForCaptures={state}
+                    onSelect={effectiveSelectMarbleColor}
+                    captures={boardState.captures[boardState.currentPlayer]}
+                    phase={boardState.phase}
+                    currentPlayer={boardState.currentPlayer}
+                    stateForCaptures={boardState}
                   />
                 </>
               )}
-              <div className={state.phase === 'placement' ? 'mt-3' : ''}>
-                <div className="flex gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={() => sendMessage('[UNDO_REQUEST]')}
-                    disabled={!canUndoOwnLastMove()}
-                    className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    ↶ {t.undoMove}
-                  </button>
-                  {canCancel && (
+              <div className={boardState.phase === 'placement' ? 'mt-3' : ''}>
+                {!isAnalyzing ? (
+                  <div className="flex gap-2 flex-wrap">
                     <button
                       type="button"
-                      onClick={() => cancelGame()}
-                      className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-900/70 transition-colors"
+                      onClick={() => sendMessage('[UNDO_REQUEST]')}
+                      disabled={!canUndoOwnLastMove()}
+                      className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      ✕ {t.cancelGame}
+                      ↶ {t.undoMove}
                     </button>
-                  )}
+                    {canCancel && (
+                      <button
+                        type="button"
+                        onClick={() => cancelGame()}
+                        className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-900/70 transition-colors"
+                      >
+                        ✕ {t.cancelGame}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowSurrenderConfirm(true)}
+                      className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-black hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                    >
+                      🏳️ {t.surrender}
+                    </button>
+                  </div>
+                ) : (
                   <button
                     type="button"
-                    onClick={() => setShowSurrenderConfirm(true)}
-                    className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-black hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                    onClick={exitAnalysis}
+                    className="w-full px-3 py-2 text-sm font-semibold rounded-lg bg-blue-500 hover:bg-blue-600 text-white transition-colors"
                   >
-                    🏳️ {t.surrender}
+                    ← {t.returnToGame}
                   </button>
+                )}
+                {isCorrespondence && !isAnalyzing && (
+                  <button
+                    type="button"
+                    onClick={enterAnalysis}
+                    className="mt-2 w-full px-3 py-1.5 text-sm rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-900/70 transition-colors"
+                  >
+                    🔬 {t.analysis}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Pre-moves panel (correspondence games only, players only) */}
+          {isCorrespondence && !isSpectator && (isAnalyzing || premoves.length > 0) && (
+            <div className="p-3 bg-white dark:bg-gray-800 rounded-lg col-span-1 sm:col-span-2 lg:col-span-1">
+              <div className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-2">
+                {t.conditionalPremoves}
+              </div>
+              {isAnalyzing && (
+                <button
+                  type="button"
+                  onClick={addCurrentVariantAsPremove}
+                  disabled={!canSaveCurrentVariant}
+                  title={
+                    !analysisHasMoves
+                      ? t.variantNeedsAtLeastTwoMoves
+                      : !analysisStartsWithOpponent
+                      ? t.variantNeedsOpponentFirst
+                      : ''
+                  }
+                  className="mb-2 w-full px-3 py-1.5 text-sm rounded-lg bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-colors"
+                >
+                  ＋ {t.addCurrentVariant}
+                </button>
+              )}
+              {premoves.length === 0 ? (
+                <div className="text-xs text-gray-500 dark:text-gray-400 italic">
+                  {t.noVariantsYet}
                 </div>
+              ) : (
+                <ul className="space-y-1">
+                  {premoves.map(v => (
+                    <li
+                      key={v.id}
+                      className="flex items-start gap-1 px-2 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded text-xs"
+                    >
+                      <div className="flex-1 min-w-0 break-words text-gray-800 dark:text-gray-200 font-mono">
+                        {v.sequence.map(s => s.notation).join(' ')}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => deletePremoveVariant(v.id)}
+                        title={t.deleteVariant}
+                        className="flex-shrink-0 text-red-500 hover:text-red-600 px-1"
+                      >
+                        ✕
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="mt-2 text-[10px] text-gray-500 dark:text-gray-400 leading-snug">
+                {t.premovesHint}
               </div>
             </div>
           )}
@@ -535,7 +663,7 @@ export function RoomScreen() {
         {/* Center - Board */}
         <div className={`flex-1 min-h-0 items-center justify-center min-h-[240px] sm:min-h-[320px] md:min-h-[400px] overflow-hidden ${mobileTab === 'chat' ? 'hidden lg:flex' : 'flex flex-col'}`}>
           <HexBoard
-            state={state}
+            state={boardState}
             onRingClick={handleRingClick}
             selectedRingId={selectedRingId}
             highlightedCaptures={highlightedCaptures}
