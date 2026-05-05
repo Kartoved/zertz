@@ -1,5 +1,5 @@
 import { useCallback, useEffect } from 'react';
-import { GameNode } from '../../game/types';
+import { GameNode, PreMoveVariant } from '../../game/types';
 import { useRoomStore } from '../../store/roomStore';
 import { useI18n } from '../../i18n';
 
@@ -69,9 +69,39 @@ function renderMoveTree(node: GameNode, currentNodeId: string, onNavigate: (node
   return elements;
 }
 
+function renderPremoveVariants(premoves: PreMoveVariant[]): JSX.Element[] {
+  if (premoves.length === 0) return [];
+  const elements: JSX.Element[] = [];
+  for (const v of premoves) {
+    elements.push(
+      <span key={`pm-open-${v.id}`} className="text-amber-600 dark:text-amber-400 italic">
+        {' '}
+        (
+      </span>
+    );
+    v.sequence.forEach((step, i) => {
+      elements.push(
+        <span
+          key={`pm-${v.id}-${i}`}
+          className="text-amber-700 dark:text-amber-300 italic px-1"
+          title="Conditional pre-move"
+        >
+          {step.notation}
+        </span>
+      );
+    });
+    elements.push(
+      <span key={`pm-close-${v.id}`} className="text-amber-600 dark:text-amber-400 italic">
+        )
+      </span>
+    );
+  }
+  return elements;
+}
+
 export default function OnlineMoveHistory() {
   const { t } = useI18n();
-  const { gameTree, currentNode, navigateToNode } = useRoomStore();
+  const { gameTree, currentNode, navigateToNode, premoves } = useRoomStore();
 
   const navigatePrev = useCallback(() => {
     if (currentNode.parent) {
@@ -99,9 +129,10 @@ export default function OnlineMoveHistory() {
   }, [navigatePrev, navigateNext]);
 
   const moves = renderMoveTree(gameTree, currentNode.id, navigateToNode);
+  const premoveElements = renderPremoveVariants(premoves);
   const isAtStart = currentNode.id === 'root';
 
-  if (moves.length === 0) {
+  if (moves.length === 0 && premoveElements.length === 0) {
     return <div className="p-1 text-xs text-gray-500 dark:text-gray-400">{t.noMovesYet}</div>;
   }
 
@@ -114,6 +145,7 @@ export default function OnlineMoveHistory() {
         {`0. ${t.moveStart}`}
       </span>
       {moves}
+      {premoveElements}
     </div>
   );
 }

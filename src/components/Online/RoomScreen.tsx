@@ -606,7 +606,7 @@ export function RoomScreen() {
           )}
 
           {/* Pre-moves panel (correspondence games only, players only) */}
-          {isCorrespondence && !isSpectator && (isAnalyzing || premoves.length > 0) && (
+          {isCorrespondence && !isSpectator && (
             <div className="p-3 bg-white dark:bg-gray-800 rounded-lg col-span-1 sm:col-span-2 lg:col-span-1">
               <div className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-2">
                 {t.conditionalPremoves}
@@ -633,14 +633,28 @@ export function RoomScreen() {
                   {t.noVariantsYet}
                 </div>
               ) : (
-                <ul className="space-y-1">
+                <ul className="space-y-2">
                   {premoves.map(v => (
                     <li
                       key={v.id}
                       className="flex items-start gap-1 px-2 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded text-xs"
                     >
-                      <div className="flex-1 min-w-0 break-words text-gray-800 dark:text-gray-200 font-mono">
-                        {v.sequence.map(s => s.notation).join(' ')}
+                      <div className="flex-1 min-w-0 font-mono text-[11px] leading-snug">
+                        {v.sequence.map((s, i) => {
+                          const isOpponent = i % 2 === 0;
+                          return (
+                            <div
+                              key={i}
+                              className={
+                                isOpponent
+                                  ? 'text-gray-500 dark:text-gray-400 italic'
+                                  : 'text-blue-700 dark:text-blue-300 font-semibold'
+                              }
+                            >
+                              {isOpponent ? '⟵ ' : '⟶ '}{s.notation}
+                            </div>
+                          );
+                        })}
                       </div>
                       <button
                         type="button"
@@ -655,7 +669,9 @@ export function RoomScreen() {
                 </ul>
               )}
               <div className="mt-2 text-[10px] text-gray-500 dark:text-gray-400 leading-snug">
-                {t.premovesHint}
+                <div>⟵ — {t.opponentTurn.toLowerCase()}</div>
+                <div>⟶ — {t.yourTurn.toLowerCase()}</div>
+                <div className="mt-1">{t.premovesHint}</div>
               </div>
             </div>
           )}

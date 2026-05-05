@@ -342,12 +342,19 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       if (!room || pendingMoveCount > 0) return;
 
       // Re-read lastUpdated after fetch to avoid stale comparison
-      const { lastUpdated } = get();
+      const { lastUpdated, myPlayer: myP } = get();
       if (room.updatedAt > lastUpdated) {
         const prevWinner = get().state.winner;
         const syncedState = syncWinnerFromRoom(room.state, room.winner);
         if (syncedState.winner && !prevWinner && get().rated) {
           useAuthStore.getState().fetchMe();
+        }
+        // Refresh pre-moves: a variant might have just auto-fired (its sequence
+        // would have advanced or the variant got removed) and we need to mirror that.
+        if (myP) {
+          premovesApi.getPremoves(roomId).then(variants => {
+            set({ premoves: variants });
+          }).catch(() => { /* ignore */ });
         }
 
         set({
