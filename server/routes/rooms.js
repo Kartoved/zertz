@@ -44,7 +44,7 @@ router.get('/open', async (req, res) => {
       `SELECT id, board_size, creator_player, player1_name, player2_name, rated,
               time_control_base_ms, time_control_increment_ms, created_at
        FROM rooms
-       WHERE winner IS NULL AND user2_id IS NULL
+       WHERE winner IS NULL AND (user1_id IS NULL OR user2_id IS NULL)
        ORDER BY created_at DESC
        LIMIT 50`
     );
