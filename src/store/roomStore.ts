@@ -134,6 +134,19 @@ function syncWinnerFromRoom(state: GameState, winnerNum: number | null): GameSta
   return patched;
 }
 
+// Defensive: if a server-saved state has phase='placement' while captures are
+// actually mandatory, fix it before the UI uses it. This guards against
+// pre-move auto-execution storing a stale phase from rebuildStateFromNode.
+function normalizePhaseForCaptures(state: GameState): GameState {
+  if (state.winner || state.phase === 'gameOver' || state.phase === 'ringRemoval') return state;
+  if (state.phase === 'placement' && hasAvailableCaptures(state)) {
+    const patched = cloneState(state);
+    patched.phase = 'capture';
+    return patched;
+  }
+  return state;
+}
+
 async function persistOnlineGame(
   roomId: number | null,
   state: GameState,
@@ -282,7 +295,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         } catch { /* ignore join errors */ }
       }
 
-      const syncedState = syncWinnerFromRoom(room.state, room.winner);
+      const syncedState = normalizePhaseForCaptures(syncWinnerFromRoom(room.state, room.winner));
 
       set({
         roomId: numericRoomId,
@@ -345,7 +358,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       const { lastUpdated, myPlayer: myP } = get();
       if (room.updatedAt > lastUpdated) {
         const prevWinner = get().state.winner;
-        const syncedState = syncWinnerFromRoom(room.state, room.winner);
+        const syncedState = normalizePhaseForCaptures(syncWinnerFromRoom(room.state, room.winner));
         if (syncedState.winner && !prevWinner && get().rated) {
           useAuthStore.getState().fetchMe();
         }
@@ -911,6 +924,15 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       const stepState = rebuildStateFromNode(moveNode, state.boardSize);
       const winner = checkWinCondition(stepState);
       const winType = winner ? getWinType(stepState, winner) : null;
+      // rebuildStateFromNode replays moves but doesn't recompute phase after captures.
+      // Normalize so the precomputed state reflects whether the next player has a
+      // mandatory capture, otherwise the server would store a broken `placement`
+      // phase even when captures are forced.
+      if (winner) {
+        stepState.phase = 'gameOver';
+      } else if (stepState.phase !== 'ringRemoval') {
+        stepState.phase = hasAvailableCaptures(stepState) ? 'capture' : 'placement';
+      }
       sequence.push({
         move: moveNode.move,
         notation: moveNode.notation,
