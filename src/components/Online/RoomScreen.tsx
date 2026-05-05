@@ -189,7 +189,8 @@ export function RoomScreen() {
   // In analysis mode, the board mirrors `analysisState`; otherwise the live state.
   const boardState = isAnalyzing && analysisState ? analysisState : state;
   // Correspondence games are marked with incrementMs === -1 (clock resets each turn).
-  const isCorrespondence = timeControlIncrementMs === -1;
+  // BIGINT columns come back as strings from node-postgres, so coerce.
+  const isCorrespondence = timeControlIncrementMs != null && Number(timeControlIncrementMs) === -1;
 
   // The first move in the analysis line must belong to the opponent for the variant
   // to be auto-triggerable. We walk from analysisCurrentNode up to the start anchor,
