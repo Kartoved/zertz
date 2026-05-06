@@ -1,12 +1,11 @@
 import { create } from 'zustand';
-import { GameState, GameNode, MarbleColor, CaptureMove, Player, PreMoveVariant, PreMoveStep } from '../game/types';
+import { GameState, GameNode, MarbleColor, CaptureMove, Player, PreMoveVariant } from '../game/types';
 import {
   createInitialState,
   cloneState,
   hasAvailableCaptures,
   getCaptureChains,
   getWinType,
-  checkWinCondition,
 } from '../game/GameEngine';
 import { getValidRemovableRings } from '../game/Board';
 import { applyPlacement, applyRingRemoval, applyCapture } from '../utils/moveActions';
@@ -17,7 +16,7 @@ import * as gamesStorage from '../db/gamesStorage';
 import { playPlaceSound, playRemoveRingSound, playCaptureSound, playWinSound } from '../utils/sounds';
 import { useAuthStore } from './authStore';
 import { getI18nFromStorage } from '../i18n';
-import { API_BASE, authHeaders, serializeState, serializeTree, deserializeTree } from '../db/apiClient';
+import { API_BASE, authHeaders, serializeTree, deserializeTree } from '../db/apiClient';
 import {
   getDefaultPlayerNames,
   createRootNode,
@@ -26,6 +25,14 @@ import {
   findDeepestMainLine,
   findNodeAndParent,
 } from '../utils/gameTreeUtils';
+import {
+  injectPremovesIntoTree,
+  computeAnalysisRingSelection,
+  applyAnalysisPlacement,
+  applyAnalysisRingRemoval,
+  applyAnalysisCapture,
+} from './analysisActions';
+import { buildPremoveSequence, makeVariantId } from './premovesActions';
 
 interface RoomStore {
   // Room info
@@ -760,34 +767,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     const found = findNodeAndParent(clonedTree, currentNode.id);
     const startNode = found ? found.node : clonedTree;
 
-    // Inject saved pre-move variants as branches under the start anchor so the
-    // user can navigate them in the move-history widget. Variants sharing a
-    // prefix collapse into the same nodes.
-    for (const variant of premoves) {
-      let parent = startNode;
-      for (let i = 0; i < variant.sequence.length; i++) {
-        const step = variant.sequence[i];
-        const existing = parent.children.find(c =>
-          c.move && JSON.stringify(c.move) === JSON.stringify(step.move)
-        );
-        if (existing) {
-          parent = existing;
-          continue;
-        }
-        const newNode: GameNode = {
-          id: `pm-${variant.id}-${i}`,
-          moveNumber: parent.moveNumber + 1,
-          player: step.player,
-          move: step.move,
-          notation: step.notation,
-          children: [],
-          parent,
-          isMainLine: parent.children.length === 0,
-        };
-        parent.children.push(newNode);
-        parent = newNode;
-      }
-    }
+    injectPremovesIntoTree(startNode, premoves);
 
     set({
       isAnalyzing: true,
@@ -823,43 +803,20 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   analysisSelectRing: (ringId) => {
     const { analysisState } = get();
     if (!analysisState) return;
-    if (!ringId) {
-      set({ selectedRingId: null, highlightedCaptures: [], availableCaptureChains: [] });
-      return;
-    }
-    const ring = analysisState.rings.get(ringId);
-    if (!ring || ring.isRemoved) return;
-
-    if (analysisState.phase === 'capture' && ring.marble) {
-      const chains = getCaptureChains(analysisState, ringId);
-      if (chains.length > 0) {
-        set({
-          selectedRingId: ringId,
-          highlightedCaptures: chains.flat(),
-          availableCaptureChains: chains,
-        });
-      }
-    } else if (analysisState.phase === 'placement' && !ring.marble) {
-      set({ selectedRingId: ringId, highlightedCaptures: [] });
-    }
+    const slice = computeAnalysisRingSelection(analysisState, ringId);
+    if (slice) set(slice);
   },
 
   analysisHandlePlacement: (ringId) => {
     const { analysisState, analysisCurrentNode, selectedMarbleColor } = get();
     if (!analysisState || !analysisCurrentNode || !selectedMarbleColor) return;
 
-    const result = applyPlacement(analysisState, ringId, selectedMarbleColor);
+    const result = applyAnalysisPlacement(analysisState, analysisCurrentNode, ringId, selectedMarbleColor);
     if (!result) return;
 
-    const { newState, move } = result;
-    if (newState.phase === 'placement' && hasAvailableCaptures(newState)) {
-      newState.phase = 'capture';
-    }
-
-    const newNode = addMoveToTree(analysisCurrentNode, move, analysisState.currentPlayer, analysisState.moveNumber, analysisState.boardSize);
     set({
-      analysisState: newState,
-      analysisCurrentNode: newNode,
+      analysisState: result.analysisState,
+      analysisCurrentNode: result.analysisCurrentNode,
       selectedMarbleColor: null,
       selectedRingId: null,
       highlightedCaptures: [],
@@ -870,19 +827,12 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   analysisHandleRingRemoval: (ringId) => {
     const { analysisState, analysisCurrentNode } = get();
     if (!analysisState || !analysisCurrentNode) return;
-    const validRings = getValidRemovableRings(analysisState.rings);
-    if (!validRings.includes(ringId)) return;
 
-    const result = applyRingRemoval(analysisState, analysisCurrentNode, ringId);
+    const result = applyAnalysisRingRemoval(analysisState, analysisCurrentNode, ringId);
     if (!result) return;
 
-    const { newState } = result;
-    if (newState.phase === 'placement' && hasAvailableCaptures(newState)) {
-      newState.phase = 'capture';
-    }
-
     set({
-      analysisState: newState,
+      analysisState: result.analysisState,
       selectedRingId: null,
       highlightedCaptures: [],
       availableCaptureChains: [],
@@ -893,15 +843,10 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     const { analysisState, analysisCurrentNode } = get();
     if (!analysisState || !analysisCurrentNode) return;
 
-    const { newState, move, previousPlayer, previousMoveNumber } = applyCapture(analysisState, captures);
-    if (newState.phase !== 'gameOver') {
-      newState.phase = hasAvailableCaptures(newState) ? 'capture' : 'placement';
-    }
-
-    const newNode = addMoveToTree(analysisCurrentNode, move, previousPlayer, previousMoveNumber, analysisState.boardSize);
+    const result = applyAnalysisCapture(analysisState, analysisCurrentNode, captures);
     set({
-      analysisState: newState,
-      analysisCurrentNode: newNode,
+      analysisState: result.analysisState,
+      analysisCurrentNode: result.analysisCurrentNode,
       selectedRingId: null,
       highlightedCaptures: [],
       availableCaptureChains: [],
@@ -939,46 +884,10 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     const { roomId, analysisGameTree, analysisCurrentNode, analysisStartNodeId, premoves, state } = get();
     if (!roomId || !analysisGameTree || !analysisCurrentNode || !analysisStartNodeId) return;
 
-    // Walk from analysisCurrentNode up to (but excluding) the start anchor.
-    const path: GameNode[] = [];
-    let node: GameNode | null = analysisCurrentNode;
-    while (node && node.id !== analysisStartNodeId) {
-      path.unshift(node);
-      node = node.parent;
-    }
-    if (!node || path.length === 0) return; // anchor not found or empty line
-
-    const sequence: PreMoveStep[] = [];
-    for (const moveNode of path) {
-      if (!moveNode.move) continue;
-      const stepState = rebuildStateFromNode(moveNode, state.boardSize);
-      const winner = checkWinCondition(stepState);
-      const winType = winner ? getWinType(stepState, winner) : null;
-      // rebuildStateFromNode replays moves but doesn't recompute phase after captures.
-      // Normalize so the precomputed state reflects whether the next player has a
-      // mandatory capture, otherwise the server would store a broken `placement`
-      // phase even when captures are forced.
-      if (winner) {
-        stepState.phase = 'gameOver';
-      } else if (stepState.phase !== 'ringRemoval') {
-        stepState.phase = hasAvailableCaptures(stepState) ? 'capture' : 'placement';
-      }
-      sequence.push({
-        move: moveNode.move,
-        notation: moveNode.notation,
-        player: moveNode.player,
-        newStateJson: serializeState(stepState),
-        newCurrentPlayer: stepState.currentPlayer === 'player1' ? 1 : 2,
-        newWinner: winner === 'player1' ? 1 : winner === 'player2' ? 2 : null,
-        newWinType: winType,
-      });
-    }
+    const sequence = buildPremoveSequence(analysisCurrentNode, analysisStartNodeId, state.boardSize);
     if (sequence.length === 0) return;
 
-    const newVariant: PreMoveVariant = {
-      id: `v-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      sequence,
-    };
+    const newVariant: PreMoveVariant = { id: makeVariantId(), sequence };
     const updated = [...premoves, newVariant];
     set({ premoves: updated });
     try {
