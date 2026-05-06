@@ -119,6 +119,7 @@ async function ensureSchema() {
       ALTER TABLE rooms ADD COLUMN IF NOT EXISTS clock_p2_ms BIGINT;
       ALTER TABLE rooms ADD COLUMN IF NOT EXISTS time_forfeit_player INTEGER;
       ALTER TABLE rooms ADD COLUMN IF NOT EXISTS premoves_json TEXT NOT NULL DEFAULT '{"player1":[],"player2":[]}';
+      ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP NOT NULL DEFAULT NOW();
       ALTER TABLE users ADD COLUMN IF NOT EXISTS contact_link TEXT NOT NULL DEFAULT '';
       ALTER TABLE games ADD COLUMN IF NOT EXISTS is_online BOOLEAN NOT NULL DEFAULT false;
       ALTER TABLE games ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id);

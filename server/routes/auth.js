@@ -131,6 +131,18 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// Lightweight heartbeat: client pings every minute while authenticated, server
+// updates last_seen so other endpoints can compute online presence.
+router.post('/heartbeat', authRequired, async (req, res) => {
+  try {
+    await pool.query('UPDATE users SET last_seen = NOW() WHERE id = $1', [req.user.id]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Heartbeat error:', err);
+    res.status(500).json({ error: 'serverError' });
+  }
+});
+
 router.get('/me', authRequired, async (req, res) => {
   try {
     const result = await pool.query(

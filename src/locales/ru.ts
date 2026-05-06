@@ -314,4 +314,8 @@ export const ru = {
   variantNeedsAtLeastTwoMoves: 'Вариант должен содержать минимум 2 хода',
   deleteVariant: 'Удалить',
   premovesHint: 'Если соперник сходит так, как ты предположил — твой ответ выполнится автоматически.',
+  statusOnline: 'Онлайн',
+  statusOffline: 'Не в сети',
+  playersTotal: 'Всего',
+  playersOnline: 'Онлайн',
 };

@@ -7,6 +7,28 @@ const followsRouter = Router();
 
 // ==================== PLAYERS ====================
 
+// "Online" means active within ONLINE_WINDOW_MS. Heartbeat fires every 60s on
+// the client; 2 minutes gives a comfortable buffer for missed beats / sleep.
+const ONLINE_WINDOW_MS = 2 * 60 * 1000;
+
+// GET /stats — total registered users and current online count.
+// MUST be declared before /:id to avoid being routed there.
+router.get('/stats', async (req, res) => {
+  try {
+    const totalRow = await pool.query('SELECT COUNT(*)::int AS c FROM users');
+    const onlineRow = await pool.query(
+      `SELECT COUNT(*)::int AS c FROM users WHERE last_seen > NOW() - INTERVAL '${Math.floor(ONLINE_WINDOW_MS / 1000)} seconds'`
+    );
+    res.json({
+      total: totalRow.rows[0].c,
+      online: onlineRow.rows[0].c,
+    });
+  } catch (err) {
+    console.error('Player stats error:', err);
+    res.status(500).json({ error: 'serverError' });
+  }
+});
+
 router.get('/', async (req, res) => {
   const sortMap = {
     rating: 'rating',
@@ -24,9 +46,10 @@ router.get('/', async (req, res) => {
 
   try {
     const result = await pool.query(
-      `SELECT id, username, country, rating, wins, losses, best_streak, created_at
+      `SELECT id, username, country, rating, wins, losses, best_streak, created_at, last_seen
        FROM users ORDER BY ${sortExpr} ${order}, id ASC`
     );
+    const now = Date.now();
     res.json(result.rows.map(u => ({
       id: u.id,
       username: u.username,
@@ -38,6 +61,8 @@ router.get('/', async (req, res) => {
       winrate: (u.wins + u.losses) > 0 ? Math.round(u.wins / (u.wins + u.losses) * 100) : 0,
       bestStreak: u.best_streak,
       createdAt: u.created_at.getTime(),
+      lastSeenMs: u.last_seen ? u.last_seen.getTime() : null,
+      online: u.last_seen ? (now - u.last_seen.getTime()) < ONLINE_WINDOW_MS : false,
     })));
   } catch (err) {
     console.error('Players list error:', err);
@@ -50,14 +75,15 @@ router.get('/:id', optionalAuth, async (req, res) => {
   const userId = parseInt(req.params.id, 10);
   try {
     const result = await pool.query(
-      'SELECT id, username, quote, country, contact_link, rating, rating_rd, wins, losses, best_streak, current_streak, created_at FROM users WHERE id = $1',
+      'SELECT id, username, quote, country, contact_link, rating, rating_rd, wins, losses, best_streak, current_streak, created_at, last_seen FROM users WHERE id = $1',
       [userId]
     );
     if (result.rows.length === 0) {
-      res.status(404).json({ error: 'Игрок не найден' });
+      res.status(404).json({ error: 'serverError' });
       return;
     }
     const u = result.rows[0];
+    const lastSeenMs = u.last_seen ? u.last_seen.getTime() : null;
     const data = {
       id: u.id,
       username: u.username,
@@ -73,6 +99,8 @@ router.get('/:id', optionalAuth, async (req, res) => {
       bestStreak: u.best_streak,
       currentStreak: u.current_streak,
       createdAt: u.created_at.getTime(),
+      lastSeenMs,
+      online: lastSeenMs ? (Date.now() - lastSeenMs) < ONLINE_WINDOW_MS : false,
       isFollowing: false,
     };
 

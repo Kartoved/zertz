@@ -314,4 +314,8 @@ export const en = {
   variantNeedsAtLeastTwoMoves: 'A variant must contain at least 2 moves',
   deleteVariant: 'Delete',
   premovesHint: 'If your opponent plays as you predicted, your reply will be played automatically.',
+  statusOnline: 'Online',
+  statusOffline: 'Offline',
+  playersTotal: 'Total',
+  playersOnline: 'Online',
 };

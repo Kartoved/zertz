@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useI18n } from '../../i18n';
 import { useAuthStore } from '../../store/authStore';
 import { getGlobalChatMessages, sendGlobalChatMessage, GlobalChatMessage } from '../../db/globalChatApi';
+import { getPlayerStats, PlayerStats } from '../../db/authApi';
 import PlayerProfileModal from '../Auth/PlayerProfileModal';
 
 const MAX_STORED_MESSAGES = 200;
@@ -14,7 +15,19 @@ export default function GlobalChat() {
   const [messages, setMessages] = useState<GlobalChatMessage[]>([]);
   const [lastMessageId, setLastMessageId] = useState(0);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
+  const [stats, setStats] = useState<PlayerStats>({ total: 0, online: 0 });
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      const s = await getPlayerStats();
+      if (!cancelled) setStats(s);
+    };
+    load();
+    const interval = setInterval(load, 30000);
+    return () => { cancelled = true; clearInterval(interval); };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -56,8 +69,13 @@ export default function GlobalChat() {
   }, [lastMessageId]);
 
   useEffect(() => {
-    const container = messagesEndRef.current?.parentElement;
-    if (container) container.scrollTop = container.scrollHeight;
+    const scroll = () => {
+      const container = messagesEndRef.current?.parentElement;
+      if (container) container.scrollTop = container.scrollHeight;
+    };
+    scroll();
+    const raf = requestAnimationFrame(scroll);
+    return () => cancelAnimationFrame(raf);
   }, [messages]);
 
   const handleSend = () => {
@@ -94,10 +112,18 @@ export default function GlobalChat() {
   return (
     <>
     <div className="flex flex-col h-full bg-white dark:bg-gray-800 rounded-2xl shadow-md overflow-hidden">
-      <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+      <div className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between gap-2">
         <h3 className="font-bold text-gray-800 dark:text-gray-200 text-sm uppercase tracking-wide">
           {t.globalChat}
         </h3>
+        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400" title={`${t.playersOnline}: ${stats.online} / ${t.playersTotal}: ${stats.total}`}>
+          <span className="inline-flex items-center gap-1">
+            <span className="inline-block w-2 h-2 rounded-full bg-green-500 ring-2 ring-green-500/30" />
+            <span className="font-semibold text-green-600 dark:text-green-400">{stats.online}</span>
+          </span>
+          <span className="text-gray-400 dark:text-gray-600">/</span>
+          <span>{stats.total}</span>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">

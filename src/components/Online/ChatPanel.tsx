@@ -22,8 +22,16 @@ export function ChatPanel({ inputBottomOffset = 0 }: ChatPanelProps) {
   };
 
   useEffect(() => {
-    const container = messagesEndRef.current?.parentElement;
-    if (container) container.scrollTop = container.scrollHeight;
+    // Pin to the bottom on mount and on new messages. Run twice — once now,
+    // once on next animation frame — so layout-not-ready cases (initial render
+    // before fonts/avatars settle) still land at the bottom.
+    const scroll = () => {
+      const container = messagesEndRef.current?.parentElement;
+      if (container) container.scrollTop = container.scrollHeight;
+    };
+    scroll();
+    const raf = requestAnimationFrame(scroll);
+    return () => cancelAnimationFrame(raf);
   }, [messages]);
 
   const handleSend = () => {

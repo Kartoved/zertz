@@ -3,6 +3,7 @@ import { getPlayers, getFollowing, getFollowIds, followUser, unfollowUser, Playe
 import { useAuthStore } from '../../store/authStore';
 import PlayerProfileModal from './PlayerProfileModal';
 import CountryBadge from '../UI/CountryBadge';
+import OnlineIndicator from '../UI/OnlineIndicator';
 import { useI18n } from '../../i18n';
 
 interface PlayersModalProps {
@@ -202,9 +203,10 @@ export default function PlayersModal({ onClose }: PlayersModalProps) {
                     <td className="px-3 py-2">
                       <button
                         onClick={() => setSelectedPlayerId(p.id)}
-                        className="font-medium text-blue-600 dark:text-blue-400 hover:underline"
+                        className="font-medium text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-2"
                       >
-                        <CountryBadge country={p.country} className="mr-2" />
+                        <OnlineIndicator online={p.online} lastSeenMs={p.lastSeenMs} />
+                        <CountryBadge country={p.country} />
                         {p.username}
                       </button>
                     </td>

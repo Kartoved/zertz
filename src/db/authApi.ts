@@ -27,6 +27,30 @@ export interface PlayerInfo {
   winrate: number;
   bestStreak: number;
   createdAt: number;
+  lastSeenMs?: number | null;
+  online?: boolean;
+}
+
+export interface PlayerStats {
+  total: number;
+  online: number;
+}
+
+export async function getPlayerStats(): Promise<PlayerStats> {
+  const response = await fetch(`${API_BASE}/api/players/stats`);
+  if (!response.ok) return { total: 0, online: 0 };
+  return response.json();
+}
+
+export async function sendHeartbeat(token: string): Promise<void> {
+  try {
+    await fetch(`${API_BASE}/api/auth/heartbeat`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch {
+    // ignore — non-critical
+  }
 }
 
 export async function register(username: string, password: string, email?: string): Promise<{ token: string; user: User }> {
@@ -112,6 +136,8 @@ export interface PlayerProfile {
   bestStreak: number;
   currentStreak: number;
   createdAt: number;
+  lastSeenMs?: number | null;
+  online?: boolean;
   isFollowing: boolean;
 }
 

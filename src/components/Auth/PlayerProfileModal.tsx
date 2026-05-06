@@ -4,6 +4,7 @@ import { getPlayerProfile, followUser, unfollowUser, createChallenge, PlayerProf
 import { useAuthStore } from '../../store/authStore';
 import { createInitialState } from '../../game/GameEngine';
 import CountryBadge from '../UI/CountryBadge';
+import OnlineIndicator from '../UI/OnlineIndicator';
 import { useI18n } from '../../i18n';
 import { createRootNode } from '../../utils/gameTreeUtils';
 import { serializeState, serializeTree } from '../../db/apiClient';
@@ -128,8 +129,9 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
         {/* Header */}
         <div className="p-4 border-b dark:border-gray-700 flex justify-between items-center">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-            <CountryBadge country={profile.country} className="mr-2" />
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white inline-flex items-center gap-2">
+            <OnlineIndicator online={profile.online} lastSeenMs={profile.lastSeenMs} size="md" />
+            <CountryBadge country={profile.country} />
             {profile.username}
           </h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">✕</button>

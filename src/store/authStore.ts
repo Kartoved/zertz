@@ -115,18 +115,35 @@ if (token) {
 
 // Poll for incoming challenges every 15 seconds when logged in
 let challengePollInterval: ReturnType<typeof setInterval> | null = null;
+// Send a heartbeat every 60 seconds to keep last_seen fresh for presence detection.
+let heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+
+function sendHeartbeatNow() {
+  const tk = useAuthStore.getState().token;
+  if (tk) authApi.sendHeartbeat(tk);
+}
 
 useAuthStore.subscribe((state, prev) => {
   if (state.user && !prev.user) {
-    // User just logged in — start polling
     challengePollInterval = setInterval(() => {
       useAuthStore.getState().pollChallenges();
     }, 15000);
+    sendHeartbeatNow();
+    heartbeatInterval = setInterval(sendHeartbeatNow, 60000);
   } else if (!state.user && prev.user) {
-    // User logged out — stop polling
     if (challengePollInterval !== null) {
       clearInterval(challengePollInterval);
       challengePollInterval = null;
     }
+    if (heartbeatInterval !== null) {
+      clearInterval(heartbeatInterval);
+      heartbeatInterval = null;
+    }
   }
 });
+
+// Fire an immediate heartbeat if we already have a token at app start.
+if (token) {
+  sendHeartbeatNow();
+  heartbeatInterval = setInterval(sendHeartbeatNow, 60000);
+}

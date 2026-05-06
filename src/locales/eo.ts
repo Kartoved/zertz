@@ -314,4 +314,8 @@ export const eo = {
   variantNeedsAtLeastTwoMoves: 'Varianto devas enhavi almenaŭ 2 movojn',
   deleteVariant: 'Forigi',
   premovesHint: 'Se via kontraŭulo movos kiel vi antaŭdiris, via respondo aŭtomate efektiviĝos.',
+  statusOnline: 'Konektita',
+  statusOffline: 'Nekonektita',
+  playersTotal: 'Entute',
+  playersOnline: 'Konektitaj',
 };
