@@ -8,7 +8,7 @@ import {
   getWinType,
 } from '../game/GameEngine';
 import { getValidRemovableRings } from '../game/Board';
-import { applyPlacement, applyRingRemoval, applyCapture } from '../utils/moveActions';
+import { applyPlacement, applyRingRemoval, applyCapture, normalizePhase } from '../utils/moveActions';
 import * as roomsApi from '../db/roomsApi';
 import { ChatMessage, FischerTimeControl, RatingDelta } from '../db/roomsApi';
 import * as premovesApi from '../db/premovesApi';
@@ -144,6 +144,9 @@ function syncWinnerFromRoom(state: GameState, winnerNum: number | null): GameSta
 // Defensive: if a server-saved state has phase='placement' while captures are
 // actually mandatory, fix it before the UI uses it. This guards against
 // pre-move auto-execution storing a stale phase from rebuildStateFromNode.
+// Clones the input so the network response object is left untouched.
+// (Only promotes 'placement' → 'capture'; never demotes — server is trusted
+// for 'capture' states even if no chains are visible locally.)
 function normalizePhaseForCaptures(state: GameState): GameState {
   if (state.winner || state.phase === 'gameOver' || state.phase === 'ringRemoval') return state;
   if (state.phase === 'placement' && hasAvailableCaptures(state)) {
@@ -495,12 +498,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       if (!result) return;
 
       const { newState, move, winner, winType, needsRingRemoval } = result;
-      // Only promote to 'capture' if turn already passed to opponent (phase='placement').
-      // If player still owes a ring removal (phase='ringRemoval'), do NOT override —
-      // the forced capture belongs to the opponent after ring removal completes.
-      if (newState.phase === 'placement' && hasAvailableCaptures(newState)) {
-        newState.phase = 'capture';
-      }
+      normalizePhase(newState);
 
       playPlaceSound();
       if (winner) playWinSound();
@@ -543,10 +541,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       if (!result) return;
 
       const { newState, winner, winType } = result;
-      // After ring removal the turn has passed; only set 'capture' if still in play.
-      if (newState.phase === 'placement' && hasAvailableCaptures(newState)) {
-        newState.phase = 'capture';
-      }
+      normalizePhase(newState);
 
       playRemoveRingSound();
       if (winner) playWinSound();
@@ -576,10 +571,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     pendingMoveCount++;
     try {
       const { newState, move, previousPlayer, previousMoveNumber, winner, winType } = applyCapture(state, captures);
-      // Don't override 'gameOver' when the capture ended the game.
-      if (newState.phase !== 'gameOver') {
-        newState.phase = hasAvailableCaptures(newState) ? 'capture' : 'placement';
-      }
+      normalizePhase(newState);
 
       const newNode = addMoveToTree(currentNode, move, previousPlayer, previousMoveNumber, state.boardSize);
 

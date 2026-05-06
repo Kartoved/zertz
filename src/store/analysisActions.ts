@@ -1,7 +1,7 @@
 import { GameState, GameNode, MarbleColor, CaptureMove, PreMoveVariant } from '../game/types';
-import { hasAvailableCaptures, getCaptureChains } from '../game/GameEngine';
+import { getCaptureChains } from '../game/GameEngine';
 import { getValidRemovableRings } from '../game/Board';
-import { applyPlacement, applyRingRemoval, applyCapture } from '../utils/moveActions';
+import { applyPlacement, applyRingRemoval, applyCapture, normalizePhase } from '../utils/moveActions';
 import { addMoveToTree, rebuildStateFromNode } from '../utils/gameTreeUtils';
 
 export interface AnalysisSelectionSlice {
@@ -86,9 +86,7 @@ export function applyAnalysisPlacement(
   if (!result) return null;
 
   const { newState, move } = result;
-  if (newState.phase === 'placement' && hasAvailableCaptures(newState)) {
-    newState.phase = 'capture';
-  }
+  normalizePhase(newState);
 
   const newNode = addMoveToTree(
     analysisCurrentNode,
@@ -113,9 +111,7 @@ export function applyAnalysisRingRemoval(
   if (!result) return null;
 
   const { newState } = result;
-  if (newState.phase === 'placement' && hasAvailableCaptures(newState)) {
-    newState.phase = 'capture';
-  }
+  normalizePhase(newState);
   return { analysisState: newState };
 }
 
@@ -125,9 +121,7 @@ export function applyAnalysisCapture(
   captures: CaptureMove[]
 ): AnalysisMoveResult {
   const { newState, move, previousPlayer, previousMoveNumber } = applyCapture(analysisState, captures);
-  if (newState.phase !== 'gameOver') {
-    newState.phase = hasAvailableCaptures(newState) ? 'capture' : 'placement';
-  }
+  normalizePhase(newState);
 
   const newNode = addMoveToTree(
     analysisCurrentNode,

@@ -1,5 +1,6 @@
 import { GameNode, PreMoveStep } from '../game/types';
-import { hasAvailableCaptures, checkWinCondition, getWinType } from '../game/GameEngine';
+import { checkWinCondition, getWinType } from '../game/GameEngine';
+import { normalizePhase } from '../utils/moveActions';
 import { rebuildStateFromNode } from '../utils/gameTreeUtils';
 import { serializeState } from '../db/apiClient';
 
@@ -31,11 +32,8 @@ export function buildPremoveSequence(
     const winner = checkWinCondition(stepState);
     const winType = winner ? getWinType(stepState, winner) : null;
 
-    if (winner) {
-      stepState.phase = 'gameOver';
-    } else if (stepState.phase !== 'ringRemoval') {
-      stepState.phase = hasAvailableCaptures(stepState) ? 'capture' : 'placement';
-    }
+    if (winner) stepState.phase = 'gameOver';
+    normalizePhase(stepState);
 
     sequence.push({
       move: moveNode.move,

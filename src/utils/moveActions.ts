@@ -8,8 +8,29 @@ import {
   checkWinCondition,
   getWinType,
   moveToNotation,
+  hasAvailableCaptures,
 } from '../game/GameEngine';
 import { getValidRemovableRings } from '../game/Board';
+
+// Normalizes state.phase based on mandatory captures. Mutates in place.
+//
+// The engine (placeMarble + skipRingRemoval / removeRing / executeCapture)
+// leaves phase as 'placement' or 'capture' mechanically, without checking
+// whether captures are now mandatory for the next player. Online/analysis code
+// wants the phase to reflect that — so a 'placement' with captures becomes
+// 'capture', and a 'capture' with no remaining chains becomes 'placement'.
+//
+// No-op when the game is over or the player still owes a ring removal —
+// the engine owns those phases and they must not be overridden.
+//
+// NOTE: gameStore (local hot-seat) intentionally does NOT call this. It keeps
+// phase='placement' across turns and detects mandatory captures via direct
+// hasAvailableCaptures() checks in selectRing / MarbleSelector. Adding
+// normalization there would break that flow.
+export function normalizePhase(state: GameState): void {
+  if (state.winner || state.phase === 'gameOver' || state.phase === 'ringRemoval') return;
+  state.phase = hasAvailableCaptures(state) ? 'capture' : 'placement';
+}
 
 export interface PlacementApplyResult {
   newState: GameState;
