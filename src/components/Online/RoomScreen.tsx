@@ -90,6 +90,7 @@ export function RoomScreen() {
     analysisHandlePlacement,
     analysisHandleRingRemoval,
     analysisHandleCapture,
+    analysisNavigateToNode,
     premoves,
     addCurrentVariantAsPremove,
     deletePremoveVariant,
@@ -539,7 +540,29 @@ export function RoomScreen() {
             <div className="p-3 bg-white dark:bg-gray-800 rounded-lg col-span-1 sm:col-span-2 lg:col-span-1">
               {isAnalyzing && (
                 <div className="mb-3 px-2 py-1.5 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-xs font-semibold text-center">
-                  🔬 {t.analysisMode}
+                  <div>🔬 {t.analysisMode}</div>
+                  {boardState.winner && boardState.winner !== 'cancelled' ? (
+                    <div className="mt-1 text-[11px] font-normal text-amber-700 dark:text-amber-300">
+                      🏆 {boardState.winner === 'player1' ? safePlayerNames.player1 : safePlayerNames.player2}
+                    </div>
+                  ) : (
+                    <div className="mt-1 text-[11px] font-normal text-amber-700 dark:text-amber-300">
+                      {boardState.currentPlayer === 'player1' ? safePlayerNames.player1 : safePlayerNames.player2}
+                      {' · '}
+                      {boardState.phase === 'placement' && t.phasePlacement}
+                      {boardState.phase === 'ringRemoval' && t.phaseRingRemoval}
+                      {boardState.phase === 'capture' && t.phaseCapture}
+                    </div>
+                  )}
+                  {analysisCurrentNode && analysisCurrentNode.id !== analysisStartNodeId && (
+                    <button
+                      type="button"
+                      onClick={() => analysisCurrentNode.parent && analysisNavigateToNode(analysisCurrentNode.parent)}
+                      className="mt-2 w-full px-2 py-1 text-[11px] rounded bg-amber-200 dark:bg-amber-800/60 text-amber-900 dark:text-amber-100 hover:bg-amber-300 dark:hover:bg-amber-800 font-normal"
+                    >
+                      ↶ {t.undoMove}
+                    </button>
+                  )}
                 </div>
               )}
               {boardState.phase === 'placement' && (
