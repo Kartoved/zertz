@@ -101,19 +101,34 @@ function renderPremoveVariants(premoves: PreMoveVariant[]): JSX.Element[] {
 
 export default function OnlineMoveHistory() {
   const { t } = useI18n();
-  const { gameTree, currentNode, navigateToNode, premoves } = useRoomStore();
+  const {
+    gameTree,
+    currentNode,
+    navigateToNode,
+    premoves,
+    isAnalyzing,
+    analysisGameTree,
+    analysisCurrentNode,
+    analysisNavigateToNode,
+  } = useRoomStore();
+
+  // In analysis mode the widget walks the analysis tree (which includes saved
+  // pre-move variants as branches), so the user can click any node freely.
+  const activeTree = isAnalyzing && analysisGameTree ? analysisGameTree : gameTree;
+  const activeCurrentNode = isAnalyzing && analysisCurrentNode ? analysisCurrentNode : currentNode;
+  const activeNavigate = isAnalyzing ? analysisNavigateToNode : navigateToNode;
 
   const navigatePrev = useCallback(() => {
-    if (currentNode.parent) {
-      navigateToNode(currentNode.parent);
+    if (activeCurrentNode.parent) {
+      activeNavigate(activeCurrentNode.parent);
     }
-  }, [currentNode, navigateToNode]);
+  }, [activeCurrentNode, activeNavigate]);
 
   const navigateNext = useCallback(() => {
-    if (currentNode.children.length > 0) {
-      navigateToNode(currentNode.children[0]);
+    if (activeCurrentNode.children.length > 0) {
+      activeNavigate(activeCurrentNode.children[0]);
     }
-  }, [currentNode, navigateToNode]);
+  }, [activeCurrentNode, activeNavigate]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -128,9 +143,11 @@ export default function OnlineMoveHistory() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [navigatePrev, navigateNext]);
 
-  const moves = renderMoveTree(gameTree, currentNode.id, navigateToNode);
-  const premoveElements = renderPremoveVariants(premoves);
-  const isAtStart = currentNode.id === 'root';
+  const moves = renderMoveTree(activeTree, activeCurrentNode.id, activeNavigate);
+  // In analysis mode pre-moves are already merged into the active tree as
+  // navigable branches, so don't render them as ghost text again.
+  const premoveElements = isAnalyzing ? [] : renderPremoveVariants(premoves);
+  const isAtStart = activeCurrentNode.id === activeTree.id;
 
   if (moves.length === 0 && premoveElements.length === 0) {
     return <div className="p-1 text-xs text-gray-500 dark:text-gray-400">{t.noMovesYet}</div>;
@@ -139,7 +156,7 @@ export default function OnlineMoveHistory() {
   return (
     <div className="flex flex-wrap gap-1 text-xs md:text-sm font-mono text-gray-800 dark:text-gray-200">
       <span
-        onClick={() => navigateToNode(gameTree)}
+        onClick={() => activeNavigate(activeTree)}
         className={`cursor-pointer px-1 rounded transition-colors select-none ${isAtStart ? 'bg-blue-500 text-white' : 'hover:bg-gray-200 dark:hover:bg-gray-700'}`}
       >
         {`0. ${t.moveStart}`}

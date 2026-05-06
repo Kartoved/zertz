@@ -753,12 +753,42 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   // ==================== Analysis mode ====================
 
   enterAnalysis: () => {
-    const { state, gameTree, currentNode, isAnalyzing } = get();
+    const { state, gameTree, currentNode, isAnalyzing, premoves } = get();
     if (isAnalyzing) return;
     // Deep-clone the live tree so analysis branches don't pollute the live game.
     const clonedTree = deserializeTree(serializeTree(gameTree));
     const found = findNodeAndParent(clonedTree, currentNode.id);
     const startNode = found ? found.node : clonedTree;
+
+    // Inject saved pre-move variants as branches under the start anchor so the
+    // user can navigate them in the move-history widget. Variants sharing a
+    // prefix collapse into the same nodes.
+    for (const variant of premoves) {
+      let parent = startNode;
+      for (let i = 0; i < variant.sequence.length; i++) {
+        const step = variant.sequence[i];
+        const existing = parent.children.find(c =>
+          c.move && JSON.stringify(c.move) === JSON.stringify(step.move)
+        );
+        if (existing) {
+          parent = existing;
+          continue;
+        }
+        const newNode: GameNode = {
+          id: `pm-${variant.id}-${i}`,
+          moveNumber: parent.moveNumber + 1,
+          player: step.player,
+          move: step.move,
+          notation: step.notation,
+          children: [],
+          parent,
+          isMainLine: parent.children.length === 0,
+        };
+        parent.children.push(newNode);
+        parent = newNode;
+      }
+    }
+
     set({
       isAnalyzing: true,
       analysisState: cloneState(state),
