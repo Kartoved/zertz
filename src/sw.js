@@ -1,6 +1,12 @@
 import { precacheAndRoute } from 'workbox-precaching';
 import { registerRoute, NavigationRoute } from 'workbox-routing';
 import { NetworkOnly } from 'workbox-strategies';
+import { clientsClaim } from 'workbox-core';
+
+// New SW activates immediately and takes over open tabs, so bundle updates
+// land on the very next reload instead of waiting for every tab to close.
+self.skipWaiting();
+clientsClaim();
 
 // Workbox injects precache manifest here
 precacheAndRoute(self.__WB_MANIFEST);

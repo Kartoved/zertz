@@ -86,7 +86,32 @@ export async function unsubscribeFromPush(): Promise<void> {
 export async function registerServiceWorker(): Promise<void> {
   if (!('serviceWorker' in navigator)) return;
   try {
-    await navigator.serviceWorker.register('/sw.js');
+    const registration = await navigator.serviceWorker.register('/sw.js');
+
+    // When a new SW is detected and reaches the "installed" state while an
+    // existing SW controls the page, ask it to skip waiting and reload once
+    // it takes control. This lets bundle updates land without the user
+    // needing to close every tab.
+    registration.addEventListener('updatefound', () => {
+      const incoming = registration.installing;
+      if (!incoming) return;
+      incoming.addEventListener('statechange', () => {
+        if (incoming.state === 'installed' && navigator.serviceWorker.controller) {
+          incoming.postMessage({ type: 'SKIP_WAITING' });
+        }
+      });
+    });
+
+    // After the new SW takes over, reload the page so the fresh shell loads.
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloaded) return;
+      reloaded = true;
+      window.location.reload();
+    });
+
+    // Probe for updates on registration (fires off-main-thread, no harm if none).
+    registration.update().catch(() => { /* ignore */ });
   } catch (err) {
     console.error('SW registration failed:', err);
   }
