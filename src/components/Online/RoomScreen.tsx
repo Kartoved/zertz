@@ -236,7 +236,6 @@ export function RoomScreen() {
   const analysisHasMoves = analysisPathLength >= 2;
   const analysisStartsWithOpponent = !!myPlayer && analysisFirstMoveBy !== null && analysisFirstMoveBy !== myPlayer;
   const canSaveCurrentVariant = isAnalyzing && analysisHasMoves && analysisStartsWithOpponent;
-  const effectiveSelectMarbleColor = isAnalyzing ? analysisSelectMarbleColor : selectMarbleColor;
   const effectiveSelectRing = isAnalyzing ? analysisSelectRing : selectRing;
   const effectiveHandlePlacement = isAnalyzing ? analysisHandlePlacement : handlePlacement;
   const effectiveHandleRingRemoval = isAnalyzing ? analysisHandleRingRemoval : handleRingRemoval;
@@ -546,12 +545,18 @@ export function RoomScreen() {
             )}
           </div>
 
-          {/* Spectator panel: badge + analysis controls (logged-in only) */}
+          {/* Spectator badge — visible to anyone watching, even anonymous */}
           {isSpectator && (
+            <div className="col-span-1 sm:col-span-2 lg:col-span-1 px-3 py-2 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded-lg text-center text-sm text-yellow-700 dark:text-yellow-300 font-medium">
+              👁 {t.youAreSpectator}
+            </div>
+          )}
+
+          {/* Unified analysis panel — any logged-in user (participant or spectator,
+              in any game type, active or finished). Shows the Analyze entry when
+              not analyzing, and the analysis status + exit when analyzing. */}
+          {isAuthed && (
             <div className="col-span-1 sm:col-span-2 lg:col-span-1 p-3 bg-white dark:bg-gray-800 rounded-lg space-y-2">
-              <div className="px-2 py-1.5 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded text-center text-sm text-yellow-700 dark:text-yellow-300 font-medium">
-                👁 {t.youAreSpectator}
-              </div>
               {isAnalyzing && (
                 <div className="px-2 py-1.5 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-xs font-semibold text-center">
                   <div>🔬 {t.analysisMode}</div>
@@ -574,7 +579,7 @@ export function RoomScreen() {
                 <MarbleSelector
                   reserve={boardState.reserve}
                   selectedColor={selectedMarbleColor}
-                  onSelect={effectiveSelectMarbleColor}
+                  onSelect={analysisSelectMarbleColor}
                   captures={boardState.captures[boardState.currentPlayer]}
                   phase={boardState.phase}
                   currentPlayer={boardState.currentPlayer}
@@ -598,7 +603,7 @@ export function RoomScreen() {
                 >
                   ← {t.exitAnalysis}
                 </button>
-              ) : isAuthed && (
+              ) : (
                 <button
                   type="button"
                   onClick={enterAnalysis}
@@ -610,95 +615,47 @@ export function RoomScreen() {
             </div>
           )}
 
-          {/* Marble selector + action buttons (players only) */}
-          {!state.winner && !isSpectator && (
+          {/* Live participant action panel — active participant, not in analysis */}
+          {!state.winner && !isSpectator && !isAnalyzing && (
             <div className="p-3 bg-white dark:bg-gray-800 rounded-lg col-span-1 sm:col-span-2 lg:col-span-1">
-              {isAnalyzing && (
-                <div className="mb-3 px-2 py-1.5 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-xs font-semibold text-center">
-                  <div>🔬 {t.analysisMode}</div>
-                  {boardState.winner && boardState.winner !== 'cancelled' ? (
-                    <div className="mt-1 text-[11px] font-normal text-amber-700 dark:text-amber-300">
-                      🏆 {boardState.winner === 'player1' ? safePlayerNames.player1 : safePlayerNames.player2}
-                    </div>
-                  ) : (
-                    <div className="mt-1 text-[11px] font-normal text-amber-700 dark:text-amber-300">
-                      {boardState.currentPlayer === 'player1' ? safePlayerNames.player1 : safePlayerNames.player2}
-                      {' · '}
-                      {boardState.phase === 'placement' && t.phasePlacement}
-                      {boardState.phase === 'ringRemoval' && t.phaseRingRemoval}
-                      {boardState.phase === 'capture' && t.phaseCapture}
-                    </div>
-                  )}
-                  {analysisCurrentNode && analysisCurrentNode.id !== analysisStartNodeId && (
+              {state.phase === 'placement' && (
+                <MarbleSelector
+                  reserve={state.reserve}
+                  selectedColor={selectedMarbleColor}
+                  onSelect={selectMarbleColor}
+                  captures={state.captures[state.currentPlayer]}
+                  phase={state.phase}
+                  currentPlayer={state.currentPlayer}
+                  stateForCaptures={state}
+                />
+              )}
+              <div className={state.phase === 'placement' ? 'mt-3' : ''}>
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={() => sendMessage('[UNDO_REQUEST]')}
+                    disabled={!canUndoOwnLastMove()}
+                    className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    ↶ {t.undoMove}
+                  </button>
+                  {canCancel && (
                     <button
                       type="button"
-                      onClick={() => analysisCurrentNode.parent && analysisNavigateToNode(analysisCurrentNode.parent)}
-                      className="mt-2 w-full px-2 py-1 text-[11px] rounded bg-amber-200 dark:bg-amber-800/60 text-amber-900 dark:text-amber-100 hover:bg-amber-300 dark:hover:bg-amber-800 font-normal"
+                      onClick={() => cancelGame()}
+                      className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-900/70 transition-colors"
                     >
-                      ↶ {t.undoMove}
+                      ✕ {t.cancelGame}
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => setShowSurrenderConfirm(true)}
+                    className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-black hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    🏳️ {t.surrender}
+                  </button>
                 </div>
-              )}
-              {boardState.phase === 'placement' && (
-                <>
-                  <MarbleSelector
-                    reserve={boardState.reserve}
-                    selectedColor={selectedMarbleColor}
-                    onSelect={effectiveSelectMarbleColor}
-                    captures={boardState.captures[boardState.currentPlayer]}
-                    phase={boardState.phase}
-                    currentPlayer={boardState.currentPlayer}
-                    stateForCaptures={boardState}
-                  />
-                </>
-              )}
-              <div className={boardState.phase === 'placement' ? 'mt-3' : ''}>
-                {!isAnalyzing ? (
-                  <div className="flex gap-2 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() => sendMessage('[UNDO_REQUEST]')}
-                      disabled={!canUndoOwnLastMove()}
-                      className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      ↶ {t.undoMove}
-                    </button>
-                    {canCancel && (
-                      <button
-                        type="button"
-                        onClick={() => cancelGame()}
-                        className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-900/70 transition-colors"
-                      >
-                        ✕ {t.cancelGame}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => setShowSurrenderConfirm(true)}
-                      className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-black hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-                    >
-                      🏳️ {t.surrender}
-                    </button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={exitAnalysis}
-                    className="w-full px-3 py-2 text-sm font-semibold rounded-lg bg-blue-500 hover:bg-blue-600 text-white transition-colors"
-                  >
-                    ← {t.returnToGame}
-                  </button>
-                )}
-                {isCorrespondence && !isAnalyzing && (
-                  <button
-                    type="button"
-                    onClick={enterAnalysis}
-                    className="mt-2 w-full px-3 py-1.5 text-sm rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-900/70 transition-colors"
-                  >
-                    🔬 {t.analysis}
-                  </button>
-                )}
               </div>
             </div>
           )}
