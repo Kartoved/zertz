@@ -31,8 +31,10 @@ import {
   applyAnalysisPlacement,
   applyAnalysisRingRemoval,
   applyAnalysisCapture,
+  mergeLiveTreeIntoAnalysis,
 } from './analysisActions';
 import { buildPremoveSequence, makeVariantId } from './premovesActions';
+import { loadAnalysis, saveAnalysis } from './analysisStorage';
 
 interface RoomStore {
   // Room info
@@ -81,6 +83,9 @@ interface RoomStore {
   analysisGameTree: GameNode | null;
   analysisCurrentNode: GameNode | null;
   analysisStartNodeId: string | null;
+  // Bumped to Date.now() each time pollRoom merges new live moves into the
+  // analysis tree. The UI watches this to surface a toast.
+  lastLiveMergeAt: number;
   premoves: PreMoveVariant[];
 
   // Actions
@@ -91,7 +96,7 @@ interface RoomStore {
     timeControl?: FischerTimeControl | null
   ) => Promise<number>;
   pendingPlayerChoice: 1 | 2 | null;
-  joinRoom: (roomId: number | string) => Promise<boolean>;
+  joinRoom: (roomId: number | string, options?: { watchOnly?: boolean }) => Promise<boolean>;
   claimSeat: () => Promise<void>;
   declineSeat: () => void;
   pollRoom: () => Promise<void>;
@@ -168,6 +173,26 @@ async function persistOnlineGame(
   await gamesStorage.saveGame(String(roomId), state, tree, playerNames, winType, true);
 }
 
+// Persists the user's analysis tree + cursor to localStorage. No-op for
+// anonymous users (analysis is gated on login in the UI), or when there's
+// nothing to save. Called after every analysis mutation so that the user can
+// close the tab and resume later within the TTL.
+function persistAnalysisLocal(snapshot: {
+  roomId: number | null;
+  analysisGameTree: GameNode | null;
+  analysisCurrentNode: GameNode | null;
+  analysisStartNodeId: string | null;
+}): void {
+  const { roomId, analysisGameTree, analysisCurrentNode, analysisStartNodeId } = snapshot;
+  const userId = useAuthStore.getState().user?.id;
+  if (!userId || !roomId || !analysisGameTree || !analysisCurrentNode || !analysisStartNodeId) return;
+  saveAnalysis(userId, roomId, {
+    tree: analysisGameTree,
+    currentNodeId: analysisCurrentNode.id,
+    startNodeId: analysisStartNodeId,
+  });
+}
+
 const _initialRoot = createRootNode();
 export const useRoomStore = create<RoomStore>((set, get) => ({
   ...(() => {
@@ -212,6 +237,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   analysisGameTree: null,
   analysisCurrentNode: null,
   analysisStartNodeId: null,
+  lastLiveMergeAt: 0,
   premoves: [],
 
   createRoom: async (boardSize, creatorPlayer = 1, rated = false, timeControl = null) => {
@@ -259,7 +285,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     }
   },
 
-  joinRoom: async (roomId) => {
+  joinRoom: async (roomId, options) => {
     set({ isLoading: true, error: null });
     try {
       const room = await roomsApi.getRoom(roomId);
@@ -277,15 +303,19 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
       const authUser = useAuthStore.getState().user;
       const names = { ...room.playerNames };
+      // Suppress seat-claim prompts when:
+      //  - the caller signalled watch-only intent (e.g. user came from a games list), or
+      //  - the game is already over (no point sitting down at a finished match).
+      const allowSeatPrompt = !options?.watchOnly && !room.winner;
       if (authUser) {
         if (room.user1Id === authUser.id) {
           myPlayer = 1;
         } else if (room.user2Id === authUser.id) {
           myPlayer = 2;
-        } else if (room.user1Id == null) {
+        } else if (allowSeatPrompt && room.user1Id == null) {
           // Free seat — let user choose instead of auto-claiming
           pendingPlayerChoice = 1;
-        } else if (room.user2Id == null) {
+        } else if (allowSeatPrompt && room.user2Id == null) {
           // Free seat — let user choose instead of auto-claiming
           pendingPlayerChoice = 2;
         }
@@ -380,6 +410,19 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
           }).catch(() => { /* ignore */ });
         }
 
+        // If the user is currently analyzing, merge new live moves into the
+        // analysis tree without moving their analysisCurrentNode pointer.
+        const { isAnalyzing, analysisGameTree } = get();
+        let mergedAnalysisTree: GameNode | null = null;
+        if (isAnalyzing && analysisGameTree) {
+          const added = mergeLiveTreeIntoAnalysis(analysisGameTree, room.tree);
+          if (added > 0) {
+            // Swap the root reference so subscribers re-render. Mutations are
+            // already applied to the shared subtree.
+            mergedAnalysisTree = { ...analysisGameTree };
+          }
+        }
+
         set({
           state: syncedState,
           gameTree: room.tree,
@@ -401,8 +444,10 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
           clockP1Ms: room.clockP1Ms,
           clockP2Ms: room.clockP2Ms,
           clockRunningSince: room.clockRunningSince,
+          ...(mergedAnalysisTree ? { analysisGameTree: mergedAnalysisTree, lastLiveMergeAt: Date.now() } : {}),
         });
         await persistOnlineGame(roomId, syncedState, room.tree, room.playerNames, room.winType);
+        if (mergedAnalysisTree) persistAnalysisLocal(get());
       }
     } catch {
       // Ignore polling errors
@@ -752,26 +797,58 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   // ==================== Analysis mode ====================
 
   enterAnalysis: () => {
-    const { state, gameTree, currentNode, isAnalyzing, premoves } = get();
+    const { state, gameTree, currentNode, isAnalyzing, premoves, roomId } = get();
     if (isAnalyzing) return;
-    // Deep-clone the live tree so analysis branches don't pollute the live game.
-    const clonedTree = deserializeTree(serializeTree(gameTree));
-    const found = findNodeAndParent(clonedTree, currentNode.id);
-    const startNode = found ? found.node : clonedTree;
 
-    injectPremovesIntoTree(startNode, premoves);
+    const authUserId = useAuthStore.getState().user?.id;
+    const saved = (authUserId && roomId) ? loadAnalysis(authUserId, roomId) : null;
+
+    let analysisTree: GameNode;
+    let startNode: GameNode;
+    let analysisCurrent: GameNode;
+    let analysisStateValue: GameState;
+
+    if (saved) {
+      // Resume from previously saved session.
+      analysisTree = saved.tree;
+      // Sync any live moves that landed since last save.
+      mergeLiveTreeIntoAnalysis(analysisTree, gameTree);
+
+      const startFound = findNodeAndParent(analysisTree, saved.startNodeId);
+      startNode = startFound?.node ?? analysisTree;
+
+      const currentFound = findNodeAndParent(analysisTree, saved.currentNodeId);
+      analysisCurrent = currentFound?.node ?? startNode;
+
+      // Pre-moves dedup by move equality, so re-injecting won't duplicate.
+      injectPremovesIntoTree(startNode, premoves);
+
+      // Replay state at the user's last-viewed position.
+      analysisStateValue = rebuildStateFromNode(analysisCurrent, state.boardSize);
+      normalizePhase(analysisStateValue);
+    } else {
+      // Fresh start — clone the live tree at the current position.
+      analysisTree = deserializeTree(serializeTree(gameTree));
+      const found = findNodeAndParent(analysisTree, currentNode.id);
+      startNode = found ? found.node : analysisTree;
+      analysisCurrent = startNode;
+      injectPremovesIntoTree(startNode, premoves);
+      analysisStateValue = cloneState(state);
+    }
 
     set({
       isAnalyzing: true,
-      analysisState: cloneState(state),
-      analysisGameTree: clonedTree,
-      analysisCurrentNode: startNode,
+      analysisState: analysisStateValue,
+      analysisGameTree: analysisTree,
+      analysisCurrentNode: analysisCurrent,
       analysisStartNodeId: startNode.id,
       selectedMarbleColor: null,
       selectedRingId: null,
       highlightedCaptures: [],
       availableCaptureChains: [],
     });
+
+    persistAnalysisLocal(get());
   },
 
   exitAnalysis: () => {
@@ -814,6 +891,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       highlightedCaptures: [],
       availableCaptureChains: [],
     });
+    persistAnalysisLocal(get());
   },
 
   analysisHandleRingRemoval: (ringId) => {
@@ -829,6 +907,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       highlightedCaptures: [],
       availableCaptureChains: [],
     });
+    persistAnalysisLocal(get());
   },
 
   analysisHandleCapture: (captures) => {
@@ -843,6 +922,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       highlightedCaptures: [],
       availableCaptureChains: [],
     });
+    persistAnalysisLocal(get());
   },
 
   analysisNavigateToNode: (targetNode) => {
@@ -857,6 +937,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       highlightedCaptures: [],
       availableCaptureChains: [],
     });
+    persistAnalysisLocal(get());
   },
 
   // ==================== Pre-moves ====================
@@ -951,6 +1032,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       analysisGameTree: null,
       analysisCurrentNode: null,
       analysisStartNodeId: null,
+      lastLiveMergeAt: 0,
       premoves: [],
     });
   },

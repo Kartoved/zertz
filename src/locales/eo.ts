@@ -307,6 +307,8 @@ export const eo = {
   analysis: 'Analizo',
   analysisMode: 'Reĝimo de analizo',
   returnToGame: 'Reen al la ludo',
+  liveMoveDuringAnalysis: 'Movo ludita en la partio',
+  exitAnalysis: 'Eliri analizon',
   conditionalPremoves: 'Kondiĉaj antaŭmovoj',
   addCurrentVariant: 'Aldoni aktualan varianton',
   noVariantsYet: 'Neniuj konservitaj variantoj',

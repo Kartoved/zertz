@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useRoomStore } from '../../store/roomStore';
 import { useAuthStore } from '../../store/authStore';
 import { useUIStore } from '../../store/uiStore';
@@ -18,6 +18,8 @@ export function RoomScreen() {
   const { toggleDarkMode, isDarkMode } = useUIStore();
   const { roomId } = useParams<{ roomId: string }>();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const watchOnly = searchParams.get('watch') === '1';
   const [copied, setCopied] = useState(false);
   const [showMobileHeaderMenu, setShowMobileHeaderMenu] = useState(false);
   const [mobileTab, setMobileTab] = useState<'game' | 'chat'>('game');
@@ -83,6 +85,7 @@ export function RoomScreen() {
     analysisState,
     analysisStartNodeId,
     analysisCurrentNode,
+    lastLiveMergeAt,
     enterAnalysis,
     exitAnalysis,
     analysisSelectMarbleColor,
@@ -100,10 +103,10 @@ export function RoomScreen() {
 
   useEffect(() => {
     if (roomId) {
-      joinRoom(roomId);
+      joinRoom(roomId, { watchOnly });
     }
     return () => reset();
-  }, [roomId]);
+  }, [roomId, watchOnly]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -118,6 +121,21 @@ export function RoomScreen() {
       setWinnerModalDismissed(false);
     }
   }, [state.winner]);
+
+  // Toast when a live move arrives during analysis. Tracked via a timestamp
+  // bumped by pollRoom; we compare against the last-seen value to ignore the
+  // initial load and to fire only on actual change.
+  const [liveMoveToast, setLiveMoveToast] = useState(false);
+  const prevLiveMergeRef = useRef(lastLiveMergeAt);
+  useEffect(() => {
+    if (lastLiveMergeAt !== prevLiveMergeRef.current && lastLiveMergeAt > 0 && isAnalyzing) {
+      setLiveMoveToast(true);
+      const timer = setTimeout(() => setLiveMoveToast(false), 3000);
+      prevLiveMergeRef.current = lastLiveMergeAt;
+      return () => clearTimeout(timer);
+    }
+    prevLiveMergeRef.current = lastLiveMergeAt;
+  }, [lastLiveMergeAt, isAnalyzing]);
 
   const isTimedGame = timeControlBaseMs != null;
 
@@ -528,10 +546,67 @@ export function RoomScreen() {
             )}
           </div>
 
-          {/* Spectator badge */}
+          {/* Spectator panel: badge + analysis controls (logged-in only) */}
           {isSpectator && (
-            <div className="col-span-1 sm:col-span-2 lg:col-span-1 px-3 py-2 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded-lg text-center text-sm text-yellow-700 dark:text-yellow-300 font-medium">
-              👁 {t.youAreSpectator}
+            <div className="col-span-1 sm:col-span-2 lg:col-span-1 p-3 bg-white dark:bg-gray-800 rounded-lg space-y-2">
+              <div className="px-2 py-1.5 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded text-center text-sm text-yellow-700 dark:text-yellow-300 font-medium">
+                👁 {t.youAreSpectator}
+              </div>
+              {isAnalyzing && (
+                <div className="px-2 py-1.5 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-xs font-semibold text-center">
+                  <div>🔬 {t.analysisMode}</div>
+                  {boardState.winner && boardState.winner !== 'cancelled' ? (
+                    <div className="mt-1 text-[11px] font-normal text-amber-700 dark:text-amber-300">
+                      🏆 {boardState.winner === 'player1' ? safePlayerNames.player1 : safePlayerNames.player2}
+                    </div>
+                  ) : (
+                    <div className="mt-1 text-[11px] font-normal text-amber-700 dark:text-amber-300">
+                      {boardState.currentPlayer === 'player1' ? safePlayerNames.player1 : safePlayerNames.player2}
+                      {' · '}
+                      {boardState.phase === 'placement' && t.phasePlacement}
+                      {boardState.phase === 'ringRemoval' && t.phaseRingRemoval}
+                      {boardState.phase === 'capture' && t.phaseCapture}
+                    </div>
+                  )}
+                </div>
+              )}
+              {isAnalyzing && boardState.phase === 'placement' && !boardState.winner && (
+                <MarbleSelector
+                  reserve={boardState.reserve}
+                  selectedColor={selectedMarbleColor}
+                  onSelect={effectiveSelectMarbleColor}
+                  captures={boardState.captures[boardState.currentPlayer]}
+                  phase={boardState.phase}
+                  currentPlayer={boardState.currentPlayer}
+                  stateForCaptures={boardState}
+                />
+              )}
+              {isAnalyzing && analysisCurrentNode && analysisCurrentNode.id !== analysisStartNodeId && (
+                <button
+                  type="button"
+                  onClick={() => analysisCurrentNode.parent && analysisNavigateToNode(analysisCurrentNode.parent)}
+                  className="w-full px-2 py-1 text-xs rounded bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"
+                >
+                  ↶ {t.undoMove}
+                </button>
+              )}
+              {isAnalyzing ? (
+                <button
+                  type="button"
+                  onClick={exitAnalysis}
+                  className="w-full px-3 py-2 text-sm font-semibold rounded-lg bg-blue-500 hover:bg-blue-600 text-white transition-colors"
+                >
+                  ← {t.exitAnalysis}
+                </button>
+              ) : isAuthed && (
+                <button
+                  type="button"
+                  onClick={enterAnalysis}
+                  className="w-full px-3 py-1.5 text-sm rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-900/70 transition-colors"
+                >
+                  🔬 {t.analysis}
+                </button>
+              )}
             </div>
           )}
 
@@ -863,6 +938,12 @@ export function RoomScreen() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {liveMoveToast && (
+        <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[90] px-4 py-2 bg-amber-500 text-white rounded-lg shadow-lg text-sm font-medium animate-pulse pointer-events-none">
+          ⚡ {t.liveMoveDuringAnalysis}
         </div>
       )}
 

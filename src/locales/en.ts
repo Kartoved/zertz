@@ -307,6 +307,8 @@ export const en = {
   analysis: 'Analysis',
   analysisMode: 'Analysis mode',
   returnToGame: 'Return to game',
+  liveMoveDuringAnalysis: 'Opponent played a move',
+  exitAnalysis: 'Exit analysis',
   conditionalPremoves: 'Conditional pre-moves',
   addCurrentVariant: 'Add current variant',
   noVariantsYet: 'No saved variants yet',

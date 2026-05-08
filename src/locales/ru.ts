@@ -307,6 +307,8 @@ export const ru = {
   analysis: 'Анализ',
   analysisMode: 'Режим анализа',
   returnToGame: 'Вернуться к игре',
+  liveMoveDuringAnalysis: 'В партии сыгран ход',
+  exitAnalysis: 'Выйти из анализа',
   conditionalPremoves: 'Условные предходы',
   addCurrentVariant: 'Добавить текущий вариант',
   noVariantsYet: 'Нет сохранённых вариантов',

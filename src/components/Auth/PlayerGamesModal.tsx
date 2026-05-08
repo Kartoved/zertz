@@ -56,7 +56,9 @@ export default function PlayerGamesModal({ username, onClose }: PlayerGamesModal
 
   const handleGameClick = (game: GameSummary) => {
     onClose();
-    navigate(`/room/${game.id}`);
+    // Spectator intent: coming from a games list, never prompt to claim a seat.
+    // (joinRoom recognizes participants regardless and routes them to their own seat.)
+    navigate(`/room/${game.id}?watch=1`);
   };
 
   const renderWinner = (game: GameSummary) => {

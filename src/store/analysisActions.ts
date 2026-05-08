@@ -136,3 +136,65 @@ export function applyAnalysisCapture(
 export function rebuildAnalysisStateAt(targetNode: GameNode, boardSize: 37 | 48 | 61): GameState {
   return rebuildStateFromNode(targetNode, boardSize);
 }
+
+// Walks the live tree's main line and the analysis tree's main line in
+// parallel, appending any new live moves into the analysis tree without
+// disturbing the user's branches.
+//
+// The analysis tree was originally a deep clone of the live tree at
+// enterAnalysis time, so they share a prefix. As the live game progresses,
+// new moves appear at the end of the live main line — those need to surface
+// in the analysis tree too.
+//
+// Behavior:
+//  - If a user branch happens to exactly match the live move (move equality
+//    by JSON.stringify), the branch is *promoted* to children[0] rather than
+//    duplicated. Predicting an opponent's move is a feature.
+//  - Otherwise a new node is unshifted to children[0] so the main-line
+//    invariant (children[0] === main line) is preserved.
+//  - The user's analysisCurrentNode pointer is never moved by this function;
+//    callers should leave it alone so focus stays put.
+//
+// Returns the number of new live moves appended. Mutates analysisRoot in
+// place; callers should swap the reference after merging to trigger
+// subscribers (Zustand uses reference equality).
+export function mergeLiveTreeIntoAnalysis(analysisRoot: GameNode, liveRoot: GameNode): number {
+  let aNode = analysisRoot;
+  let lNode = liveRoot;
+  let added = 0;
+
+  while (lNode.children.length > 0) {
+    const liveChild = lNode.children[0];
+    const moveKey = JSON.stringify(liveChild.move);
+    const matchIdx = aNode.children.findIndex(c =>
+      c.move && JSON.stringify(c.move) === moveKey
+    );
+
+    if (matchIdx >= 0) {
+      // User's branch matches the live move — promote to main line if needed.
+      if (matchIdx > 0) {
+        const [matched] = aNode.children.splice(matchIdx, 1);
+        aNode.children.unshift(matched);
+      }
+      aNode = aNode.children[0];
+    } else {
+      // New live move — shallow-clone (the loop will recurse if there are
+      // more descendants below) and unshift to become the main line.
+      const cloned: GameNode = {
+        id: liveChild.id,
+        moveNumber: liveChild.moveNumber,
+        player: liveChild.player,
+        move: liveChild.move,
+        notation: liveChild.notation,
+        children: [],
+        parent: aNode,
+        isMainLine: true,
+      };
+      aNode.children.unshift(cloned);
+      aNode = cloned;
+      added++;
+    }
+    lNode = liveChild;
+  }
+  return added;
+}
