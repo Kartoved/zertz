@@ -3,6 +3,15 @@ import { pool } from '../db.js';
 import { authRequired, optionalAuth } from '../middleware/auth.js';
 import { glicko2Update } from '../utils/glicko2.js';
 import { sendPushToUser } from '../utils/pushNotifications.js';
+import { indexRoom } from '../explorer.js';
+
+// Fire-and-forget indexer call. We never want explorer-side errors to block
+// the API response, but we still want to know if it failed.
+function fireExplorerIndex(roomId) {
+  indexRoom(pool, roomId).catch(err => {
+    console.error(`[explorer] indexRoom(${roomId}) failed:`, err);
+  });
+}
 
 const router = Router();
 
@@ -215,6 +224,7 @@ router.get('/:id', async (req, res) => {
         );
         if (timeoutResult.rows.length > 0) {
           row = timeoutResult.rows[0];
+          fireExplorerIndex(id);
         }
       }
     }
@@ -415,6 +425,12 @@ router.put('/:id/state', optionalAuth, async (req, res) => {
   );
 
   let ratingDelta = null;
+
+  // Index the finished game for the opening explorer (fire-and-forget;
+  // skips cancelled games via indexRoom's own checks).
+  if (nextWinner && nextWinType !== 'cancelled') {
+    fireExplorerIndex(id);
+  }
 
   // Glicko-2 rating update for rated games when winner is determined (not for cancelled games)
   if (nextWinner && nextWinType !== 'cancelled') {

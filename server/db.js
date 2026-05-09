@@ -211,6 +211,55 @@ async function ensureSchema() {
     );
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_lobby_expires ON lobby_slots(expires_at);`);
+
+  // ─── Opening explorer ────────────────────────────────────────────────
+  // position_moves: aggregated counts per (canonical position, move played)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS position_moves (
+      position_hash CHAR(16) NOT NULL,
+      board_size INTEGER NOT NULL,
+      move_notation TEXT NOT NULL,
+      move_json TEXT NOT NULL,
+      total_games INTEGER NOT NULL DEFAULT 0,
+      player1_wins INTEGER NOT NULL DEFAULT 0,
+      player2_wins INTEGER NOT NULL DEFAULT 0,
+      draws INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (position_hash, board_size, move_notation)
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_position_moves_lookup ON position_moves(position_hash, board_size);`);
+
+  // position_games: every (position, move, game) tuple — drives drill-down
+  // and player-filtered queries. game_id references rooms(id).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS position_games (
+      id BIGSERIAL PRIMARY KEY,
+      position_hash CHAR(16) NOT NULL,
+      board_size INTEGER NOT NULL,
+      game_id INTEGER NOT NULL,
+      ply INTEGER NOT NULL,
+      move_notation TEXT NOT NULL,
+      move_json TEXT NOT NULL,
+      user1_id INTEGER,
+      user2_id INTEGER,
+      winner INTEGER,
+      played_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_position_games_hash ON position_games(position_hash, board_size);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_position_games_game ON position_games(game_id);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_position_games_user1 ON position_games(user1_id) WHERE user1_id IS NOT NULL;`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_position_games_user2 ON position_games(user2_id) WHERE user2_id IS NOT NULL;`);
+
+  // Idempotency marker: stamp rooms once they've been processed by the
+  // indexer, so re-runs (manual backfill, double-fired hooks) don't double-
+  // count a game.
+  await pool.query(`
+    DO $$ BEGIN
+      ALTER TABLE rooms ADD COLUMN IF NOT EXISTS explorer_indexed_at TIMESTAMP;
+    EXCEPTION WHEN others THEN NULL;
+    END $$;
+  `);
 }
 
 export { pool, ensureSchema };

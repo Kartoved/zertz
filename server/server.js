@@ -14,6 +14,7 @@ import chatRouter from './routes/chat.js';
 import gamesRouter from './routes/games.js';
 import pushRouter from './routes/push.js';
 import lobbyRouter from './routes/lobby.js';
+import explorerRouter from './routes/explorer.js';
 
 dotenv.config();
 
@@ -39,6 +40,7 @@ app.use('/api/global-chat', chatRouter);
 app.use('/api/games', gamesRouter);
 app.use('/api/push', pushRouter);
 app.use('/api/lobby', lobbyRouter);
+app.use('/api/explorer', explorerRouter);
 
 // Serve static files
 const __filename = fileURLToPath(import.meta.url);

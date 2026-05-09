@@ -11,6 +11,7 @@ import { getWinType } from '../../game/GameEngine';
 import PlayerProfileModal from '../Auth/PlayerProfileModal';
 import RulesContent from '../UI/RulesContent';
 import OnlineMoveHistory from '../UI/OnlineMoveHistory';
+import OpeningExplorerPanel from './OpeningExplorerPanel';
 import { getWinTypeLabel, useI18n } from '../../i18n';
 
 export function RoomScreen() {
@@ -614,6 +615,9 @@ export function RoomScreen() {
               )}
             </div>
           )}
+
+          {/* Opening explorer — only visible while analyzing */}
+          {isAnalyzing && <OpeningExplorerPanel />}
 
           {/* Live participant action panel — active participant, not in analysis */}
           {!state.winner && !isSpectator && !isAnalyzing && (
