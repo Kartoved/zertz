@@ -23,6 +23,39 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.10.0',
+    date: '2026-05-09',
+    changes: {
+      ru: [
+        'Дебютный обозреватель: в режиме анализа отображаются ходы из текущей позиции с количеством сыгравших и процентами побед, фильтр «только мои партии» и клик по ходу для добавления ветки',
+        'Анализ для зрителей: любой залогиненный игрок может параллельно анализировать чужую партию со своими приватными ветками',
+        'Live-обновления в анализе: пока изучаете активную партию других игроков, их реальные ходы появляются в вашем дереве, тост уведомляет о новом ходе',
+        'Сессии анализа сохраняются в браузере на 7 дней — закрыли вкладку, вернулись позже, ваше дерево на месте',
+        'Анализ доступен в любой партии — live, correspondence, завершённой (раньше был только в correspondence)',
+        'Зрители больше не получают приглашение занять место при входе в чужую партию из списка',
+        'Версия обновлена до v0.10.0',
+      ],
+      en: [
+        'Opening explorer: while analyzing, see moves played from the current position with game counts and win percentages; filter to your own games and click any move to add a branch',
+        'Spectator analysis: any logged-in player can analyze someone else\'s game in parallel with private branches',
+        'Live updates during analysis: as you study an ongoing game, real moves appear in your analysis tree, with a toast on each new move',
+        'Analysis sessions persist in your browser for 7 days — close the tab and come back later, your tree is still there',
+        'Analyze any game now — live, correspondence, or finished (previously correspondence only)',
+        'Spectators no longer receive a "Take this seat?" prompt when entering someone\'s game from a games list',
+        'Version updated to v0.10.0',
+      ],
+      eo: [
+        'Malfermaĵa esplorilo: dum analizo videblas movoj el la nuna pozicio kun nombroj de partioj kaj procentoj de venkoj; filtrilo «nur miaj partioj» kaj alklako por aldoni branĉon',
+        'Spektanta analizo: iu ajn ensalutinta ludanto povas paralele analizi alies partion kun privataj branĉoj',
+        'Vivaj ĝisdatigoj dum analizo: dum vi studas daŭrantan partion, realaj movoj aperas en via analiza arbo kun tosta sciigo pri ĉiu nova movo',
+        'Analizaj sesioj konserviĝas en via retumilo dum 7 tagoj — fermu la langeton kaj revenu poste, via arbo ankoraŭ estas tie',
+        'Analizu ajnan partion nun — vivan, korespondan, aŭ finitan (antaŭe nur korespondan)',
+        'Spektantoj ne plu ricevas peton «Preni ĉi tiun sidlokon?» kiam ili eniras alies partion el luda listo',
+        'Versio ĝisdatigita al v0.10.0',
+      ],
+    },
+  },
+  {
     version: '0.9.26',
     date: '2026-04-24',
     changes: {

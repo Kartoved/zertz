@@ -74,6 +74,21 @@ Unit tests live in `src/game/GameEngine.test.ts` (Vitest). Playwright is install
 
 **Localization** (`src/locales/`) — TypeScript objects, three languages: `ru`, `en`, `eo`.
 
+### Shared (`shared/`)
+
+Plain-JS ESM modules consumed by **both** the Vite client and the Node server. Used for code that must produce byte-identical output on both sides (the opening-explorer pipeline depends on this).
+
+- `shared/explorer/` — opening-explorer canonicalization & indexing:
+  - `axial.js` — hex coordinate transforms (12 D6 symmetries), per-board valid-symmetry detection, inverse table.
+  - `replay.js` — minimal ZERTZ state-replay engine. **Mirror of `src/game/GameEngine.ts`** for the subset needed to compute boundary positions (placeMarble, removeRing+isolation, executeCapture, applyMove). Doesn't validate moves — trusts game-tree data.
+  - `canonicalize.js` — picks a canonical state representative across all valid symmetries; canonicalizes & decanonicalizes moves so equivalent (state, move) pairs collapse to the same hash.
+  - `hash.js` — 64-bit FNV-1a hash, returned as 16-char hex (works in Node and browser, no `node:crypto`).
+  - `indexer.js` — walks a game tree's main line, yields `{positionHash, ply, move, moveNotation}` per node.
+  - `*.test.js` / `parity.test.ts` — guards against drift between TS engine and JS replay; `parity.test.ts` runs the same Move sequences through both engines and asserts state equality.
+  - `*.d.ts` — ambient declarations so TypeScript clients can import without `allowJs`.
+
+If you change `src/game/GameEngine.ts`, mirror the change into `shared/explorer/replay.js`. The parity test will catch divergence.
+
 ### Backend (`server/`)
 
 Express app with JWT auth middleware. All routes under `/api`, static `dist/` served with SPA fallback.
@@ -89,8 +104,11 @@ Express app with JWT auth middleware. All routes under `/api`, static `dist/` se
 | `/api/global-chat` | `routes/chat.js` | Global chat |
 | `/api/push` | `routes/push.js` | Web Push subscriptions (VAPID) |
 | `/api/lobby` | `routes/lobby.js` | Public lobby slots (create/join/cancel, 10-min TTL) |
+| `/api/explorer` | `routes/explorer.js` | Opening-explorer position lookup (aggregates + per-game refs) |
 
-`server/db.js` owns the PostgreSQL pool and creates all tables on startup (idempotent).
+`server/db.js` owns the PostgreSQL pool and creates all tables on startup (idempotent). Tables include `position_moves` (per-position move aggregates) and `position_games` (per-game references); see `shared/explorer/` for the indexing pipeline.
+
+`server/explorer.js` indexes a finished room into both tables when the rooms route sets a winner; idempotent via `rooms.explorer_indexed_at`. One-shot backfill: `node server/scripts/backfillExplorer.js`.
 
 `server/utils/`:
 - `glicko2.js` — standalone Glicko-2 rating implementation
