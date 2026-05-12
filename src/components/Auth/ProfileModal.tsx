@@ -122,7 +122,10 @@ export default function ProfileModal({ onClose }: ProfileModalProps) {
             <div className="text-sm text-gray-500 dark:text-gray-400">{t.registrationDate}: {formattedDate}</div>
           </div>
 
-          {/* Stats */}
+          {/* Stats — rated games only */}
+          <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            {t.ratedStats}
+          </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-3 text-center">
               <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">{Math.round(user.rating)}</div>

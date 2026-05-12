@@ -69,7 +69,10 @@ export default function PlayerProfileCard({ onLoginClick }: PlayerProfileCardPro
         </div>
       )}
 
-      {/* Stats */}
+      {/* Stats — rated games only */}
+      <div className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-1.5">
+        {t.ratedStats}
+      </div>
       <div className="grid grid-cols-2 gap-2">
         <div className="bg-gray-50 dark:bg-gray-700/50 rounded-xl p-2.5 text-center">
           <div className="text-lg font-bold text-blue-600 dark:text-blue-400">{Math.round(user.rating)}</div>
