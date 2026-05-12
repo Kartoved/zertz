@@ -57,7 +57,7 @@ export default function ActiveGamesWidget({ currentGames, user, onLoadGame }: Ac
                     )}
                   </div>
                   <div className="text-[10px] text-gray-400 font-medium">
-                    {game.moveCount} {t.moves.toLowerCase()}
+                    {game.moveCount - 1} {t.moves.toLowerCase()}
                   </div>
                 </div>
               </button>

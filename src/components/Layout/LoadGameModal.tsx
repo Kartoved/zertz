@@ -139,7 +139,7 @@ export default function LoadGameModal({ savedGames, boardLabels, onClose, onLoad
                           {game.playerNames.player1} vs {game.playerNames.player2}
                         </div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {t.moves}: {game.moveCount} • {t.board}: {boardLabels[game.boardSize] ?? `${game.boardSize}`}
+                          {t.moves}: {game.moveCount - 1} • {t.board}: {boardLabels[game.boardSize] ?? `${game.boardSize}`}
                         </div>
                         {game.winType && game.winner !== 'cancelled' && (
                           <div className="text-sm text-gray-500 dark:text-gray-400">
@@ -186,7 +186,7 @@ export default function LoadGameModal({ savedGames, boardLabels, onClose, onLoad
                         </span>
                       </div>
                       <div className="text-sm text-gray-500 dark:text-gray-400">
-                        {t.moves}: {game.moveCount} • {t.board}: {boardLabels[game.boardSize] ?? `${game.boardSize}`}
+                        {t.moves}: {game.moveCount - 1} • {t.board}: {boardLabels[game.boardSize] ?? `${game.boardSize}`}
                       </div>
                       {game.winType && game.winner !== 'cancelled' && (
                         <div className="text-sm text-gray-500 dark:text-gray-400">

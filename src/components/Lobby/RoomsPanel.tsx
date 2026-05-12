@@ -212,7 +212,7 @@ export default function RoomsPanel({ onCreateGame, currentGames, onLoadGame }: R
                 <div className="flex items-center gap-1.5 mt-1">
                   <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300">{t.onlineLabel}</span>
                   {isMyTurn && <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-300">{t.yourTurn}</span>}
-                  <span className="text-[10px] text-gray-400 ml-auto">{game.moveCount} {t.moves.toLowerCase()}</span>
+                  <span className="text-[10px] text-gray-400 ml-auto">{game.moveCount - 1} {t.moves.toLowerCase()}</span>
                 </div>
               </button>
             );

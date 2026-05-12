@@ -102,7 +102,7 @@ export default function PlayerGamesModal({ username, onClose }: PlayerGamesModal
                         {game.playerNames.player1} vs {game.playerNames.player2}
                       </div>
                       <div className="text-sm text-gray-500 dark:text-gray-400">
-                        {t.moves}: {game.moveCount}
+                        {t.moves}: {game.moveCount - 1}
                       </div>
                       {game.winType && game.winner !== 'cancelled' && (
                         <div className="text-xs text-gray-500 dark:text-gray-400">

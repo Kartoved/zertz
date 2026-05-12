@@ -84,6 +84,23 @@ router.get('/:id', optionalAuth, async (req, res) => {
     }
     const u = result.rows[0];
     const lastSeenMs = u.last_seen ? u.last_seen.getTime() : null;
+
+    const gamesStatsResult = await pool.query(
+      `SELECT
+         COUNT(*) AS total,
+         SUM(CASE WHEN (winner = 'player1' AND player1_name = $1) OR (winner = 'player2' AND player2_name = $1) THEN 1 ELSE 0 END) AS wins,
+         SUM(CASE WHEN (winner = 'player1' AND player2_name = $1) OR (winner = 'player2' AND player1_name = $1) THEN 1 ELSE 0 END) AS losses
+       FROM games
+       WHERE is_online = true
+         AND winner IS NOT NULL
+         AND winner != 'cancelled'
+         AND (player1_name = $1 OR player2_name = $1)`,
+      [u.username]
+    );
+    const gamesRow = gamesStatsResult.rows[0];
+    const totalGames = parseInt(gamesRow.total, 10);
+    const totalWins = parseInt(gamesRow.wins, 10);
+
     const data = {
       id: u.id,
       username: u.username,
@@ -94,8 +111,8 @@ router.get('/:id', optionalAuth, async (req, res) => {
       ratingRd: u.rating_rd,
       wins: u.wins,
       losses: u.losses,
-      games: u.wins + u.losses,
-      winrate: (u.wins + u.losses) > 0 ? Math.round(u.wins / (u.wins + u.losses) * 100) : 0,
+      games: totalGames,
+      winrate: totalGames > 0 ? Math.round(totalWins / totalGames * 100) : 0,
       bestStreak: u.best_streak,
       currentStreak: u.current_streak,
       createdAt: u.created_at.getTime(),
