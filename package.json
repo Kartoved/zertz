@@ -1,7 +1,9 @@
 {
   "name": "zertz",
   "private": true,
-  "version": "0.10.0",
+  "version": "0.12.4",
+  "license": "AGPL-3.0-only",
+  "author": "Wood Romanov",
   "type": "module",
   "scripts": {
     "dev": "vite",
