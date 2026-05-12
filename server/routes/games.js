@@ -31,18 +31,19 @@ router.get('/', authRequired, async (req, res) => {
 router.get('/public', async (req, res) => {
   const { username } = req.query;
   const params = [];
-  let whereClause = 'WHERE is_online = true';
+  let whereClause = 'WHERE g.is_online = true';
 
   if (username) {
-    whereClause += ' AND (player1_name = $1 OR player2_name = $1)';
+    whereClause += ' AND (g.player1_name = $1 OR g.player2_name = $1)';
     params.push(username);
   }
 
   const result = await pool.query(
-    `SELECT id, player1_name, player2_name, updated_at, move_count, winner, win_type, board_size
-     FROM games
+    `SELECT g.id, g.player1_name, g.player2_name, g.updated_at, g.move_count, g.winner, g.win_type, g.board_size, r.rated
+     FROM games g
+     LEFT JOIN rooms r ON r.id::text = g.id
      ${whereClause}
-     ORDER BY updated_at DESC
+     ORDER BY g.updated_at DESC
      LIMIT 100`,
     params
   );
@@ -56,6 +57,7 @@ router.get('/public', async (req, res) => {
     winType: row.win_type,
     boardSize: row.board_size,
     isOnline: true,
+    rated: row.rated ?? false,
   })));
 });
 

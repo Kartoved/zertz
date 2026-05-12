@@ -81,7 +81,7 @@ router.post('/', optionalAuth, async (req, res) => {
     creatorPlayer = 1,
     stateJson,
     treeJson,
-    rated = false,
+    rated = true,
     timeControlBaseMs = null,
     timeControlIncrementMs = null,
   } = req.body;

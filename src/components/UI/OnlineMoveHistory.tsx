@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { GameNode, PreMoveVariant } from '../../game/types';
 import { useRoomStore } from '../../store/roomStore';
 import { useI18n } from '../../i18n';
@@ -7,16 +7,18 @@ interface MoveElementProps {
   node: GameNode;
   isCurrentMove: boolean;
   onNavigate: (node: GameNode) => void;
+  activeRef?: React.RefObject<HTMLSpanElement>;
 }
 
-function MoveElement({ node, isCurrentMove, onNavigate }: MoveElementProps) {
+function MoveElement({ node, isCurrentMove, onNavigate, activeRef }: MoveElementProps) {
   const moveNum = `${node.moveNumber}. `;
 
   return (
     <span
+      ref={isCurrentMove ? activeRef : undefined}
       onClick={() => onNavigate(node)}
       className={`
-        cursor-pointer px-1 rounded transition-colors select-none
+        cursor-pointer px-1 rounded transition-colors select-none whitespace-nowrap
         ${isCurrentMove ? 'bg-blue-500 text-white' : 'hover:bg-gray-200 dark:hover:bg-gray-700'}
       `}
     >
@@ -26,7 +28,12 @@ function MoveElement({ node, isCurrentMove, onNavigate }: MoveElementProps) {
   );
 }
 
-function renderMoveTree(node: GameNode, currentNodeId: string, onNavigate: (node: GameNode) => void): JSX.Element[] {
+function renderMoveTree(
+  node: GameNode,
+  currentNodeId: string,
+  onNavigate: (node: GameNode) => void,
+  activeRef: React.RefObject<HTMLSpanElement>
+): JSX.Element[] {
   const elements: JSX.Element[] = [];
   const mainChild = node.children[0];
 
@@ -38,6 +45,7 @@ function renderMoveTree(node: GameNode, currentNodeId: string, onNavigate: (node
       node={mainChild}
       isCurrentMove={mainChild.id === currentNodeId}
       onNavigate={onNavigate}
+      activeRef={activeRef}
     />
   );
 
@@ -55,9 +63,10 @@ function renderMoveTree(node: GameNode, currentNodeId: string, onNavigate: (node
         node={variation}
         isCurrentMove={variation.id === currentNodeId}
         onNavigate={onNavigate}
+        activeRef={activeRef}
       />
     );
-    elements.push(...renderMoveTree(variation, currentNodeId, onNavigate));
+    elements.push(...renderMoveTree(variation, currentNodeId, onNavigate, activeRef));
     elements.push(
       <span key={`var-close-${variation.id}`} className="text-gray-500">
         )
@@ -65,7 +74,7 @@ function renderMoveTree(node: GameNode, currentNodeId: string, onNavigate: (node
     );
   }
 
-  elements.push(...renderMoveTree(mainChild, currentNodeId, onNavigate));
+  elements.push(...renderMoveTree(mainChild, currentNodeId, onNavigate, activeRef));
   return elements;
 }
 
@@ -99,9 +108,24 @@ function renderPremoveVariants(premoves: PreMoveVariant[]): JSX.Element[] {
   return elements;
 }
 
+// Compact symbol summarising how the game ended. Title carries the long form.
+function winMarker(winner: string | null | undefined, winType: string | null | undefined, t: ReturnType<typeof useI18n>['t']): { symbol: string; title: string } | null {
+  if (!winner) return null;
+  if (winner === 'cancelled') return { symbol: '✕', title: t.cancelledStatus };
+  if (winType === 'white') return { symbol: '⚪', title: t.winByWhite };
+  if (winType === 'gray') return { symbol: '🔘', title: t.winByGray };
+  if (winType === 'black') return { symbol: '⚫', title: t.winByBlack };
+  if (winType === 'mixed') return { symbol: '🎨', title: t.winByMixed };
+  if (winType === 'time') return { symbol: '⏱', title: t.winByTime };
+  if (winType === 'surrender') return { symbol: '🏳', title: t.surrender };
+  return { symbol: '★', title: t.gameOver || '' };
+}
+
 export default function OnlineMoveHistory() {
   const { t } = useI18n();
   const {
+    state,
+    winType,
     gameTree,
     currentNode,
     navigateToNode,
@@ -143,26 +167,49 @@ export default function OnlineMoveHistory() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [navigatePrev, navigateNext]);
 
-  const moves = renderMoveTree(activeTree, activeCurrentNode.id, activeNavigate);
+  const activeRef = useRef<HTMLSpanElement>(null);
+  const didInitialScrollRef = useRef(false);
+  useEffect(() => {
+    const behavior: ScrollBehavior = didInitialScrollRef.current ? 'smooth' : 'auto';
+    activeRef.current?.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior });
+    didInitialScrollRef.current = true;
+  }, [activeCurrentNode.id]);
+
+  const moves = renderMoveTree(activeTree, activeCurrentNode.id, activeNavigate, activeRef);
   // In analysis mode pre-moves are already merged into the active tree as
   // navigable branches, so don't render them as ghost text again.
   const premoveElements = isAnalyzing ? [] : renderPremoveVariants(premoves);
   const isAtStart = activeCurrentNode.id === activeTree.id;
+  // Append a victory marker after the move list when the (live) game has ended.
+  // In analysis mode different branches end differently, so don't show.
+  const marker = !isAnalyzing ? winMarker(state.winner, winType, t) : null;
 
   if (moves.length === 0 && premoveElements.length === 0) {
     return <div className="p-1 text-xs text-gray-500 dark:text-gray-400">{t.noMovesYet}</div>;
   }
 
   return (
-    <div className="flex flex-wrap gap-1 text-xs md:text-sm font-mono text-gray-800 dark:text-gray-200">
+    <div
+      className="flex gap-1 overflow-x-auto whitespace-nowrap text-xs md:text-sm font-mono text-gray-800 dark:text-gray-200 [&::-webkit-scrollbar]:hidden"
+      style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}
+    >
       <span
+        ref={isAtStart ? activeRef : undefined}
         onClick={() => activeNavigate(activeTree)}
-        className={`cursor-pointer px-1 rounded transition-colors select-none ${isAtStart ? 'bg-blue-500 text-white' : 'hover:bg-gray-200 dark:hover:bg-gray-700'}`}
+        className={`cursor-pointer px-1 rounded transition-colors select-none whitespace-nowrap ${isAtStart ? 'bg-blue-500 text-white' : 'hover:bg-gray-200 dark:hover:bg-gray-700'}`}
       >
         {`0. ${t.moveStart}`}
       </span>
       {moves}
       {premoveElements}
+      {marker && (
+        <span
+          title={marker.title}
+          className="px-1 select-none text-gray-700 dark:text-gray-200 font-bold"
+        >
+          {marker.symbol}
+        </span>
+      )}
     </div>
   );
 }

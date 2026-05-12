@@ -25,7 +25,7 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
   const [toast, setToast] = useState('');
   const [showChallenge, setShowChallenge] = useState(false);
   const [challengeBoardSize, setChallengeBoardSize] = useState<37 | 48 | 61>(37);
-  const [challengeRated, setChallengeRated] = useState(false);
+  const [challengeRated, setChallengeRated] = useState(true);
   const [challengePlayer, setChallengePlayer] = useState<1 | 2 | 'random'>(1);
   const [challengeTimePreset, setChallengeTimePreset] = useState<TimePresetId>('5+5');
   const [challengeLoading, setChallengeLoading] = useState(false);
@@ -143,7 +143,10 @@ export default function PlayerProfileModal({ playerId, onClose }: PlayerProfileM
             <div className="text-sm text-gray-600 dark:text-gray-400 italic">"{profile.quote}"</div>
           )}
 
-          {/* Stats grid */}
+          {/* Stats grid — rated games only */}
+          <div className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+            {t.ratedStats}
+          </div>
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded-lg">
               <div className="text-gray-500 dark:text-gray-400">{t.rating}</div>

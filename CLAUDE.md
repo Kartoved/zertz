@@ -115,6 +115,14 @@ Express app with JWT auth middleware. All routes under `/api`, static `dist/` se
 - `mailer.js` — email sending (used for magic link auth)
 - `pushNotifications.js` — server-side Web Push delivery
 
+### Conventions worth remembering
+
+**Rated by default.** All paths that create a multiplayer room (`/api/rooms`, `/api/challenges`, `OnlineChallengeModal`, `PlayerProfileModal`'s invite, lobby slots, matchmaking) default to `rated = true`. Unrated is an explicit opt-out for experiments/training. The profile stats block (`games`, `wins`, `losses`, `winrate`, `bestStreak`) is sourced from `users.wins`/`users.losses` and reflects **rated games only** — the UI labels it «Rated stats» / «Рейтинговая статистика». The full history list (`PlayerGamesModal`, `LoadGameModal`) shows all games with a `rated`/`unrated` badge per row.
+
+**`state.moveNumber` starts at 1.** The initial `GameState` has `moveNumber: 1`; it increments after every move. So after N completed moves, `moveNumber === N + 1`. Code that *counts* moves for display should subtract 1; code that uses the parity to determine whose turn it is should use `moveNumber` as-is. This is the recurring off-by-one trap.
+
+**Mobile game screens use compact strips.** Both `RoomScreen` (online) and `GameScreen` (local) hide their desktop side panels on `<lg` and render: move-history strip under the header → opponent/player1 strip → board (flex-1) → you/player2 strip + ⋯ menu → marble picker (only during placement). Action buttons (Undo, Resign, Analysis, Cancel) live in a bottom-sheet popover triggered by the ⋯ icon in the bottom strip. Pre-moves are rendered in a separate "Plan" tab in the right sidebar / bottom nav, visible only for correspondence participants in analysis mode.
+
 ### Game rules summary (for engine work)
 
 **Turn phases:** `placement` → `ringRemoval` → `capture` → back to `placement`

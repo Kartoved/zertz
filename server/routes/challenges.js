@@ -7,7 +7,7 @@ const router = Router();
 
 // Create a challenge (immediately creates a room)
 router.post('/', authRequired, async (req, res) => {
-  const { toUserId, boardSize = 37, rated = false, creatorPlayer = 1, timeControlBaseMs = null, timeControlIncrementMs = null } = req.body;
+  const { toUserId, boardSize = 37, rated = true, creatorPlayer = 1, timeControlBaseMs = null, timeControlIncrementMs = null } = req.body;
   const fromUserId = req.user.id;
 
   if (fromUserId === toUserId) {

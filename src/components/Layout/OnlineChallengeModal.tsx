@@ -28,7 +28,7 @@ export default function OnlineChallengeModal({
   const [selectedBoardSize, setSelectedBoardSize] = useState<37 | 48 | 61>(initialBoardSize);
   const [selectedPreset, setSelectedPreset] = useState<TimePresetId>(initialPreset);
   const [selectedPlayer, setSelectedPlayer] = useState<1 | 2 | 'random'>(1);
-  const [isRated, setIsRated] = useState(false);
+  const [isRated, setIsRated] = useState(true);
   const [createdRoomId, setCreatedRoomId] = useState<number | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
 

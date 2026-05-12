@@ -13,6 +13,7 @@ type GameSummary = {
   winType: string | null;
   boardSize: 37 | 48 | 61;
   isOnline: boolean;
+  rated?: boolean;
 };
 
 function formatDate(timestamp: number): string {
@@ -98,8 +99,15 @@ export default function PlayerGamesModal({ username, onClose }: PlayerGamesModal
                 >
                   <div className="flex justify-between items-start">
                     <div>
-                      <div className="font-medium text-gray-900 dark:text-white">
+                      <div className="font-medium text-gray-900 dark:text-white flex items-center gap-1.5">
                         {game.playerNames.player1} vs {game.playerNames.player2}
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                          game.rated
+                            ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300'
+                            : 'bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-400'
+                        }`}>
+                          {game.rated ? t.lobbyRated : t.lobbyUnrated}
+                        </span>
                       </div>
                       <div className="text-sm text-gray-500 dark:text-gray-400">
                         {t.moves}: {game.moveCount - 1}

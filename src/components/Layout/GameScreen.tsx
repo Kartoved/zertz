@@ -11,6 +11,38 @@ import { useAuthStore } from '../../store/authStore';
 import { getWinType } from '../../game/GameEngine';
 import { getWinTypeLabel, useI18n } from '../../i18n';
 
+interface LocalPlayerStripProps {
+  slot: 'player1' | 'player2';
+  isActive: boolean;
+  captures: { white: number; gray: number; black: number };
+  name: string;
+  showActionsMenu: boolean;
+  onOpenActions?: () => void;
+}
+function LocalPlayerStrip({ isActive, captures, name, showActionsMenu, onOpenActions }: LocalPlayerStripProps) {
+  return (
+    <div className={`lg:hidden flex items-center gap-2 px-3 py-1.5 ${
+      isActive ? 'bg-blue-100 dark:bg-blue-900 ring-1 ring-blue-500' : 'bg-white dark:bg-gray-800'
+    } border-b border-gray-200 dark:border-gray-700`}>
+      <div className="flex gap-1 text-xs font-medium text-gray-800 dark:text-gray-200 flex-shrink-0">
+        <span>⚪{captures.white}</span>
+        <span>🔘{captures.gray}</span>
+        <span>⚫{captures.black}</span>
+      </div>
+      <div className="flex-1 min-w-0 font-semibold text-sm text-gray-800 dark:text-gray-200 truncate">{name}</div>
+      {showActionsMenu && onOpenActions && (
+        <button
+          type="button"
+          onClick={onOpenActions}
+          className="flex-shrink-0 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
+        >
+          ⋯
+        </button>
+      )}
+    </div>
+  );
+}
+
 export default function GameScreen() {
   const { t } = useI18n();
   const { state, playerNames, newGame, cancelGame, botPlayer, isBotThinking } = useGameStore();
@@ -18,8 +50,11 @@ export default function GameScreen() {
   const { user } = useAuthStore();
   const [showRematchDialog, setShowRematchDialog] = useState(false);
   const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [showMobileActions, setShowMobileActions] = useState(false);
   const [showSurrenderConfirm, setShowSurrenderConfirm] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
+  const { undo, currentNode } = useGameStore();
+  const canCancelLocal = !state.winner && (state.moveNumber ?? 0) <= 2 && currentNode.children.length === 0;
 
   const navTabs: Array<{ id: string; label: string; authOnly?: boolean }> = [
     { id: 'playLocal', label: t.playLocal },
@@ -94,6 +129,11 @@ export default function GameScreen() {
         </div>
       </header>
 
+      {/* Mobile move history strip — mirrors the desktop header version. */}
+      <div className="md:hidden bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-2 py-1 overflow-x-auto">
+        <MoveHistory />
+      </div>
+
       {showMobileMenu && (
         <div className="md:hidden px-3 pb-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
           <div className="space-y-2">
@@ -135,12 +175,12 @@ export default function GameScreen() {
       
       {/* Main content */}
       <main className="flex-1 min-h-0 flex flex-col lg:flex-row gap-3 md:gap-4 p-2 md:p-4 max-w-7xl mx-auto w-full pb-28 sm:pb-24 lg:pb-4 overflow-y-auto">
-        {/* Left panel - Stats and Controls */}
-        <div className={`lg:w-64 lg:flex lg:flex-col gap-2 lg:gap-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 min-w-0 ${isGameOver ? 'hidden lg:flex' : ''}`}>
+        {/* Left panel - Stats and Controls (desktop only) */}
+        <div className={`hidden lg:flex lg:w-64 lg:flex-col gap-2 lg:gap-4 min-w-0 ${isGameOver ? 'hidden lg:flex' : ''}`}>
           <GameStats compact={false} />
 
           {!isGameOver && (
-            <div className="p-3 bg-white dark:bg-gray-800 rounded-lg col-span-1 sm:col-span-2 lg:col-span-1 shadow-sm">
+            <div className="p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
               {isBotThinking && botPlayer === state.currentPlayer ? (
                 <div className="flex items-center gap-2 py-2 text-sm text-indigo-600 dark:text-indigo-400 font-medium animate-pulse">
                   🤖 {t.botThinking}
@@ -155,19 +195,84 @@ export default function GameScreen() {
           )}
         </div>
 
-        {/* Board */}
-        <div className="flex-1 min-w-0 flex flex-col items-center justify-center p-2 lg:bg-white lg:dark:bg-gray-800 lg:rounded-xl shadow-sm">
-          <HexBoard />
-        </div>
-
-        {/* Move history — mobile only, below board */}
-        <div className="lg:hidden p-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-x-auto">
-          <MoveHistory />
+        {/* Board container — mobile: framed by compact strips; desktop: just the board */}
+        <div className="flex-1 min-w-0 flex flex-col">
+          {/* Player 1 strip (mobile) */}
+          <LocalPlayerStrip
+            slot="player1"
+            isActive={state.currentPlayer === 'player1' && !state.winner}
+            captures={state.captures.player1}
+            name={playerNames.player1}
+            showActionsMenu={false}
+          />
+          <div className="flex-1 min-h-0 flex items-center justify-center p-2 lg:bg-white lg:dark:bg-gray-800 lg:rounded-xl shadow-sm overflow-hidden">
+            <HexBoard />
+          </div>
+          {/* Player 2 strip + ⋯ menu (mobile) */}
+          <LocalPlayerStrip
+            slot="player2"
+            isActive={state.currentPlayer === 'player2' && !state.winner}
+            captures={state.captures.player2}
+            name={playerNames.player2}
+            showActionsMenu={true}
+            onOpenActions={() => setShowMobileActions(true)}
+          />
+          {/* Marble picker (mobile, when placement phase) */}
+          {!isGameOver && state.phase === 'placement' && (
+            <div className="lg:hidden p-2 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+              {isBotThinking && botPlayer === state.currentPlayer ? (
+                <div className="flex items-center justify-center gap-2 py-2 text-sm text-indigo-600 dark:text-indigo-400 font-medium animate-pulse">
+                  🤖 {t.botThinking}
+                </div>
+              ) : (
+                <MarbleSelector />
+              )}
+            </div>
+          )}
         </div>
 
         {/* Empty right area to balance layout identical to online chat panel implicitly */}
         <div className="hidden lg:block lg:w-72 opacity-0 pointer-events-none"></div>
       </main>
+
+      {/* Mobile actions sheet */}
+      {showMobileActions && !isGameOver && (
+        <div className="lg:hidden fixed inset-0 bg-black/50 z-[60] flex items-end" onClick={() => setShowMobileActions(false)}>
+          <div className="bg-white dark:bg-gray-800 w-full rounded-t-2xl shadow-2xl p-3 space-y-2 pb-[calc(0.75rem+env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              onClick={() => { undo(); setShowMobileActions(false); }}
+              disabled={!currentNode.parent}
+              className="w-full px-3 py-2.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              ↶ {t.undo}
+            </button>
+            {canCancelLocal && (
+              <button
+                type="button"
+                onClick={() => { cancelGame(); setShowMobileActions(false); }}
+                className="w-full px-3 py-2.5 text-sm rounded-lg bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-900/70"
+              >
+                ✕ {t.cancelGame}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => { setShowMobileActions(false); setShowSurrenderConfirm(true); }}
+              className="w-full px-3 py-2.5 text-sm rounded-lg bg-red-500 hover:bg-red-600 text-white"
+            >
+              🏳️ {t.surrender}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowMobileActions(false)}
+              className="w-full px-3 py-2 text-sm rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400"
+            >
+              {t.cancel}
+            </button>
+          </div>
+        </div>
+      )}
 
       {isGameOver && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">

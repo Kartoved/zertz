@@ -23,8 +23,10 @@ export function RoomScreen() {
   const watchOnly = searchParams.get('watch') === '1';
   const [copied, setCopied] = useState(false);
   const [showMobileHeaderMenu, setShowMobileHeaderMenu] = useState(false);
-  const [mobileTab, setMobileTab] = useState<'game' | 'chat'>('game');
+  const [mobileTab, setMobileTab] = useState<'game' | 'chat' | 'plan'>('game');
+  const [rightTab, setRightTab] = useState<'chat' | 'plan'>('chat');
   const [chatCollapsed, setChatCollapsed] = useState(false);
+  const [showMobileActions, setShowMobileActions] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
   const [winnerModalDismissed, setWinnerModalDismissed] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
@@ -169,7 +171,10 @@ export function RoomScreen() {
   const isSpectator = !myPlayer;
   const isCancelled = state.winner === 'cancelled';
   const safePlayerNames = playerNames || { player1: 'Player 1', player2: 'Player 2' };
-  const safeCaptures = state.captures || { player1: { white: 0, gray: 0, black: 0 }, player2: { white: 0, gray: 0, black: 0 } };
+  // Captures reflect whichever state the board is showing: live state normally,
+  // analysis state while exploring variants.
+  const activeCapturesSrc = isAnalyzing && analysisState ? analysisState.captures : state.captures;
+  const safeCaptures = activeCapturesSrc || { player1: { white: 0, gray: 0, black: 0 }, player2: { white: 0, gray: 0, black: 0 } };
   const winnerName = isCancelled ? '' : (state.winner === 'player1' ? safePlayerNames.player1 : safePlayerNames.player2);
   const winnerWinType = state.winner && !isCancelled ? (winType || (state.captures ? getWinType(state, state.winner as import('../../game/types').Player) : null)) : null;
   const canCancel = !isSpectator && !state.winner && (state.moveNumber ?? 0) <= 2;
@@ -237,14 +242,230 @@ export function RoomScreen() {
   const analysisHasMoves = analysisPathLength >= 2;
   const analysisStartsWithOpponent = !!myPlayer && analysisFirstMoveBy !== null && analysisFirstMoveBy !== myPlayer;
   const canSaveCurrentVariant = isAnalyzing && analysisHasMoves && analysisStartsWithOpponent;
+  // Notations of every move in the current analysis path (from start anchor to current node),
+  // in chronological order. Used to preview the would-be variant before saving.
+  const analysisDraftNotations = (() => {
+    if (!isAnalyzing || !analysisCurrentNode || !analysisStartNodeId) return [] as string[];
+    const items: string[] = [];
+    let node: typeof analysisCurrentNode | null = analysisCurrentNode;
+    while (node && node.id !== analysisStartNodeId) {
+      if (node.move) items.unshift(node.notation);
+      node = node.parent;
+    }
+    return items;
+  })();
   const effectiveSelectRing = isAnalyzing ? analysisSelectRing : selectRing;
   const effectiveHandlePlacement = isAnalyzing ? analysisHandlePlacement : handlePlacement;
   const effectiveHandleRingRemoval = isAnalyzing ? analysisHandleRingRemoval : handleRingRemoval;
   const effectiveHandleCapture = isAnalyzing ? analysisHandleCapture : handleCapture;
 
+  // Plan tab — pre-moves panel — only available to correspondence participants in analysis.
+  const planTabAvailable = isCorrespondence && !isSpectator && isAnalyzing;
+  useEffect(() => {
+    if (planTabAvailable) {
+      setRightTab('plan');
+    } else {
+      setRightTab('chat');
+      setMobileTab(prev => (prev === 'plan' ? 'game' : prev));
+    }
+  }, [planTabAvailable]);
+
+  const preMovesPanelContent = (
+    <div className="h-full overflow-y-auto p-3">
+      {isAnalyzing && analysisDraftNotations.length > 0 && (
+        <div className="mb-2 flex items-start gap-1 px-2 py-1.5 bg-green-50 dark:bg-green-900/20 border border-dashed border-green-400 dark:border-green-700 rounded text-xs">
+          <div className="flex-1 min-w-0 font-mono text-[11px] leading-snug">
+            {analysisDraftNotations.map((notation, i) => {
+              const isOpponent = i % 2 === 0;
+              return (
+                <div
+                  key={i}
+                  className={
+                    isOpponent
+                      ? 'text-gray-500 dark:text-gray-400 italic'
+                      : 'text-blue-700 dark:text-blue-300 font-semibold'
+                  }
+                >
+                  {isOpponent ? '⟵ ' : '⟶ '}{notation}
+                </div>
+              );
+            })}
+          </div>
+          <button
+            type="button"
+            onClick={addCurrentVariantAsPremove}
+            disabled={!canSaveCurrentVariant}
+            title={
+              !analysisHasMoves
+                ? t.variantNeedsAtLeastTwoMoves
+                : !analysisStartsWithOpponent
+                ? t.variantNeedsOpponentFirst
+                : t.addCurrentVariant
+            }
+            className="flex-shrink-0 px-2 py-0.5 rounded bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold"
+          >
+            ＋
+          </button>
+        </div>
+      )}
+      {isAnalyzing && analysisDraftNotations.length === 0 && (
+        <div className="mb-2 text-xs text-gray-500 dark:text-gray-400 italic">
+          {t.variantNeedsAtLeastTwoMoves}
+        </div>
+      )}
+      {premoves.length === 0 ? (
+        <div className="text-xs text-gray-500 dark:text-gray-400 italic">
+          {t.noVariantsYet}
+        </div>
+      ) : (
+        <ul className="space-y-2">
+          {premoves.map(v => (
+            <li
+              key={v.id}
+              className="flex items-start gap-1 px-2 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded text-xs"
+            >
+              <div className="flex-1 min-w-0 font-mono text-[11px] leading-snug">
+                {v.sequence.map((s, i) => {
+                  const isOpponent = i % 2 === 0;
+                  return (
+                    <div
+                      key={i}
+                      className={
+                        isOpponent
+                          ? 'text-gray-500 dark:text-gray-400 italic'
+                          : 'text-blue-700 dark:text-blue-300 font-semibold'
+                      }
+                    >
+                      {isOpponent ? '⟵ ' : '⟶ '}{s.notation}
+                    </div>
+                  );
+                })}
+              </div>
+              <button
+                type="button"
+                onClick={() => deletePremoveVariant(v.id)}
+                title={t.deleteVariant}
+                className="flex-shrink-0 text-red-500 hover:text-red-600 px-1"
+              >
+                ✕
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="mt-2 text-[10px] text-gray-500 dark:text-gray-400 leading-snug">
+        <div>⟵ — {t.opponentTurn.toLowerCase()}</div>
+        <div>⟶ — {t.yourTurn.toLowerCase()}</div>
+        <div className="mt-1">{t.premovesHint}</div>
+      </div>
+    </div>
+  );
+
   const validRemovableRings = boardState.phase === 'ringRemoval'
     ? getValidRemovableRings(boardState.rings)
     : [];
+
+  // ---- Mobile compact strips ----
+  // Determine which slot is "top" (opponent's view) and which is "bottom" (your view).
+  // Spectators default to player1 top / player2 bottom (chess-board convention).
+  const topSlot: 'player1' | 'player2' = myPlayer === 1 ? 'player2' : 'player1';
+  const bottomSlot: 'player1' | 'player2' = topSlot === 'player1' ? 'player2' : 'player1';
+  const topClockMs = topSlot === 'player1' ? p1ClockMs : p2ClockMs;
+  const bottomClockMs = bottomSlot === 'player1' ? p1ClockMs : p2ClockMs;
+  const topRating = topSlot === 'player1' ? user1Rating : user2Rating;
+  const bottomRating = bottomSlot === 'player1' ? user1Rating : user2Rating;
+  const topUserId = topSlot === 'player1' ? user1Id : user2Id;
+  const bottomUserId = bottomSlot === 'player1' ? user1Id : user2Id;
+  const isMyTurn = !state.winner && !isSpectator && state.currentPlayer === bottomSlot;
+
+  const renderMobilePlayerStrip = (
+    slot: 'player1' | 'player2',
+    clockMs: number | null,
+    rating: number | null | undefined,
+    userId: number | null | undefined,
+    isBottom: boolean
+  ) => {
+    const isActive = !boardState.winner && boardState.currentPlayer === slot;
+    const caps = safeCaptures[slot];
+    const name = safePlayerNames[slot];
+    const isMine = !isSpectator && myPlayer != null && ((myPlayer === 1 ? 'player1' : 'player2') === slot);
+    return (
+      <div className={`lg:hidden flex items-center gap-2 px-3 py-1.5 ${
+        isActive ? 'bg-blue-100 dark:bg-blue-900 ring-1 ring-blue-500' : 'bg-white dark:bg-gray-800'
+      }`}>
+        {/* Captures */}
+        <div className="flex gap-1 text-xs font-medium text-gray-800 dark:text-gray-200 flex-shrink-0">
+          <span>⚪{caps.white}</span>
+          <span>🔘{caps.gray}</span>
+          <span>⚫{caps.black}</span>
+        </div>
+        {/* Name + sub-line (rating / phase) */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            {isMine && <span className="text-[10px] bg-green-500 text-white px-1 py-0.5 rounded leading-none">{t.you}</span>}
+            {isAuthed && userId ? (
+              <button
+                type="button"
+                onClick={() => setSelectedPlayerId(userId)}
+                className="font-semibold text-sm text-gray-800 dark:text-gray-200 truncate hover:underline"
+              >
+                {name}
+              </button>
+            ) : (
+              <span className="font-semibold text-sm text-gray-800 dark:text-gray-200 truncate">{name}</span>
+            )}
+            {rating != null && (
+              <span className="text-[11px] text-blue-600 dark:text-blue-400 font-medium flex-shrink-0">{rating}</span>
+            )}
+          </div>
+          {isActive && (
+            <div className="text-[10px] text-blue-700 dark:text-blue-200 truncate">
+              {isMine ? t.yourTurn : t.opponentTurn} · {getPhaseText()}
+            </div>
+          )}
+        </div>
+        {/* Clock */}
+        {clockMs != null && (
+          <div className={`text-sm font-mono font-bold flex-shrink-0 ${
+            clockMs <= LOW_TIME_THRESHOLD_MS ? 'text-red-600 dark:text-red-400' : 'text-gray-900 dark:text-gray-100'
+          }`}>
+            {formatClock(clockMs)}
+          </div>
+        )}
+        {/* Action menu — only on bottom strip */}
+        {isBottom && isAuthed && (
+          <button
+            type="button"
+            onClick={() => setShowMobileActions(true)}
+            className="flex-shrink-0 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-300"
+            title="Actions"
+          >
+            ⋯
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  const mobileOpponentStrip = renderMobilePlayerStrip(topSlot, topClockMs, topRating, topUserId, false);
+  const mobileYouStrip = renderMobilePlayerStrip(bottomSlot, bottomClockMs, bottomRating, bottomUserId, true);
+
+  // Marble picker (mobile): visible when in placement phase and acting player has agency.
+  const shouldShowMobileMarblePicker = boardState.phase === 'placement' && !boardState.winner &&
+    (isAnalyzing || isMyTurn);
+  const mobileMarblePicker = shouldShowMobileMarblePicker ? (
+    <div className="lg:hidden p-2 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
+      <MarbleSelector
+        reserve={boardState.reserve}
+        selectedColor={selectedMarbleColor}
+        onSelect={isAnalyzing ? analysisSelectMarbleColor : selectMarbleColor}
+        captures={boardState.captures[boardState.currentPlayer]}
+        phase={boardState.phase}
+        currentPlayer={boardState.currentPlayer}
+        stateForCaptures={boardState}
+      />
+    </div>
+  ) : null;
 
   const handleRingClick = (ringId: string) => {
     if (boardState.winner) return;
@@ -366,6 +587,11 @@ export function RoomScreen() {
         </div>
       </header>
 
+      {/* Mobile move history strip — mirrors the desktop header version, sits just under the header. */}
+      <div className="md:hidden bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-2 py-1 overflow-x-auto">
+        <OnlineMoveHistory />
+      </div>
+
       {showMobileHeaderMenu && (
         <div className="md:hidden px-3 pb-3 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
           <div className="space-y-2">
@@ -422,8 +648,8 @@ export function RoomScreen() {
 
       {/* Main content */}
       <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-3 md:gap-4 p-2 md:p-4 max-w-7xl mx-auto w-full pb-28 sm:pb-24 lg:pb-4 overflow-y-auto lg:overflow-hidden">
-        {/* Left panel - Players */}
-        <div className={`lg:w-64 lg:flex lg:flex-col gap-2 lg:gap-4 ${mobileTab === 'chat' ? 'hidden lg:flex' : 'grid grid-cols-2 lg:grid-cols-1'} min-w-0`}>
+        {/* Left panel - Players (desktop only — mobile uses compact strips around the board) */}
+        <div className="hidden lg:flex lg:w-64 lg:flex-col gap-2 lg:gap-4 min-w-0">
           {/* Player 1 */}
           <div className={`p-2 lg:p-3 rounded-lg ${
             state.currentPlayer === 'player1' && !state.winner
@@ -553,10 +779,10 @@ export function RoomScreen() {
             </div>
           )}
 
-          {/* Unified analysis panel — any logged-in user (participant or spectator,
-              in any game type, active or finished). Shows the Analyze entry when
-              not analyzing, and the analysis status + exit when analyzing. */}
-          {isAuthed && (
+          {/* Standalone analysis card — shown only when there's no live action panel
+              to host the Analyze button (spectators, finished games, or when in
+              analysis mode itself which renders the full panel here). */}
+          {isAuthed && (isAnalyzing || state.winner || isSpectator) && (
             <div className="col-span-1 sm:col-span-2 lg:col-span-1 p-3 bg-white dark:bg-gray-800 rounded-lg space-y-2">
               {isAnalyzing && (
                 <div className="px-2 py-1.5 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-xs font-semibold text-center">
@@ -660,95 +886,51 @@ export function RoomScreen() {
                     🏳️ {t.surrender}
                   </button>
                 </div>
+                {isAuthed && (
+                  <button
+                    type="button"
+                    onClick={enterAnalysis}
+                    className="mt-2 w-full px-3 py-1.5 text-sm rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-900/70 transition-colors"
+                  >
+                    🔬 {t.analysis}
+                  </button>
+                )}
               </div>
             </div>
           )}
 
-          {/* Pre-moves panel (correspondence games only, players only) */}
-          {isCorrespondence && !isSpectator && (
-            <div className="p-3 bg-white dark:bg-gray-800 rounded-lg col-span-1 sm:col-span-2 lg:col-span-1">
-              <div className="text-xs font-semibold text-gray-700 dark:text-gray-200 mb-2">
-                {t.conditionalPremoves}
-              </div>
-              {isAnalyzing && (
-                <button
-                  type="button"
-                  onClick={addCurrentVariantAsPremove}
-                  disabled={!canSaveCurrentVariant}
-                  title={
-                    !analysisHasMoves
-                      ? t.variantNeedsAtLeastTwoMoves
-                      : !analysisStartsWithOpponent
-                      ? t.variantNeedsOpponentFirst
-                      : ''
-                  }
-                  className="mb-2 w-full px-3 py-1.5 text-sm rounded-lg bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-colors"
-                >
-                  ＋ {t.addCurrentVariant}
-                </button>
-              )}
-              {premoves.length === 0 ? (
-                <div className="text-xs text-gray-500 dark:text-gray-400 italic">
-                  {t.noVariantsYet}
-                </div>
-              ) : (
-                <ul className="space-y-2">
-                  {premoves.map(v => (
-                    <li
-                      key={v.id}
-                      className="flex items-start gap-1 px-2 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded text-xs"
-                    >
-                      <div className="flex-1 min-w-0 font-mono text-[11px] leading-snug">
-                        {v.sequence.map((s, i) => {
-                          const isOpponent = i % 2 === 0;
-                          return (
-                            <div
-                              key={i}
-                              className={
-                                isOpponent
-                                  ? 'text-gray-500 dark:text-gray-400 italic'
-                                  : 'text-blue-700 dark:text-blue-300 font-semibold'
-                              }
-                            >
-                              {isOpponent ? '⟵ ' : '⟶ '}{s.notation}
-                            </div>
-                          );
-                        })}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => deletePremoveVariant(v.id)}
-                        title={t.deleteVariant}
-                        className="flex-shrink-0 text-red-500 hover:text-red-600 px-1"
-                      >
-                        ✕
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <div className="mt-2 text-[10px] text-gray-500 dark:text-gray-400 leading-snug">
-                <div>⟵ — {t.opponentTurn.toLowerCase()}</div>
-                <div>⟶ — {t.yourTurn.toLowerCase()}</div>
-                <div className="mt-1">{t.premovesHint}</div>
-              </div>
-            </div>
-          )}
         </div>
 
-        {/* Center - Board */}
-        <div className={`flex-1 min-h-0 items-center justify-center min-h-[240px] sm:min-h-[320px] md:min-h-[400px] overflow-hidden ${mobileTab === 'chat' ? 'hidden lg:flex' : 'flex flex-col'}`}>
-          <HexBoard
-            state={boardState}
-            onRingClick={handleRingClick}
-            selectedRingId={selectedRingId}
-            highlightedCaptures={highlightedCaptures}
-            validRemovableRings={validRemovableRings}
-          />
-          {/* Move history — mobile only, below board */}
-          <div className={`lg:hidden w-full mt-2 p-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-x-auto ${mobileTab === 'chat' ? 'hidden' : ''}`}>
-            <OnlineMoveHistory />
+        {/* Center - Board (mobile: framed by compact strips; desktop: just the board) */}
+        <div className={`flex-1 min-h-0 min-h-[240px] sm:min-h-[320px] md:min-h-[400px] ${mobileTab === 'chat' ? 'hidden lg:flex' : 'flex flex-col'}`}>
+          {/* Spectator badge (mobile) */}
+          {isSpectator && (
+            <div className="lg:hidden mx-3 mt-1 px-2 py-1 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 rounded text-center text-xs text-yellow-700 dark:text-yellow-300 font-medium">
+              👁 {t.youAreSpectator}
+            </div>
+          )}
+          {/* Analysis badge (mobile) */}
+          {isAnalyzing && (
+            <div className="lg:hidden mx-3 mt-1 px-2 py-1 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 text-xs font-semibold text-center">
+              🔬 {t.analysisMode}
+            </div>
+          )}
+          {/* Opponent strip (mobile only) */}
+          {mobileOpponentStrip}
+          {/* Board */}
+          <div className="flex-1 min-h-0 flex items-center justify-center overflow-hidden">
+            <HexBoard
+              state={boardState}
+              onRingClick={handleRingClick}
+              selectedRingId={selectedRingId}
+              highlightedCaptures={highlightedCaptures}
+              validRemovableRings={validRemovableRings}
+            />
           </div>
+          {/* You strip (mobile only) */}
+          {mobileYouStrip}
+          {/* Marble picker (mobile only, conditional) */}
+          {mobileMarblePicker}
         </div>
 
         {mobileTab === 'chat' && (
@@ -759,28 +941,73 @@ export function RoomScreen() {
           </div>
         )}
 
-        {/* Right panel - Chat (desktop, collapsible) */}
+        {mobileTab === 'plan' && planTabAvailable && (
+          <div className="lg:hidden fixed inset-x-0 z-10 flex flex-col p-2" style={{ top: '56px', bottom: '60px' }}>
+            <div className="flex-1 min-h-0 bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden flex flex-col">
+              <div className="px-3 py-2 border-b border-gray-200 dark:border-gray-700 text-xs font-semibold text-gray-700 dark:text-gray-200">
+                {t.conditionalPremoves}
+              </div>
+              <div className="flex-1 min-h-0">{preMovesPanelContent}</div>
+            </div>
+          </div>
+        )}
+
+        {/* Right panel - Chat / Plan tabs (desktop, collapsible) */}
         <div className={`hidden lg:flex min-h-0 flex-col transition-all duration-300 ${
           chatCollapsed ? 'lg:w-12' : 'lg:w-80'
         }`}>
           <button
             onClick={() => setChatCollapsed(!chatCollapsed)}
-            className="mb-2 p-2 bg-white dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 
+            className="mb-2 p-2 bg-white dark:bg-gray-800 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700
                        flex items-center justify-center transition-colors"
             title={chatCollapsed ? t.expandChat : t.collapseChat}
           >
             {chatCollapsed ? '💬' : '→'}
           </button>
           {!chatCollapsed && (
-            <div className="flex-1 min-h-0 overflow-hidden">
-              <ChatPanel />
-            </div>
+            <>
+              {planTabAvailable && (
+                <div className="mb-2 grid grid-cols-2 bg-white dark:bg-gray-800 rounded-lg p-1 shadow-sm border border-gray-200 dark:border-gray-700">
+                  <button
+                    type="button"
+                    onClick={() => setRightTab('chat')}
+                    className={`py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                      rightTab === 'chat'
+                        ? 'bg-indigo-500 text-white'
+                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {t.chat}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRightTab('plan')}
+                    className={`py-1.5 text-xs font-semibold rounded-md transition-colors ${
+                      rightTab === 'plan'
+                        ? 'bg-indigo-500 text-white'
+                        : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    }`}
+                  >
+                    {t.tabPlan}
+                  </button>
+                </div>
+              )}
+              <div className="flex-1 min-h-0 overflow-hidden">
+                {planTabAvailable && rightTab === 'plan' ? (
+                  <div className="h-full bg-white dark:bg-gray-800 rounded-xl shadow-sm overflow-hidden">
+                    {preMovesPanelContent}
+                  </div>
+                ) : (
+                  <ChatPanel />
+                )}
+              </div>
+            </>
           )}
         </div>
       </div>
 
       <div className="lg:hidden fixed bottom-0 inset-x-0 z-40 px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
-        <div className="grid grid-cols-2 bg-white dark:bg-gray-800 rounded-xl p-1 shadow-lg border border-gray-200 dark:border-gray-700">
+        <div className={`grid ${planTabAvailable ? 'grid-cols-3' : 'grid-cols-2'} bg-white dark:bg-gray-800 rounded-xl p-1 shadow-lg border border-gray-200 dark:border-gray-700`}>
           <button
             type="button"
             onClick={() => setMobileTab('game')}
@@ -792,6 +1019,19 @@ export function RoomScreen() {
           >
             {t.tabPlay}
           </button>
+          {planTabAvailable && (
+            <button
+              type="button"
+              onClick={() => setMobileTab('plan')}
+              className={`py-2 text-sm font-semibold rounded-lg transition-colors ${
+                mobileTab === 'plan'
+                  ? 'bg-indigo-500 text-white'
+                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+              }`}
+            >
+              {t.tabPlan}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setMobileTab('chat')}
@@ -805,6 +1045,79 @@ export function RoomScreen() {
           </button>
         </div>
       </div>
+
+      {/* Mobile actions sheet — Undo / Analysis / Cancel / Resign */}
+      {showMobileActions && (
+        <div className="lg:hidden fixed inset-0 bg-black/50 z-[60] flex items-end" onClick={() => setShowMobileActions(false)}>
+          <div className="bg-white dark:bg-gray-800 w-full rounded-t-2xl shadow-2xl p-3 space-y-2 pb-[calc(0.75rem+env(safe-area-inset-bottom))]" onClick={(e) => e.stopPropagation()}>
+            {isAnalyzing ? (
+              <>
+                {analysisCurrentNode && analysisStartNodeId && analysisCurrentNode.id !== analysisStartNodeId && (
+                  <button
+                    type="button"
+                    onClick={() => { analysisCurrentNode.parent && analysisNavigateToNode(analysisCurrentNode.parent); setShowMobileActions(false); }}
+                    className="w-full px-3 py-2.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"
+                  >
+                    ↶ {t.undoMove}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => { exitAnalysis(); setShowMobileActions(false); }}
+                  className="w-full px-3 py-2.5 text-sm font-semibold rounded-lg bg-blue-500 hover:bg-blue-600 text-white"
+                >
+                  ← {t.exitAnalysis}
+                </button>
+              </>
+            ) : (
+              <>
+                {!isSpectator && !state.winner && (
+                  <button
+                    type="button"
+                    onClick={() => { sendMessage('[UNDO_REQUEST]'); setShowMobileActions(false); }}
+                    disabled={!canUndoOwnLastMove()}
+                    className="w-full px-3 py-2.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    ↶ {t.undoMove}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => { enterAnalysis(); setShowMobileActions(false); }}
+                  className="w-full px-3 py-2.5 text-sm rounded-lg bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200 hover:bg-amber-200 dark:hover:bg-amber-900/70"
+                >
+                  🔬 {t.analysis}
+                </button>
+                {canCancel && (
+                  <button
+                    type="button"
+                    onClick={() => { cancelGame(); setShowMobileActions(false); }}
+                    className="w-full px-3 py-2.5 text-sm rounded-lg bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 hover:bg-orange-200 dark:hover:bg-orange-900/70"
+                  >
+                    ✕ {t.cancelGame}
+                  </button>
+                )}
+                {!isSpectator && !state.winner && (
+                  <button
+                    type="button"
+                    onClick={() => { setShowMobileActions(false); setShowSurrenderConfirm(true); }}
+                    className="w-full px-3 py-2.5 text-sm rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-black hover:bg-gray-300 dark:hover:bg-gray-600"
+                  >
+                    🏳️ {t.surrender}
+                  </button>
+                )}
+              </>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowMobileActions(false)}
+              className="w-full px-3 py-2 text-sm rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-500 dark:text-gray-400"
+            >
+              {t.cancel || 'Cancel'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {showSurrenderConfirm && (
         <div className="fixed inset-0 bg-black/50 z-[70] flex items-center justify-center p-4">
@@ -843,7 +1156,7 @@ export function RoomScreen() {
         />
       )}
 
-      {state.winner && !winnerModalDismissed && (
+      {state.winner && !winnerModalDismissed && !isAnalyzing && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-6 text-center">
             {isCancelled ? (
