@@ -877,8 +877,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   },
 
   analysisHandlePlacement: (ringId) => {
-    const { analysisState, analysisCurrentNode, selectedMarbleColor } = get();
-    if (!analysisState || !analysisCurrentNode || !selectedMarbleColor) return;
+    const { analysisState, analysisCurrentNode, analysisGameTree, selectedMarbleColor } = get();
+    if (!analysisState || !analysisCurrentNode || !analysisGameTree || !selectedMarbleColor) return;
 
     const result = applyAnalysisPlacement(analysisState, analysisCurrentNode, ringId, selectedMarbleColor);
     if (!result) return;
@@ -886,6 +886,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     set({
       analysisState: result.analysisState,
       analysisCurrentNode: result.analysisCurrentNode,
+      analysisGameTree: { ...analysisGameTree },
       selectedMarbleColor: null,
       selectedRingId: null,
       highlightedCaptures: [],
@@ -895,14 +896,15 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   },
 
   analysisHandleRingRemoval: (ringId) => {
-    const { analysisState, analysisCurrentNode } = get();
-    if (!analysisState || !analysisCurrentNode) return;
+    const { analysisState, analysisCurrentNode, analysisGameTree } = get();
+    if (!analysisState || !analysisCurrentNode || !analysisGameTree) return;
 
     const result = applyAnalysisRingRemoval(analysisState, analysisCurrentNode, ringId);
     if (!result) return;
 
     set({
       analysisState: result.analysisState,
+      analysisGameTree: { ...analysisGameTree },
       selectedRingId: null,
       highlightedCaptures: [],
       availableCaptureChains: [],
@@ -911,13 +913,14 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   },
 
   analysisHandleCapture: (captures) => {
-    const { analysisState, analysisCurrentNode } = get();
-    if (!analysisState || !analysisCurrentNode) return;
+    const { analysisState, analysisCurrentNode, analysisGameTree } = get();
+    if (!analysisState || !analysisCurrentNode || !analysisGameTree) return;
 
     const result = applyAnalysisCapture(analysisState, analysisCurrentNode, captures);
     set({
       analysisState: result.analysisState,
       analysisCurrentNode: result.analysisCurrentNode,
+      analysisGameTree: { ...analysisGameTree },
       selectedRingId: null,
       highlightedCaptures: [],
       availableCaptureChains: [],
