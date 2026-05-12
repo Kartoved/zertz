@@ -1,4 +1,4 @@
-import { useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useRef } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { GameNode } from '../../game/types';
 import { useI18n } from '../../i18n';
@@ -10,14 +10,15 @@ interface MoveElementProps {
   onDelete: (node: GameNode) => void;
   canDelete: boolean;
   deleteConfirmText: string;
+  activeRef?: React.RefObject<HTMLSpanElement>;
 }
 
-function MoveElement({ node, isCurrentMove, onNavigate, onDelete, canDelete, deleteConfirmText }: MoveElementProps) {
-  // Number format: "1." for both players, no ellipsis
+function MoveElement({ node, isCurrentMove, onNavigate, onDelete, canDelete, deleteConfirmText, activeRef }: MoveElementProps) {
   const moveNum = `${node.moveNumber}. `;
-  
+
   return (
     <span
+      ref={isCurrentMove ? activeRef : undefined}
       onClick={() => onNavigate(node)}
       onContextMenu={(e) => {
         e.preventDefault();
@@ -27,9 +28,9 @@ function MoveElement({ node, isCurrentMove, onNavigate, onDelete, canDelete, del
         }
       }}
       className={`
-        cursor-pointer px-1 rounded transition-colors select-none
-        ${isCurrentMove 
-          ? 'bg-blue-500 text-white' 
+        cursor-pointer px-1 rounded transition-colors select-none whitespace-nowrap
+        ${isCurrentMove
+          ? 'bg-blue-500 text-white'
           : 'hover:bg-gray-200 dark:hover:bg-gray-700'}
       `}
     >
@@ -38,23 +39,32 @@ function MoveElement({ node, isCurrentMove, onNavigate, onDelete, canDelete, del
   );
 }
 
+function winMarker(winner: string | null | undefined, winType: string | null | undefined, t: ReturnType<typeof useI18n>['t']): { symbol: string; title: string } | null {
+  if (!winner) return null;
+  if (winner === 'cancelled') return { symbol: '✕', title: t.cancelledStatus };
+  if (winType === 'white') return { symbol: '⚪', title: t.winByWhite };
+  if (winType === 'gray') return { symbol: '🔘', title: t.winByGray };
+  if (winType === 'black') return { symbol: '⚫', title: t.winByBlack };
+  if (winType === 'mixed') return { symbol: '🎨', title: t.winByMixed };
+  if (winType === 'time') return { symbol: '⏱', title: t.winByTime };
+  if (winType === 'surrender') return { symbol: '🏳', title: t.surrender };
+  return { symbol: '★', title: t.gameOver || '' };
+}
+
 function renderMoveTree(
   node: GameNode,
   currentNodeId: string,
   onNavigate: (node: GameNode) => void,
   onDelete: (node: GameNode) => void,
   canDeleteNode: (node: GameNode) => boolean,
-  deleteConfirmText: string
+  deleteConfirmText: string,
+  activeRef: React.RefObject<HTMLSpanElement>
 ): JSX.Element[] {
-  // We treat node.children[0] as the main line, and node.children[1..] as variations.
-  // Rendering rule: show the main move first, then sibling variations in parentheses,
-  // then continue along the main line.
   const elements: JSX.Element[] = [];
 
   const mainChild = node.children[0];
   if (!mainChild) return elements;
 
-  // Render main move first
   elements.push(
     <MoveElement
       key={mainChild.id}
@@ -64,10 +74,10 @@ function renderMoveTree(
       onDelete={onDelete}
       canDelete={canDeleteNode(mainChild)}
       deleteConfirmText={deleteConfirmText}
+      activeRef={activeRef}
     />
   );
 
-  // Then render variations in parentheses
   const variations = node.children.slice(1);
   for (const variation of variations) {
     elements.push(
@@ -82,23 +92,23 @@ function renderMoveTree(
         onDelete={onDelete}
         canDelete={canDeleteNode(variation)}
         deleteConfirmText={deleteConfirmText}
+        activeRef={activeRef}
       />
     );
-    elements.push(...renderMoveTree(variation, currentNodeId, onNavigate, onDelete, canDeleteNode, deleteConfirmText));
+    elements.push(...renderMoveTree(variation, currentNodeId, onNavigate, onDelete, canDeleteNode, deleteConfirmText, activeRef));
     elements.push(
       <span key={`var-close-${variation.id}`} className="text-gray-500">)</span>
     );
   }
 
-  // Continue main line
-  elements.push(...renderMoveTree(mainChild, currentNodeId, onNavigate, onDelete, canDeleteNode, deleteConfirmText));
+  elements.push(...renderMoveTree(mainChild, currentNodeId, onNavigate, onDelete, canDeleteNode, deleteConfirmText, activeRef));
 
   return elements;
 }
 
 export default function MoveHistory() {
   const { t } = useI18n();
-  const { gameTree, currentNode, navigateToNode, deleteBranchFrom, isLoadedGame } = useGameStore();
+  const { state, winType, gameTree, currentNode, navigateToNode, deleteBranchFrom, isLoadedGame } = useGameStore();
   
   const navigatePrev = useCallback(() => {
     if (currentNode.parent) {
@@ -137,9 +147,18 @@ export default function MoveHistory() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [navigatePrev, navigateNext]);
   
-  const moves = renderMoveTree(gameTree, currentNode.id, navigateToNode, handleDelete, canDeleteNode, t.deleteMovesConfirm);
+  const activeRef = useRef<HTMLSpanElement>(null);
+  const didInitialScrollRef = useRef(false);
+  useEffect(() => {
+    const behavior: ScrollBehavior = didInitialScrollRef.current ? 'smooth' : 'auto';
+    activeRef.current?.scrollIntoView({ inline: 'nearest', block: 'nearest', behavior });
+    didInitialScrollRef.current = true;
+  }, [currentNode.id]);
+
+  const moves = renderMoveTree(gameTree, currentNode.id, navigateToNode, handleDelete, canDeleteNode, t.deleteMovesConfirm, activeRef);
   const isAtStart = currentNode.id === 'root';
-  
+  const marker = winMarker(state.winner, winType, t);
+
   if (moves.length === 0) {
     return (
       <div className="p-2 text-gray-500 dark:text-gray-400 text-sm">
@@ -147,16 +166,28 @@ export default function MoveHistory() {
       </div>
     );
   }
-  
+
   return (
-    <div className="flex flex-wrap gap-1 text-sm font-mono text-gray-800 dark:text-gray-200">
+    <div
+      className="flex gap-1 overflow-x-auto whitespace-nowrap text-sm font-mono text-gray-800 dark:text-gray-200 [&::-webkit-scrollbar]:hidden"
+      style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}
+    >
       <span
+        ref={isAtStart ? activeRef : undefined}
         onClick={() => navigateToNode(gameTree)}
-        className={`cursor-pointer px-1 rounded transition-colors select-none ${isAtStart ? 'bg-blue-500 text-white' : 'hover:bg-gray-200 dark:hover:bg-gray-700'}`}
+        className={`cursor-pointer px-1 rounded transition-colors select-none whitespace-nowrap ${isAtStart ? 'bg-blue-500 text-white' : 'hover:bg-gray-200 dark:hover:bg-gray-700'}`}
       >
         {`0. ${t.moveStart}`}
       </span>
       {moves}
+      {marker && (
+        <span
+          title={marker.title}
+          className="px-1 select-none text-gray-700 dark:text-gray-200 font-bold"
+        >
+          {marker.symbol}
+        </span>
+      )}
     </div>
   );
 }

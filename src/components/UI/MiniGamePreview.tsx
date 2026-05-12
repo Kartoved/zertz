@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import HexBoard from '../Board/HexBoard';
 import { GameState } from '../../game/types';
 import { loadGame } from '../../db/gamesStorage';
+import { useI18n } from '../../i18n';
 
 interface MiniGamePreviewProps {
   gameId: string;
@@ -16,6 +17,7 @@ const SCALE = 0.32;
 const INNER_PX = Math.round(PREVIEW_PX / SCALE);
 
 export default function MiniGamePreview({ gameId, playerNames, moveCount, isOnline, onClick }: MiniGamePreviewProps) {
+  const { t } = useI18n();
   const [gameState, setGameState] = useState<GameState | null>(null);
 
   useEffect(() => {
@@ -66,7 +68,7 @@ export default function MiniGamePreview({ gameId, playerNames, moveCount, isOnli
           {playerNames.player1} vs {playerNames.player2}
         </div>
         <div className="text-[9px] text-gray-400 dark:text-gray-500">
-          {moveCount} ходов
+          {moveCount - 1} {t.moves.toLowerCase()}
         </div>
       </div>
     </div>

@@ -24,15 +24,15 @@ export default function LoadGameModal({ savedGames, boardLabels, onClose, onLoad
   const [archiveGames, setArchiveGames] = useState<SavedGame[]>([]);
   const [archiveLoading, setArchiveLoading] = useState(false);
 
+  // Load the archive once on mount so the count is shown on the tab immediately,
+  // not only after the user clicks it.
   useEffect(() => {
-    if (loadTab === 'archive' && archiveGames.length === 0) {
-      setArchiveLoading(true);
-      listPublicGames()
-        .then(setArchiveGames)
-        .catch(() => {})
-        .finally(() => setArchiveLoading(false));
-    }
-  }, [loadTab]);
+    setArchiveLoading(true);
+    listPublicGames()
+      .then(setArchiveGames)
+      .catch(() => {})
+      .finally(() => setArchiveLoading(false));
+  }, []);
 
   const currentGames = savedGames.filter(g => !g.winner);
   const completedGames = savedGames.filter(g => !!g.winner);
@@ -96,7 +96,7 @@ export default function LoadGameModal({ savedGames, boardLabels, onClose, onLoad
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700'
             }`}
           >
-            {t.loadArchive}
+            {t.loadArchive} ({archiveGames.length})
           </button>
         </div>
 

@@ -240,7 +240,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   lastLiveMergeAt: 0,
   premoves: [],
 
-  createRoom: async (boardSize, creatorPlayer = 1, rated = false, timeControl = null) => {
+  createRoom: async (boardSize, creatorPlayer = 1, rated = true, timeControl = null) => {
     set({ isLoading: true, error: null });
     try {
       const initialState = createInitialState(boardSize);

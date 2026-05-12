@@ -49,7 +49,7 @@ export async function createRoom(
   state: GameState,
   tree: GameNode,
   creatorPlayer: 1 | 2 = 1,
-  rated: boolean = false,
+  rated: boolean = true,
   timeControl?: FischerTimeControl | null
 ): Promise<number> {
   const response = await fetch(`${API_BASE}/api/rooms`, {
@@ -284,6 +284,26 @@ export async function getActiveRoomsForPlayer(username: string): Promise<Array<{
   isOnline: true;
 }>> {
   const response = await fetch(`${API_BASE}/api/rooms/active/${encodeURIComponent(username)}`);
+  if (!response.ok) return [];
+  return response.json();
+}
+
+// All active rooms across all players. Optional `username` narrows the list
+// (equivalent to getActiveRoomsForPlayer but via the new query-string endpoint).
+export async function getActiveRooms(username?: string): Promise<Array<{
+  id: string;
+  playerNames: { player1: string; player2: string };
+  updatedAt: number;
+  moveCount: number;
+  winner: null;
+  winType: null;
+  boardSize: 37 | 48 | 61;
+  isOnline: true;
+}>> {
+  const url = username
+    ? `${API_BASE}/api/rooms/active?username=${encodeURIComponent(username)}`
+    : `${API_BASE}/api/rooms/active`;
+  const response = await fetch(url);
   if (!response.ok) return [];
   return response.json();
 }

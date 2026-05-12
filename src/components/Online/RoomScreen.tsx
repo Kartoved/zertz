@@ -162,9 +162,10 @@ export function RoomScreen() {
   };
 
   const getPhaseText = () => {
-    if (state.phase === 'placement') return t.phasePlacement;
-    if (state.phase === 'ringRemoval') return t.phaseRingRemoval;
-    if (state.phase === 'capture') return t.phaseCapture;
+    const activeState = isAnalyzing && analysisState ? analysisState : state;
+    if (activeState.phase === 'placement') return t.phasePlacement;
+    if (activeState.phase === 'ringRemoval') return t.phaseRingRemoval;
+    if (activeState.phase === 'capture') return t.phaseCapture;
     return '';
   };
 
@@ -652,7 +653,7 @@ export function RoomScreen() {
         <div className="hidden lg:flex lg:w-64 lg:flex-col gap-2 lg:gap-4 min-w-0">
           {/* Player 1 */}
           <div className={`p-2 lg:p-3 rounded-lg ${
-            state.currentPlayer === 'player1' && !state.winner
+            boardState.currentPlayer === 'player1' && !boardState.winner
               ? 'bg-blue-100 dark:bg-blue-900 ring-2 ring-blue-500'
               : 'bg-white dark:bg-gray-800'
           }`}>
@@ -703,7 +704,7 @@ export function RoomScreen() {
               <span>🔘 {safeCaptures.player1.gray}</span>
               <span>⚫ {safeCaptures.player1.black}</span>
             </div>
-            {state.currentPlayer === 'player1' && !state.winner && (
+            {boardState.currentPlayer === 'player1' && !boardState.winner && (
               <div className="mt-2 text-sm font-medium text-blue-700 dark:text-blue-200">
                 <div>{myPlayer === 1 ? t.yourTurn : t.opponentTurn}</div>
                 <div className="text-xs text-blue-600/90 dark:text-blue-300/90">{getPhaseText()}</div>
@@ -713,7 +714,7 @@ export function RoomScreen() {
 
           {/* Player 2 */}
           <div className={`p-2 lg:p-3 rounded-lg ${
-            state.currentPlayer === 'player2' && !state.winner
+            boardState.currentPlayer === 'player2' && !boardState.winner
               ? 'bg-blue-100 dark:bg-blue-900 ring-2 ring-blue-500'
               : 'bg-white dark:bg-gray-800'
           }`}>
@@ -764,7 +765,7 @@ export function RoomScreen() {
               <span>🔘 {safeCaptures.player2.gray}</span>
               <span>⚫ {safeCaptures.player2.black}</span>
             </div>
-            {state.currentPlayer === 'player2' && !state.winner && (
+            {boardState.currentPlayer === 'player2' && !boardState.winner && (
               <div className="mt-2 text-sm font-medium text-blue-700 dark:text-blue-200">
                 <div>{myPlayer === 2 ? t.yourTurn : t.opponentTurn}</div>
                 <div className="text-xs text-blue-600/90 dark:text-blue-300/90">{getPhaseText()}</div>

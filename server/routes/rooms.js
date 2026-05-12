@@ -149,6 +149,36 @@ router.post('/', optionalAuth, async (req, res) => {
 });
 
 // Get active rooms for a specific player username (for spectating)
+// All active rooms (no username filter). Optional ?username= narrows the list.
+router.get('/active', async (req, res) => {
+  const { username } = req.query;
+  const params = [];
+  let where = 'WHERE winner IS NULL AND user2_id IS NOT NULL';
+  if (username) {
+    where += ' AND (player1_name = $1 OR player2_name = $1)';
+    params.push(username);
+  }
+  const result = await pool.query(
+    `SELECT id, board_size, player1_name, player2_name, updated_at
+       FROM rooms
+       ${where}
+      ORDER BY updated_at DESC
+      LIMIT 100`,
+    params
+  );
+  res.json(result.rows.map(r => ({
+    id: String(r.id),
+    playerNames: { player1: r.player1_name, player2: r.player2_name },
+    updatedAt: r.updated_at.getTime(),
+    moveCount: 0,
+    winner: null,
+    winType: null,
+    boardSize: r.board_size,
+    isOnline: true,
+  })));
+});
+
+// Back-compat: /active/:username — same as /active?username=...
 router.get('/active/:username', async (req, res) => {
   const { username } = req.params;
   const result = await pool.query(

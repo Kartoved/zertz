@@ -23,6 +23,45 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.12.4',
+    date: '2026-05-13',
+    changes: {
+      ru: [
+        'Просмотр партий → Архив теперь грузится сразу, счётчик «Архив (N)» виден без открытия таба',
+        'Модалка «Партии» в профиле игрока пересобрана: два таба «Активные / Завершённые» со счётчиками + фильтр «только этот игрок / все игроки»',
+        'Подпись «Рейтинговая статистика» добавлена и в карточку профиля в лобби, и в модалку «Мой профиль»',
+        'Анализ: фаза партии («ход, удаление кольца, взятие») и подсветка активного игрока на десктопе теперь следуют за вариантом, а не за live-игрой',
+        'Локальный журнал ходов получил то же оформление, что и онлайн: одна строка с горизонтальным скроллом, авто-прокрутка к текущему ходу, маркер исхода',
+        'Превью партии (на главной) — больше не показывает «N ходов» с off-by-one и захардкоженной русской подписью',
+        'Фикс: «зависшие» партии (когда комната удалена, но запись в games таблице осталась) больше не появляются в списке активных',
+        'Полировка: rated по умолчанию во всех способах создания игры, единообразно',
+        'Версия обновлена до v0.12.4',
+      ],
+      en: [
+        'View Games → Archive now loads upfront, the count "Archive (N)" is visible without opening the tab',
+        'Player profile → Games modal rebuilt: two tabs "Active / Finished" with counts + filter "this player only / all players"',
+        '"Rated stats" label added to the lobby profile card and the My Profile modal',
+        'Analysis: game phase ("place a marble, remove a ring, capture") and active-player highlight on desktop now follow the variant, not the live game',
+        'Local move history matches the online one: single-line horizontal scroll, auto-scroll to the current move, outcome marker',
+        'Mini game preview no longer shows "N moves" with an off-by-one and a hard-coded Russian label',
+        'Fix: stuck games (server room deleted but the games table entry stayed) no longer appear in the active list',
+        'Polish: rated by default consistently across all game creation paths',
+        'Version updated to v0.12.4',
+      ],
+      eo: [
+        'Vidi ludojn → Arkivo nun ŝargiĝas tuj, la kalkulilo «Arkivo (N)» videblas sen malfermi la langeton',
+        'Modalo «Ludoj» en ludanta profilo refarita: du langetoj «Aktivaj / Finitaj» kun kalkuliloj + filtrilo «nur ĉi tiu ludanto / ĉiuj ludantoj»',
+        'Etikedo «Taksata statistiko» aldonita al la profilkarto en vestiblo kaj al la modalo «Mia profilo»',
+        'Analizo: ludofazo («meti globon, forigi ringon, kapti») kaj reliefigo de aktiva ludanto sur komputilo nun sekvas la varianton, ne la vivan ludon',
+        'Loka movhistorio konformas al la reta: unu linio kun horizontala rulumado, aŭtomata rulumo al la nuna movo, rezultmarko',
+        'Miniaturo de ludo ne plu montras «N movoj» kun erara kalkulo kaj malmolkodita rusa etikedo',
+        'Riparo: blokitaj partioj (kiam ĉambro forigita, sed enskribo en tabelo games restis) ne plu aperas en aktiva listo',
+        'Polurado: taksata defaŭlte ĉie konsekvence',
+        'Versio ĝisdatigita al v0.12.4',
+      ],
+    },
+  },
+  {
     version: '0.12.0',
     date: '2026-05-13',
     changes: {

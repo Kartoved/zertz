@@ -7,11 +7,21 @@ const router = Router();
 router.get('/', authRequired, async (req, res) => {
   const userId = req.user.id;
   const username = req.user.username;
+  // For online in-progress games, ensure a matching room actually exists —
+  // otherwise the record is a phantom (room was deleted) and would show up as
+  // an "active" game forever.
   const result = await pool.query(
-    `SELECT id, player1_name, player2_name, updated_at, move_count, winner, win_type, board_size, is_online
-     FROM games
-     WHERE user_id = $1 OR (is_online = true AND (player1_name = $2 OR player2_name = $2)) OR (is_online = false AND (player1_name = $2 OR player2_name = $2))
-     ORDER BY updated_at DESC`, [userId, username]
+    `SELECT g.id, g.player1_name, g.player2_name, g.updated_at, g.move_count, g.winner, g.win_type, g.board_size, g.is_online
+       FROM games g
+      WHERE (g.user_id = $1
+             OR (g.player1_name = $2 OR g.player2_name = $2))
+        AND (
+          g.winner IS NOT NULL
+          OR g.is_online = false
+          OR EXISTS (SELECT 1 FROM rooms r WHERE r.id::text = g.id AND r.winner IS NULL)
+        )
+      ORDER BY g.updated_at DESC`,
+    [userId, username]
   );
   res.json(
     result.rows.map(row => ({
