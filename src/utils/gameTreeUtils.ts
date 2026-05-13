@@ -123,6 +123,14 @@ export function isDescendant(root: GameNode, targetId: string): boolean {
   return false;
 }
 
+// After splicing a child out of `parent.children`, call this to ensure the
+// `isMainLine` flags stay in sync: children[0] is the main line, the rest aren't.
+export function syncMainLineFlags(parent: GameNode): void {
+  for (let i = 0; i < parent.children.length; i++) {
+    parent.children[i].isMainLine = i === 0;
+  }
+}
+
 export function findDeepestMainLine(node: GameNode): GameNode {
   let current = node;
   while (current.children.length > 0) {

@@ -3,7 +3,7 @@ import { useAuthStore } from '../../store/authStore';
 import CountryBadge from '../UI/CountryBadge';
 import { normalizeCountryValue } from '../../utils/country';
 import { useI18n } from '../../i18n';
-import { getCountryOptions } from '../../utils/countries';
+import { getCountryOptions } from '../../utils/country';
 
 const SPECIAL_CHARS = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/;
 

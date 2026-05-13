@@ -181,6 +181,11 @@ export function mergeLiveTreeIntoAnalysis(analysisRoot: GameNode, liveRoot: Game
       if (matchIdx > 0) {
         const [matched] = aNode.children.splice(matchIdx, 1);
         aNode.children.unshift(matched);
+        // Sync isMainLine flags: promoted node becomes main line, others don't.
+        aNode.children[0].isMainLine = true;
+        for (let ci = 1; ci < aNode.children.length; ci++) {
+          aNode.children[ci].isMainLine = false;
+        }
       }
       aNode = aNode.children[0];
     } else {

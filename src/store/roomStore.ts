@@ -24,6 +24,7 @@ import {
   rebuildStateFromNode,
   findDeepestMainLine,
   findNodeAndParent,
+  syncMainLineFlags,
 } from '../utils/gameTreeUtils';
 import {
   injectPremovesIntoTree,
@@ -149,19 +150,42 @@ function syncWinnerFromRoom(state: GameState, winnerNum: number | null): GameSta
   return patched;
 }
 
-// Defensive: if a server-saved state has phase='placement' while captures are
-// actually mandatory, fix it before the UI uses it. This guards against
-// pre-move auto-execution storing a stale phase from rebuildStateFromNode.
-// Clones the input so the network response object is left untouched.
-// (Only promotes 'placement' → 'capture'; never demotes — server is trusted
-// for 'capture' states even if no chains are visible locally.)
+// Defensive phase normalizer applied to every state that arrives from the server.
+// Fixes two known cases where the server can send a stale phase:
+//
+//  1. phase='placement' but captures are mandatory (pre-move auto-execute bug):
+//     promote to 'capture'.
+//
+//  2. phase='ringRemoval' but no rings are actually removable (can happen when
+//     the board state makes every adjacent ring occupied/invalid at the moment
+//     the premove was saved, or when the server auto-executes a premove step
+//     whose preceding placeMarble call left no free rings):
+//     advance to 'placement' + flip currentPlayer + increment moveNumber, i.e.
+//     execute the implicit skipRingRemoval.
+//
+// Clones only when a patch is needed; returns the original reference otherwise.
 function normalizePhaseForCaptures(state: GameState): GameState {
-  if (state.winner || state.phase === 'gameOver' || state.phase === 'ringRemoval') return state;
+  if (state.winner || state.phase === 'gameOver') return state;
+
+  if (state.phase === 'ringRemoval') {
+    const validRings = getValidRemovableRings(state.rings);
+    if (validRings.length === 0) {
+      const patched = cloneState(state);
+      patched.pendingPlacement = null;
+      patched.phase = 'placement';
+      patched.currentPlayer = patched.currentPlayer === 'player1' ? 'player2' : 'player1';
+      patched.moveNumber++;
+      return patched;
+    }
+    return state;
+  }
+
   if (state.phase === 'placement' && hasAvailableCaptures(state)) {
     const patched = cloneState(state);
     patched.phase = 'capture';
     return patched;
   }
+
   return state;
 }
 
@@ -447,6 +471,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
           selectedMarbleColor: null,
           selectedRingId: null,
           highlightedCaptures: [],
+          availableCaptureChains: [],
           rated: room.rated,
           user1Rating: room.user1Rating,
           user2Rating: room.user2Rating,
@@ -567,7 +592,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       if (winner) playWinSound();
 
       const newNode = addMoveToTree(currentNode, move, state.currentPlayer, state.moveNumber, state.boardSize);
-      set({ state: newState, currentNode: newNode, selectedMarbleColor: null, selectedRingId: null, winType: winType ?? null });
+      set({ state: newState, currentNode: newNode, selectedMarbleColor: null, selectedRingId: null, highlightedCaptures: [], availableCaptureChains: [], winType: winType ?? null });
 
       if (!needsRingRemoval) {
         const winnerNum = winner === 'player1' ? 1 : winner === 'player2' ? 2 : null;
@@ -609,7 +634,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       playRemoveRingSound();
       if (winner) playWinSound();
 
-      set({ state: newState, selectedRingId: null, winType: winType ?? null });
+      set({ state: newState, selectedRingId: null, highlightedCaptures: [], availableCaptureChains: [], winType: winType ?? null });
 
       const winnerNum = winner === 'player1' ? 1 : winner === 'player2' ? 2 : null;
       const currentPlayerNum = newState.currentPlayer === 'player1' ? 1 : 2;
@@ -679,6 +704,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       const idx = parentNode.children.indexOf(startOfTurn);
       if (idx >= 0) {
         parentNode.children.splice(idx, 1);
+        syncMainLineFlags(parentNode);
       }
 
       const newState = rebuildStateFromNode(parentNode, state.boardSize);

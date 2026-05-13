@@ -304,11 +304,9 @@ export function getAvailableMoves(state: GameState): {
   captures?: CaptureMove[];
   placements?: { ringId: string; colors: MarbleColor[] }[];
 } {
-  if (hasAvailableCaptures(state)) {
-    return {
-      type: 'capture',
-      captures: getAvailableCaptures(state),
-    };
+  const captures = getAvailableCaptures(state);
+  if (captures.length > 0) {
+    return { type: 'capture', captures };
   }
   
   const emptyRings = getEmptyRings(state);

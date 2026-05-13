@@ -26,6 +26,7 @@ import {
   findNodeAndParent,
   isDescendant,
   formatGameId,
+  syncMainLineFlags,
 } from '../utils/gameTreeUtils';
 import { BotLevel, BotMove } from '../ai/minimax';
 
@@ -309,6 +310,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const idx = parent.children.indexOf(node);
     if (idx >= 0) {
       parent.children.splice(idx, 1);
+      syncMainLineFlags(parent);
     }
 
     const shouldRewind = isDescendant(node, currentNode.id);
