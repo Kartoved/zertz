@@ -23,6 +23,47 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.14.0',
+    date: '2026-05-14',
+    changes: {
+      ru: [
+        'Безопасность: закрыты auth-дыры в серверных роутах; состояние партии теперь верифицируется на сервере через replay-движок — фальсификация захватов или победы невозможна',
+        'Рейтинг: победа по таймауту теперь корректно обновляет Glicko-2; идемпотентная защита от двойного начисления',
+        'Поллинг: HEAD-запрос перед полным fetch — ~90% запросов в ожидающих партиях стали лёгкими; глобальный чат пагинирован (последние 50 + кнопка «ранее»)',
+        'Очередь матчмейкинга перенесена из памяти процесса в БД — выживает при перезапуске сервера',
+        'Rate limiting на авторизацию, ходы и создание комнат',
+        'Фикс: выбор ветки в цепочке взятий — теперь всегда выбирается правильная цепочка при развилке',
+        'Фикс: зависание в фазе «удаление кольца» если колец нет — авто-пропуск',
+        'Фикс: победа по таймауту корректно отражается в рейтинге',
+        'Множество мелких исправлений: подсветки взятий, ID нод дерева, сброс состояния после хода',
+        'Версия обновлена до v0.14.0',
+      ],
+      en: [
+        'Security: auth holes in server routes closed; game state is now verified server-side via replay engine — faking captures or a win is no longer possible',
+        'Rating: timeout wins now correctly update Glicko-2; idempotent guard against double rating',
+        'Polling: HEAD request before full fetch — ~90% of requests in waiting games are now lightweight; global chat paginated (last 50 + load earlier)',
+        'Matchmaking queue moved from process memory to DB — survives server restarts',
+        'Rate limiting on auth, moves and room creation',
+        'Fix: capture chain branch selection — correct chain always chosen at a fork',
+        'Fix: stuck ring-removal phase when no rings are available — auto-skip',
+        'Fix: timeout win now reflected in player ratings',
+        'Many small fixes: capture highlights, node IDs, state reset after moves',
+        'Version updated to v0.14.0',
+      ],
+      eo: [
+        'Sekureco: fermitaj aŭtentikigaj truoj en servilaj vojoj; ludstato nun kontrolata servile per ripeto — falsigi kaptojn aŭ venkon ne plu eblas',
+        'Rangotaksado: venko per tempolimo nun ĝuste ĝisdatigas Glicko-2',
+        'Balotado: HEAD-peto antaŭ plena alŝuto — ~90% petoj en atendantaj ludoj nun estas malpezaj; tutmonda babilejo paginita',
+        'Atendovico de paro translokita el procezmemoro al datumbazo',
+        'Indiclimigoj sur aŭtentikigo, movoj kaj kreado de ĉambroj',
+        'Riparo: elekto de branĉo en kaptovico — ĉiam elektiĝas ĝusta ĉeno ĉe disbranĉiĝo',
+        'Riparo: blokiĝo en fazo «forigi ringon» kiam neniu ringo haveblas — aŭtomata preteriro',
+        'Multaj malgrandaj riparoj: reliefiĝoj de kaptoj, nodaj IDoj, restarigo de stato post movo',
+        'Versio ĝisdatigita al v0.14.0',
+      ],
+    },
+  },
+  {
     version: '0.12.4',
     date: '2026-05-13',
     changes: {
