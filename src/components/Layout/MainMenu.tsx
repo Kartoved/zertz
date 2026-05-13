@@ -276,6 +276,16 @@ export default function MainMenu() {
               </div>
             )}
           </div>
+
+          {/* NEWS — top-level tab, links to /blog */}
+          <button
+            onClick={() => navigate('/blog')}
+            className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors
+              text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700
+              hover:text-gray-900 dark:hover:text-white uppercase tracking-wide"
+          >
+            {t.tabMainNews}
+          </button>
         </nav>
 
         <div className="flex-1" />
@@ -418,6 +428,12 @@ export default function MainMenu() {
                 {tab.label}
               </button>
             ))}
+          <button
+            onClick={() => { modals.setShowMobileMenu(false); navigate('/blog'); }}
+            className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700"
+          >
+            {t.tabMainNews}
+          </button>
           <button
             disabled
             className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold text-gray-400 dark:text-gray-500 bg-gray-100 dark:bg-gray-700 cursor-not-allowed"

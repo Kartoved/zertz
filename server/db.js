@@ -260,6 +260,15 @@ async function ensureSchema() {
     EXCEPTION WHEN others THEN NULL;
     END $$;
   `);
+
+  // Blog announcements: tracks which posts have already been pushed to global
+  // chat so re-runs of the announce script don't duplicate.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS blog_announced (
+      slug TEXT PRIMARY KEY,
+      announced_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+  `);
 }
 
 export { pool, ensureSchema };

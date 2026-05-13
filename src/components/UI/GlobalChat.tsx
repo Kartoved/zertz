@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { getGlobalChatMessages, sendGlobalChatMessage, GlobalChatMessage } from '../../db/globalChatApi';
 import { getPlayerStats, PlayerStats } from '../../db/authApi';
 import PlayerProfileModal from '../Auth/PlayerProfileModal';
+import { tryRenderSystemBody, isSystemActor } from './SystemMessageCard';
 
 const MAX_STORED_MESSAGES = 200;
 
@@ -134,26 +135,44 @@ export default function GlobalChat() {
         ) : (
           messages.map((msg) => {
             const isMe = msg.username === user?.username;
+            const isSystem = isSystemActor(msg.username);
+            const systemRender = isSystem ? tryRenderSystemBody(msg.message) : null;
             return (
               <div key={msg.id} className="flex items-start gap-2">
-                <div className="w-7 h-7 rounded-full bg-teal-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                  {msg.username.charAt(0).toUpperCase()}
-                </div>
+                {isSystem ? (
+                  <div className="w-7 h-7 rounded-full bg-amber-500 flex items-center justify-center text-white text-xs flex-shrink-0">
+                    📢
+                  </div>
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-teal-500 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                    {msg.username.charAt(0).toUpperCase()}
+                  </div>
+                )}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setSelectedUserId(msg.userId)}
-                      className={`text-xs font-semibold hover:underline ${isMe ? 'text-teal-600 dark:text-teal-400' : 'text-gray-700 dark:text-gray-300'}`}
-                    >
-                      {msg.username}
-                    </button>
+                    {isSystem ? (
+                      <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                        {msg.username}
+                      </span>
+                    ) : (
+                      <button
+                        onClick={() => setSelectedUserId(msg.userId)}
+                        className={`text-xs font-semibold hover:underline ${isMe ? 'text-teal-600 dark:text-teal-400' : 'text-gray-700 dark:text-gray-300'}`}
+                      >
+                        {msg.username}
+                      </button>
+                    )}
                     <span className="text-xs text-gray-400 dark:text-gray-500">
                       {formatTime(msg.createdAt)}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-800 dark:text-gray-200 break-words">
-                    {msg.message}
-                  </p>
+                  {systemRender ? (
+                    <div className="mt-1">{systemRender.node}</div>
+                  ) : (
+                    <p className="text-sm text-gray-800 dark:text-gray-200 break-words">
+                      {msg.message}
+                    </p>
+                  )}
                 </div>
               </div>
             );

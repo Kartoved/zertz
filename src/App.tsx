@@ -6,6 +6,8 @@ import GameScreen from './components/Layout/GameScreen';
 import Rules from './components/Layout/Rules';
 import { RoomScreen } from './components/Online/RoomScreen';
 import MagicLinkPage from './components/Auth/MagicLinkPage';
+import BlogList from './components/Blog/BlogList';
+import BlogPostPage from './components/Blog/BlogPostPage';
 
 function LocalApp() {
   const { screen, initPush } = useUIStore();
@@ -30,6 +32,8 @@ function App() {
         <Route path="/" element={<LocalApp />} />
         <Route path="/room/:roomId" element={<RoomScreen />} />
         <Route path="/magic" element={<MagicLinkPage />} />
+        <Route path="/blog" element={<BlogList />} />
+        <Route path="/blog/:slug" element={<BlogPostPage />} />
       </Routes>
     </BrowserRouter>
   );
