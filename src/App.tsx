@@ -32,8 +32,8 @@ function App() {
         <Route path="/" element={<LocalApp />} />
         <Route path="/room/:roomId" element={<RoomScreen />} />
         <Route path="/magic" element={<MagicLinkPage />} />
-        <Route path="/blog" element={<BlogList />} />
-        <Route path="/blog/:slug" element={<BlogPostPage />} />
+        <Route path="/news" element={<BlogList />} />
+        <Route path="/news/:slug" element={<BlogPostPage />} />
       </Routes>
     </BrowserRouter>
   );

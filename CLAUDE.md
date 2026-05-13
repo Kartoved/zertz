@@ -72,6 +72,13 @@ Unit tests live in `src/game/GameEngine.test.ts` (Vitest). Playwright is install
 - `version.ts` — app version constant
 - `sw.js` — service worker (PWA caching)
 
+**News / blog** (`src/blog/`, `src/components/Blog/`, `blog/`):
+- Posts live as Markdown files in `blog/*.md` at project root. Frontmatter is YAML-lite (slug, date, tags, version, title.{ru,en,eo}, pinned, announce, cover); body is split into per-locale sections by `# ru` / `# en` / `# eo` headings.
+- `src/blog/parse.ts` parses one file; `loader.ts` uses Vite `import.meta.glob('/blog/*.md', { query: '?raw', eager: true })` to bundle every post at build time. No runtime fetch.
+- UI is reached via the top-level **NEWS** nav button (route `/news`, post detail `/news/:slug`). Labels in `src/locales/*.ts` use `t.blog` (= "News" / "Новости" / "Novaĵoj"); the URL deliberately matches the label, the on-disk folder is named `blog/` for historical reasons.
+- Rendering uses `react-markdown` + Tailwind Typography (`prose` classes).
+- WhatsNewModal still keeps its own TS array for legacy changelog auto-show on version bump — not migrated to MD yet.
+
 **Localization** (`src/locales/`) — TypeScript objects, three languages: `ru`, `en`, `eo`.
 
 ### Shared (`shared/`)
@@ -114,6 +121,10 @@ Express app with JWT auth middleware. All routes under `/api`, static `dist/` se
 - `glicko2.js` — standalone Glicko-2 rating implementation
 - `mailer.js` — email sending (used for magic link auth)
 - `pushNotifications.js` — server-side Web Push delivery
+
+`server/scripts/`:
+- `backfillExplorer.js` — one-shot indexer for finished games into `position_moves` / `position_games`
+- `announceBlog.js` — pushes blog posts into global chat as system messages from the username **"Zertz System"** (`user_id = NULL`, body `[BLOG_POST]<slug>|<title>`). Idempotent via the `blog_announced` table (slug PK). Run as `npm run blog:announce`; flags: `--slug=X` (force one post), `--dry-run`, `--list`. The `tryRenderSystemBody()` helper in `src/components/UI/SystemMessageCard.tsx` recognises the `[BLOG_POST]...` body and renders a clickable amber card linking to `/news/<slug>`.
 
 ### Conventions worth remembering
 
