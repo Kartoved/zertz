@@ -101,8 +101,11 @@ export function isDescendant(root: GameNode, targetId: string): boolean {
 }
 
 export function findDeepestMainLine(node: GameNode): GameNode {
-  if (node.children.length === 0) return node;
-  return findDeepestMainLine(node.children[0]);
+  let current = node;
+  while (current.children.length > 0) {
+    current = current.children[0];
+  }
+  return current;
 }
 
 export function formatGameId(timestamp: number): string {

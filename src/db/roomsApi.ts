@@ -74,6 +74,13 @@ export async function createRoom(
   return data.id;
 }
 
+export async function getRoomHead(id: number | string): Promise<{ updatedAt: number; winner: number | null } | null> {
+  const response = await fetch(`${API_BASE}/api/rooms/${id}/head`);
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error('Failed to get room head');
+  return response.json();
+}
+
 export async function getRoom(id: number | string): Promise<{
   state: GameState;
   tree: GameNode;

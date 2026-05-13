@@ -391,11 +391,19 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     if (!roomId || pendingMoveCount > 0) return;
 
     try {
+      // Fast path: check only updatedAt before pulling the full blob.
+      const head = await roomsApi.getRoomHead(roomId);
+      if (!head) return;
+      if (pendingMoveCount > 0) return;
+
+      const { lastUpdated, myPlayer: myP } = get();
+      if (head.updatedAt <= lastUpdated) return; // nothing changed
+
       const room = await roomsApi.getRoom(roomId);
       if (!room || pendingMoveCount > 0) return;
 
-      // Re-read lastUpdated after fetch to avoid stale comparison
-      const { lastUpdated, myPlayer: myP } = get();
+      // Re-check after the full fetch: a concurrent handlePlacement could have
+      // updated lastUpdated in the store between the HEAD call and now.
       if (room.updatedAt > lastUpdated) {
         const prevWinner = get().state.winner;
         const syncedState = normalizePhaseForCaptures(syncWinnerFromRoom(room.state, room.winner));
@@ -500,7 +508,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     if (!myPlayer) return;
     const myPlayerStr = myPlayer === 1 ? 'player1' : 'player2';
     if (state.currentPlayer !== myPlayerStr) return; // Not my turn
-    set({ selectedMarbleColor: color, selectedRingId: null, highlightedCaptures: [] });
+    set({ selectedMarbleColor: color, selectedRingId: null, highlightedCaptures: [], availableCaptureChains: [] });
   },
 
   selectRing: (ringId) => {

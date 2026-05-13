@@ -275,6 +275,31 @@ router.get('/active/:username', async (req, res) => {
   })));
 });
 
+// Lightweight "did anything change?" check used by pollRoom to skip a full
+// fetch when the room is unchanged. Returns { updatedAt, winner } only.
+// Must be defined before /:id so Express doesn't match "head" as an id.
+router.get('/:id/head', async (req, res) => {
+  const { id } = req.params;
+  try {
+    const result = await pool.query(
+      'SELECT updated_at, winner FROM rooms WHERE id = $1',
+      [id]
+    );
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'Room not found' });
+      return;
+    }
+    const row = result.rows[0];
+    res.json({
+      updatedAt: row.updated_at.getTime(),
+      winner: row.winner,
+    });
+  } catch (err) {
+    console.error('Error getting room head:', err);
+    res.status(500).json({ error: 'Failed to get room head' });
+  }
+});
+
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
   try {
@@ -352,16 +377,19 @@ router.get('/:id', async (req, res) => {
       }
     }
 
-    // Fetch user ratings if users are associated
+    // Fetch both player ratings in one query.
     let user1Rating = null;
     let user2Rating = null;
-    if (row.user1_id) {
-      const u = await pool.query('SELECT rating FROM users WHERE id = $1', [row.user1_id]);
-      if (u.rows.length > 0) user1Rating = Math.round(u.rows[0].rating);
-    }
-    if (row.user2_id) {
-      const u = await pool.query('SELECT rating FROM users WHERE id = $1', [row.user2_id]);
-      if (u.rows.length > 0) user2Rating = Math.round(u.rows[0].rating);
+    const playerIds = [row.user1_id, row.user2_id].filter(Boolean);
+    if (playerIds.length > 0) {
+      const uRatings = await pool.query(
+        'SELECT id, rating FROM users WHERE id = ANY($1::int[])',
+        [playerIds]
+      );
+      for (const u of uRatings.rows) {
+        if (String(u.id) === String(row.user1_id)) user1Rating = Math.round(u.rating);
+        if (String(u.id) === String(row.user2_id)) user2Rating = Math.round(u.rating);
+      }
     }
 
     const ratingDelta = (row.rating1_before != null && row.rating1_after != null) ? {

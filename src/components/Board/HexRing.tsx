@@ -32,11 +32,9 @@ export default function HexRing({
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log('[HexRing.handleClick]', { ringId: ring.id, hasOnClick: !!onClick });
-    
+
     // In online mode, always use the passed onClick handler
     if (onClick) {
-      console.log('[HexRing] calling onClick', ring.id);
       onClick(ring.id);
       return;
     }
