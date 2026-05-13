@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRoomStore } from '../../store/roomStore';
 import { useI18n } from '../../i18n';
+import { GameNode } from '../../game/types';
 
 interface ChatPanelProps {
   inputBottomOffset?: number;
@@ -8,7 +9,11 @@ interface ChatPanelProps {
 
 export function ChatPanel({ inputBottomOffset = 0 }: ChatPanelProps) {
   const { t, locale } = useI18n();
-  const { messages, playerNames, myPlayer, sendMessage, state, undoLastMove } = useRoomStore();
+  const {
+    messages, playerNames, myPlayer, sendMessage, state, undoLastMove,
+    gameTree, navigateToNode,
+    isAnalyzing, analysisGameTree, analysisNavigateToNode,
+  } = useRoomStore();
   const [text, setText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -64,6 +69,27 @@ export function ChatPanel({ inputBottomOffset = 0 }: ChatPanelProps) {
     return `Move ${num}`;
   };
 
+  // Walk the main line and return the deepest node whose moveNumber ≤ target.
+  const findNodeByMoveNumber = useCallback((root: GameNode, target: number): GameNode => {
+    let node = root;
+    while (node.children.length > 0) {
+      const next = node.children[0];
+      if (next.moveNumber > target) break;
+      node = next;
+    }
+    return node;
+  }, []);
+
+  const handleMoveBadgeClick = useCallback((msgMoveNumber: number) => {
+    // msg.moveNumber === state.moveNumber at send time; the board position at
+    // that moment is represented by the node with moveNumber = msgMoveNumber - 1.
+    const target = msgMoveNumber - 1;
+    const activeTree = isAnalyzing && analysisGameTree ? analysisGameTree : gameTree;
+    const activeNavigate = isAnalyzing ? analysisNavigateToNode : navigateToNode;
+    const node = findNodeByMoveNumber(activeTree, target);
+    activeNavigate(node);
+  }, [isAnalyzing, analysisGameTree, gameTree, analysisNavigateToNode, navigateToNode, findNodeByMoveNumber]);
+
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-800 rounded-lg shadow-md">
       <div className="p-3 border-b border-gray-200 dark:border-gray-700">
@@ -92,9 +118,14 @@ export function ChatPanel({ inputBottomOffset = 0 }: ChatPanelProps) {
                   </span>
                   <span className="text-xs text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
                     {msg.moveNumber !== undefined && (
-                      <span className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded">
+                      <button
+                        type="button"
+                        onClick={() => handleMoveBadgeClick(msg.moveNumber!)}
+                        className="bg-gray-100 dark:bg-gray-700 px-1.5 py-0.5 rounded hover:bg-indigo-100 dark:hover:bg-indigo-900/50 hover:text-indigo-700 dark:hover:text-indigo-300 transition-colors cursor-pointer"
+                        title={locale === 'ru' ? 'Перейти к этой позиции' : 'Go to this position'}
+                      >
                         {getMoveLabel(msg.moveNumber)}
-                      </span>
+                      </button>
                     )}
                     <span>{formatDate(msg.createdAt)} {formatTime(msg.createdAt)}</span>
                   </span>
