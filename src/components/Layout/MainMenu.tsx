@@ -746,7 +746,7 @@ export default function MainMenu() {
           {/* Footer */}
           <div className="mt-3 text-xs text-gray-400 dark:text-gray-500 text-center leading-5">
             <div>
-              <span>v{APP_VERSION}</span>
+              <span>v{APP_VERSION} <span className="text-amber-500 dark:text-amber-400 font-medium">beta</span></span>
               <span className="mx-2">·</span>
               <span>{t.developedBy}</span>
             </div>
