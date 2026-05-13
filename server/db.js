@@ -269,6 +269,28 @@ async function ensureSchema() {
       announced_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
   `);
+
+  // Matchmaking queue — survives server restarts and supports multiple instances.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS matchmaking_queue (
+      user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      board_size  INTEGER NOT NULL,
+      time_control TEXT NOT NULL,
+      rating      REAL NOT NULL,
+      state_json  TEXT NOT NULL,
+      tree_json   TEXT NOT NULL,
+      joined_at   TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  // Matchmaking results — temporary holding area until the client polls /status.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS matchmaking_results (
+      user_id     INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+      room_id     INTEGER NOT NULL REFERENCES rooms(id) ON DELETE CASCADE,
+      matched_at  TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+  `);
 }
 
 export { pool, ensureSchema };

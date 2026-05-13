@@ -1,6 +1,5 @@
 import { Ring } from '../../game/types';
 import { useGameStore } from '../../store/gameStore';
-import { getCaptureChains } from '../../game/GameEngine';
 
 interface HexRingProps {
   ring: Ring;
@@ -27,7 +26,7 @@ export default function HexRing({
   isValidPlacement,
   onClick,
 }: HexRingProps) {
-  const { selectRing, handleCapture, state, selectedRingId } = useGameStore();
+  const { selectRing, handleCapture, selectedRingId, availableCaptureChains } = useGameStore();
   
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -39,11 +38,9 @@ export default function HexRing({
       return;
     }
     
-    // Local mode - use gameStore. Match the chain whose *terminal* landing
-    // equals the clicked ring so branching chains can be picked unambiguously.
+    // Local mode — use pre-computed chains from the store (set by selectRing).
     if (isCaptureTarget && selectedRingId) {
-      const chains = getCaptureChains(state, selectedRingId);
-      const fullChain = chains.find(c => c[c.length - 1].to === ring.id);
+      const fullChain = availableCaptureChains.find(c => c[c.length - 1].to === ring.id);
       if (fullChain) {
         handleCapture(fullChain);
       }

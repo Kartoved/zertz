@@ -118,21 +118,25 @@ export function getRingBehind(
   return behind && !behind.isRemoved ? behindId : null;
 }
 
-export function createBoard(size: BoardSize = 37): Map<string, Ring> {
+const boardTemplateCache = new Map<BoardSize, Map<string, Ring>>();
+
+function getBoardTemplate(size: BoardSize): Map<string, Ring> {
+  if (boardTemplateCache.has(size)) return boardTemplateCache.get(size)!;
   const rings = new Map<string, Ring>();
-  const coords = BOARD_COORDS_BY_SIZE[size];
-  
-  for (const coord of coords) {
+  for (const coord of BOARD_COORDS_BY_SIZE[size]) {
     const id = coordToId(coord.q, coord.r);
-    rings.set(id, {
-      id,
-      q: coord.q,
-      r: coord.r,
-      marble: null,
-      isRemoved: false,
-    });
+    rings.set(id, { id, q: coord.q, r: coord.r, marble: null, isRemoved: false });
   }
-  
+  boardTemplateCache.set(size, rings);
+  return rings;
+}
+
+export function createBoard(size: BoardSize = 37): Map<string, Ring> {
+  const template = getBoardTemplate(size);
+  const rings = new Map<string, Ring>();
+  for (const [id, ring] of template) {
+    rings.set(id, { ...ring });
+  }
   return rings;
 }
 

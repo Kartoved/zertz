@@ -15,6 +15,12 @@ import gamesRouter from './routes/games.js';
 import pushRouter from './routes/push.js';
 import lobbyRouter from './routes/lobby.js';
 import explorerRouter from './routes/explorer.js';
+import {
+  authLimiter,
+  chatLimiter,
+  moveLimiter,
+  createRoomLimiter,
+} from './middleware/rateLimits.js';
 
 dotenv.config();
 
@@ -30,16 +36,16 @@ app.get('/api/health', async (_req, res) => {
 });
 
 // Mount route modules
-app.use('/api/auth', authRouter);
+app.use('/api/auth', authLimiter, authRouter);
 app.use('/api/players', playersRouter);
 app.use('/api/follows', followsRouter);
 app.use('/api/challenges', challengesRouter);
 app.use('/api/matchmake', matchmakingRouter);
-app.use('/api/rooms', roomsRouter);
-app.use('/api/global-chat', chatRouter);
+app.use('/api/rooms', roomsRouter);          // per-route limiters applied inside
+app.use('/api/global-chat', chatLimiter, chatRouter);
 app.use('/api/games', gamesRouter);
 app.use('/api/push', pushRouter);
-app.use('/api/lobby', lobbyRouter);
+app.use('/api/lobby', createRoomLimiter, lobbyRouter);
 app.use('/api/explorer', explorerRouter);
 
 // Serve static files

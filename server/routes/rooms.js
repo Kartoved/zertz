@@ -5,6 +5,7 @@ import { glicko2Update } from '../utils/glicko2.js';
 import { sendPushToUser } from '../utils/pushNotifications.js';
 import { indexRoom } from '../explorer.js';
 import { verifySubmittedState } from '../utils/verifyState.js';
+import { moveLimiter, createRoomLimiter, chatLimiter } from '../middleware/rateLimits.js';
 
 // Fire-and-forget indexer call. We never want explorer-side errors to block
 // the API response, but we still want to know if it failed.
@@ -147,7 +148,7 @@ router.get('/open', async (req, res) => {
 });
 
 // Create a new room
-router.post('/', optionalAuth, async (req, res) => {
+router.post('/', createRoomLimiter, optionalAuth, async (req, res) => {
   const {
     boardSize = 37,
     creatorPlayer = 1,
@@ -428,7 +429,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Update room state (after each move)
-router.put('/:id/state', authRequired, async (req, res) => {
+router.put('/:id/state', moveLimiter, authRequired, async (req, res) => {
   const { id } = req.params;
   const { stateJson, treeJson, currentPlayer, winner, winType, isUndo } = req.body;
 
@@ -912,7 +913,7 @@ router.get('/:id/messages', async (req, res) => {
 
 // Send chat message to a room — only seated players may post, and the
 // playerIndex is derived from the authenticated user (never trusted from body).
-router.post('/:id/messages', authRequired, async (req, res) => {
+router.post('/:id/messages', chatLimiter, authRequired, async (req, res) => {
   const { id } = req.params;
   const { message, moveNumber } = req.body;
 

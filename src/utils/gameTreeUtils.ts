@@ -1,6 +1,7 @@
 import { GameNode, GameState, Move, Player } from '../game/types';
 import {
   createInitialState,
+  cloneState,
   placeMarble,
   removeRing,
   skipRingRemoval,
@@ -50,7 +51,20 @@ export function addMoveToTree(
   return newNode;
 }
 
+// Cache of fully-replayed states keyed by their GameNode. WeakMap so entries
+// are automatically evicted when nodes are GC'd (e.g. after undo). Callers
+// that mutate a node after creation (applyRingRemoval patches removedRingId)
+// must call invalidateNodeStateCache to keep entries consistent.
+const nodeStateCache = new WeakMap<GameNode, GameState>();
+
+export function invalidateNodeStateCache(node: GameNode): void {
+  nodeStateCache.delete(node);
+}
+
 export function rebuildStateFromNode(targetNode: GameNode, boardSize: 37 | 48 | 61): GameState {
+  const cached = nodeStateCache.get(targetNode);
+  if (cached) return cloneState(cached);
+
   const nextState = createInitialState(boardSize);
   const moves: GameNode[] = [];
 
@@ -74,6 +88,15 @@ export function rebuildStateFromNode(targetNode: GameNode, boardSize: 37 | 48 | 
       executeCapture(nextState, captures);
     }
   }
+
+  // Only cache nodes whose move is fully committed (placement has removedRingId
+  // resolved, or is a capture). Root node (move === null) is always the same.
+  const move = targetNode.move;
+  const isCommitted =
+    move === null ||
+    move.type === 'capture' ||
+    (move.type === 'placement' && move.data.removedRingId !== null);
+  if (isCommitted) nodeStateCache.set(targetNode, cloneState(nextState));
 
   return nextState;
 }

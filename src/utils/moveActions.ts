@@ -11,6 +11,7 @@ import {
   hasAvailableCaptures,
 } from '../game/GameEngine';
 import { getValidRemovableRings } from '../game/Board';
+import { invalidateNodeStateCache } from './gameTreeUtils';
 
 // Normalizes state.phase based on mandatory captures. Mutates in place.
 //
@@ -93,8 +94,11 @@ export function applyRingRemoval(
   const isolated = removeRing(newState, ringId);
   if (isolated === false) return null;
 
-  // Update the existing tree node (shared pattern in both stores)
+  // Update the existing tree node (shared pattern in both stores).
+  // The node is mutated here, so evict its stale cache entry before it can be
+  // re-cached with the now-complete move data.
   if (currentNode.move?.type === 'placement') {
+    invalidateNodeStateCache(currentNode);
     currentNode.move.data.removedRingId = ringId;
     if (isolated.length > 0) currentNode.move.data.isolatedCaptures = isolated;
     currentNode.notation = moveToNotation(currentNode.move, state.boardSize);
