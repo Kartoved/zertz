@@ -170,6 +170,7 @@ export const ru = {
   collapseChat: 'Свернуть чат',
   chat: 'Чат',
   noMessagesYet: 'Пока нет сообщений',
+  loadEarlierMessages: 'Загрузить ранние сообщения',
   messagePlaceholder: 'Сообщение...',
   gameOver: 'Партия завершена',
   gameRulesTitle: 'Правила игры ZERTZ',

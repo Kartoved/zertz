@@ -1,7 +1,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { useI18n } from '../../i18n';
 import { useAuthStore } from '../../store/authStore';
-import { getGlobalChatMessages, sendGlobalChatMessage, GlobalChatMessage } from '../../db/globalChatApi';
+import {
+  getGlobalChatMessages,
+  getGlobalChatMessagesBefore,
+  sendGlobalChatMessage,
+  GlobalChatMessage,
+} from '../../db/globalChatApi';
 import { getPlayerStats, PlayerStats } from '../../db/authApi';
 import PlayerProfileModal from '../Auth/PlayerProfileModal';
 import { tryRenderSystemBody, isSystemActor } from './SystemMessageCard';
@@ -15,9 +20,12 @@ export default function GlobalChat() {
   const [text, setText] = useState('');
   const [messages, setMessages] = useState<GlobalChatMessage[]>([]);
   const [lastMessageId, setLastMessageId] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [stats, setStats] = useState<PlayerStats>({ total: 0, online: 0 });
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,11 +43,11 @@ export default function GlobalChat() {
 
     const loadInitial = async () => {
       try {
-        const initial = await getGlobalChatMessages();
-        if (!cancelled && Array.isArray(initial)) {
-          const trimmed = initial.slice(-MAX_STORED_MESSAGES);
-          setMessages(trimmed);
-          setLastMessageId(trimmed.length > 0 ? trimmed[trimmed.length - 1].id : 0);
+        const page = await getGlobalChatMessages();
+        if (!cancelled) {
+          setMessages(page.messages);
+          setHasMore(page.hasMore);
+          setLastMessageId(page.messages.length > 0 ? page.messages[page.messages.length - 1].id : 0);
         }
       } catch {
         // ignore initial load errors
@@ -47,19 +55,16 @@ export default function GlobalChat() {
     };
 
     loadInitial();
-
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, []);
 
   useEffect(() => {
     const interval = setInterval(async () => {
       try {
-        const fresh = await getGlobalChatMessages(lastMessageId || undefined);
-        if (fresh.length > 0) {
-          setMessages((prev) => [...prev, ...fresh].slice(-MAX_STORED_MESSAGES));
-          setLastMessageId(fresh[fresh.length - 1].id);
+        const page = await getGlobalChatMessages(lastMessageId || undefined);
+        if (page.messages.length > 0) {
+          setMessages((prev) => [...prev, ...page.messages].slice(-MAX_STORED_MESSAGES));
+          setLastMessageId(page.messages[page.messages.length - 1].id);
         }
       } catch {
         // ignore polling errors
@@ -68,6 +73,29 @@ export default function GlobalChat() {
 
     return () => clearInterval(interval);
   }, [lastMessageId]);
+
+  const handleLoadMore = async () => {
+    if (!messages.length || loadingMore) return;
+    const oldestId = messages[0].id;
+    const container = scrollContainerRef.current;
+    const prevScrollHeight = container?.scrollHeight ?? 0;
+    setLoadingMore(true);
+    try {
+      const page = await getGlobalChatMessagesBefore(oldestId);
+      setMessages(prev => [...page.messages, ...prev].slice(-MAX_STORED_MESSAGES));
+      setHasMore(page.hasMore);
+      // Restore scroll position so the view doesn't jump to top.
+      requestAnimationFrame(() => {
+        if (container) {
+          container.scrollTop = container.scrollHeight - prevScrollHeight;
+        }
+      });
+    } catch {
+      // ignore load-more errors
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   useEffect(() => {
     const scroll = () => {
@@ -127,7 +155,18 @@ export default function GlobalChat() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
+      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
+        {hasMore && (
+          <div className="text-center">
+            <button
+              onClick={handleLoadMore}
+              disabled={loadingMore}
+              className="text-xs text-blue-600 dark:text-blue-400 hover:underline disabled:opacity-50"
+            >
+              {loadingMore ? '…' : t.loadEarlierMessages}
+            </button>
+          </div>
+        )}
         {messages.length === 0 ? (
           <p className="text-gray-400 dark:text-gray-500 text-sm text-center py-8">
             {t.noMessagesYet}

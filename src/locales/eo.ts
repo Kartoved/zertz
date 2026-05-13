@@ -170,6 +170,7 @@ export const eo = {
   collapseChat: 'Faldi babilejon',
   chat: 'Babilejo',
   noMessagesYet: 'Ankoraŭ neniuj mesaĝoj',
+  loadEarlierMessages: 'Ŝarĝi pli fruajn mesaĝojn',
   messagePlaceholder: 'Mesaĝo...',
   gameOver: 'Partio finiĝis',
   gameRulesTitle: 'Reguloj de ZERTZ',

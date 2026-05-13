@@ -467,8 +467,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   },
 
   pollMessages: async () => {
-    const { roomId, lastMessageId } = get();
-    if (!roomId) return;
+    const { roomId, lastMessageId, state } = get();
+    if (!roomId || state.winner) return;
 
     try {
       const newMessages = await roomsApi.getChatMessages(roomId, lastMessageId);
@@ -531,17 +531,18 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     if (state.phase === 'capture' && ring.marble) {
       const chains = getCaptureChains(state, ringId);
       if (chains.length > 0) {
-        // Highlight only the *terminal* landing of each chain (Zertz forces a
-        // chain to be played to its end). This also disambiguates branching:
-        // each chain has a unique terminal `to`, so a click commits to a
-        // specific branch instead of executing the first chain that happens
-        // to pass through the clicked ring.
         set({
           selectedRingId: ringId,
           highlightedCaptures: chains.map(c => c[c.length - 1]),
           availableCaptureChains: chains,
         });
+      } else {
+        // Marble has no captures from here — clear stale highlights.
+        set({ selectedRingId: null, highlightedCaptures: [], availableCaptureChains: [] });
       }
+    } else if (state.phase === 'capture' && !ring.marble) {
+      // Empty ring clicked during capture phase — clear selection.
+      set({ selectedRingId: null, highlightedCaptures: [], availableCaptureChains: [] });
     } else if (state.phase === 'placement' && !ring.marble) {
       set({ selectedRingId: ringId, highlightedCaptures: [] });
     }

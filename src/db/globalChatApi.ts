@@ -8,16 +8,23 @@ export interface GlobalChatMessage {
   createdAt: number;
 }
 
-export async function getGlobalChatMessages(afterId?: number): Promise<GlobalChatMessage[]> {
+export interface GlobalChatPage {
+  messages: GlobalChatMessage[];
+  hasMore: boolean;
+}
+
+export async function getGlobalChatMessages(afterId?: number): Promise<GlobalChatPage> {
   const url = afterId
     ? `${API_BASE}/api/global-chat?after=${afterId}`
     : `${API_BASE}/api/global-chat`;
-
   const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error('Failed to fetch global chat messages');
-  }
+  if (!response.ok) throw new Error('Failed to fetch global chat messages');
+  return response.json();
+}
 
+export async function getGlobalChatMessagesBefore(beforeId: number): Promise<GlobalChatPage> {
+  const response = await fetch(`${API_BASE}/api/global-chat?before=${beforeId}`);
+  if (!response.ok) throw new Error('Failed to fetch earlier messages');
   return response.json();
 }
 
@@ -27,10 +34,6 @@ export async function sendGlobalChatMessage(message: string): Promise<GlobalChat
     headers: authHeaders(),
     body: JSON.stringify({ message }),
   });
-
-  if (!response.ok) {
-    throw new Error('Failed to send global chat message');
-  }
-
+  if (!response.ok) throw new Error('Failed to send global chat message');
   return response.json();
 }

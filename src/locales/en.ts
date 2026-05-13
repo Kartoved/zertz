@@ -170,6 +170,7 @@ export const en = {
   collapseChat: 'Collapse chat',
   chat: 'Chat',
   noMessagesYet: 'No messages yet',
+  loadEarlierMessages: 'Load earlier messages',
   messagePlaceholder: 'Message...',
   gameOver: 'Game finished',
   gameRulesTitle: 'ZERTZ Game Rules',

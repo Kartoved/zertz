@@ -61,17 +61,21 @@ export function computeAnalysisRingSelection(
 
   if (analysisState.phase === 'capture' && ring.marble) {
     const chains = getCaptureChains(analysisState, ringId);
-    if (chains.length === 0) return null;
-    // Terminal-only highlighting so each chain is uniquely selectable by its
-    // landing (chains may share intermediate `to`s when they branch).
-    return {
-      selectedRingId: ringId,
-      highlightedCaptures: chains.map(c => c[c.length - 1]),
-      availableCaptureChains: chains,
-    };
+    if (chains.length > 0) {
+      return {
+        selectedRingId: ringId,
+        highlightedCaptures: chains.map(c => c[c.length - 1]),
+        availableCaptureChains: chains,
+      };
+    }
+    // Marble with no captures — clear stale highlights.
+    return { selectedRingId: null, highlightedCaptures: [], availableCaptureChains: [] };
+  }
+  if (analysisState.phase === 'capture' && !ring.marble) {
+    // Empty ring clicked during capture phase — clear selection.
+    return { selectedRingId: null, highlightedCaptures: [], availableCaptureChains: [] };
   }
   if (analysisState.phase === 'placement' && !ring.marble) {
-    // Preserve original behavior: do not clear availableCaptureChains here.
     return { selectedRingId: ringId, highlightedCaptures: [] };
   }
   return null;

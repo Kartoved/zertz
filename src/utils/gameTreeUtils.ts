@@ -38,7 +38,7 @@ export function addMoveToTree(
   boardSize: 37 | 48 | 61
 ): GameNode {
   const newNode: GameNode = {
-    id: `${moveNumber}-${Date.now()}`,
+    id: crypto.randomUUID(),
     moveNumber,
     player,
     move,
