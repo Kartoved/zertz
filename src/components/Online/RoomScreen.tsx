@@ -479,14 +479,17 @@ export function RoomScreen() {
         effectiveHandleRingRemoval(ringId);
       }
     } else if (boardState.phase === 'capture') {
-      if (selectedRingId && highlightedCaptures.some(c => c.to === ringId)) {
-        const chain = availableCaptureChains.find(chain =>
-          chain.some(c => c.to === ringId)
-        );
+      // Match the chain whose *terminal* landing equals the clicked ring.
+      // Chains share an intermediate `to` when they branch — only the terminal
+      // is unique per chain, so matching there disambiguates the user's intent.
+      if (selectedRingId) {
+        const chain = availableCaptureChains.find(c => c[c.length - 1].to === ringId);
         if (chain) {
           effectiveHandleCapture(chain);
+          return;
         }
-      } else if (ring.marble) {
+      }
+      if (ring.marble) {
         effectiveSelectRing(ringId);
       }
     } else if (boardState.phase === 'placement') {

@@ -1,5 +1,5 @@
 import { GameState, GameNode } from '../game/types';
-import { API_BASE, authHeaders, jsonHeaders, serializeState, deserializeState, serializeTree, deserializeTree } from './apiClient';
+import { API_BASE, authHeaders, serializeState, deserializeState, serializeTree, deserializeTree } from './apiClient';
 
 export interface RatingDelta {
   player1: { before: number; after: number; delta: number };
@@ -138,7 +138,7 @@ export async function updateRoomState(
   currentPlayer: 1 | 2,
   winner: number | null,
   winType: string | null,
-  playerIndex?: 1 | 2,
+  _playerIndex?: 1 | 2, // server derives from auth; kept for call-site compatibility
   isUndo?: boolean
 ): Promise<{ ratingDelta: RatingDelta | null }> {
   const response = await fetch(`${API_BASE}/api/rooms/${id}/state`, {
@@ -150,7 +150,6 @@ export async function updateRoomState(
       currentPlayer,
       winner,
       winType,
-      playerIndex,
       isUndo: isUndo ?? false,
     }),
   });
@@ -170,7 +169,7 @@ export async function updatePlayerName(
 ): Promise<void> {
   const response = await fetch(`${API_BASE}/api/rooms/${roomId}/players/${playerIndex}`, {
     method: 'PUT',
-    headers: jsonHeaders(),
+    headers: authHeaders(),
     body: JSON.stringify({ name }),
   });
 
@@ -198,14 +197,14 @@ export async function getChatMessages(
 
 export async function sendChatMessage(
   roomId: number | string,
-  playerIndex: 1 | 2,
+  _playerIndex: 1 | 2, // server derives from auth; arg kept for call-site compatibility
   message: string,
   moveNumber?: number
 ): Promise<ChatMessage> {
   const response = await fetch(`${API_BASE}/api/rooms/${roomId}/messages`, {
     method: 'POST',
-    headers: jsonHeaders(),
-    body: JSON.stringify({ playerIndex, message, moveNumber }),
+    headers: authHeaders(),
+    body: JSON.stringify({ message, moveNumber }),
   });
 
   if (!response.ok) {
@@ -269,8 +268,14 @@ export async function getOpenRooms(): Promise<PendingRoom[]> {
 }
 
 export async function deleteRoom(id: number | string): Promise<void> {
-  const response = await fetch(`${API_BASE}/api/rooms/${id}`, { method: 'DELETE' });
-  if (!response.ok) throw new Error('Failed to delete room');
+  const response = await fetch(`${API_BASE}/api/rooms/${id}`, {
+    method: 'DELETE',
+    headers: authHeaders(false),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to delete room');
+  }
 }
 
 export async function getActiveRoomsForPlayer(username: string): Promise<Array<{

@@ -164,9 +164,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
       if (ring?.marble) {
         const chains = getCaptureChains(state, ringId);
         if (chains.length > 0) {
+          // Terminal-only highlighting — see roomStore.selectRing for rationale.
           set({
             selectedRingId: ringId,
-            highlightedCaptures: chains.flat(),
+            highlightedCaptures: chains.map(c => c[c.length - 1]),
+            availableCaptureChains: chains,
           });
         }
       }

@@ -20,39 +20,60 @@ import { indexGameTree } from '../shared/explorer/indexer.js';
  * reason } on a no-op.
  */
 export async function indexRoom(pool, roomId) {
-  const result = await pool.query(
-    `SELECT id, board_size, tree_json, user1_id, user2_id, winner, explorer_indexed_at
-       FROM rooms WHERE id = $1`,
-    [roomId]
-  );
-  if (result.rowCount === 0) return { indexed: false, reason: 'not_found' };
-  const room = result.rows[0];
-
-  if (room.explorer_indexed_at) return { indexed: false, reason: 'already_indexed' };
-  if (!room.winner || room.winner === 0) return { indexed: false, reason: 'no_winner' };
-
-  let tree;
-  try {
-    tree = JSON.parse(room.tree_json);
-  } catch {
-    return { indexed: false, reason: 'bad_tree_json' };
-  }
-
-  const entries = indexGameTree(tree, room.board_size);
-  if (entries.length === 0) {
-    // Mark as indexed anyway so we don't re-process empty trees forever.
-    await pool.query(`UPDATE rooms SET explorer_indexed_at = NOW() WHERE id = $1`, [roomId]);
-    return { indexed: true, entries: 0 };
-  }
-
-  const winnerNum = room.winner; // 1 or 2
-  const p1Win = winnerNum === 1 ? 1 : 0;
-  const p2Win = winnerNum === 2 ? 1 : 0;
-  const draw = (winnerNum !== 1 && winnerNum !== 2) ? 1 : 0;
-
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
+
+    // Atomically claim the indexing slot in one statement: only the first
+    // caller to flip explorer_indexed_at from NULL succeeds. Concurrent
+    // callers see rowCount === 0 and bail out cleanly. The UPDATE happens
+    // inside the transaction, so any INSERT failure rolls back the claim too
+    // and the row becomes eligible for retry.
+    const claim = await client.query(
+      `UPDATE rooms
+          SET explorer_indexed_at = NOW()
+        WHERE id = $1
+          AND explorer_indexed_at IS NULL
+          AND winner IS NOT NULL
+          AND winner <> 0
+       RETURNING id, board_size, tree_json, user1_id, user2_id, winner`,
+      [roomId]
+    );
+
+    if (claim.rowCount === 0) {
+      await client.query('ROLLBACK');
+      // Distinguish "nothing to do" from "actually missing" for the caller.
+      const probe = await pool.query(
+        `SELECT explorer_indexed_at, winner FROM rooms WHERE id = $1`,
+        [roomId]
+      );
+      if (probe.rowCount === 0) return { indexed: false, reason: 'not_found' };
+      if (probe.rows[0].explorer_indexed_at != null) return { indexed: false, reason: 'already_indexed' };
+      return { indexed: false, reason: 'no_winner' };
+    }
+
+    const room = claim.rows[0];
+
+    let tree;
+    try {
+      tree = JSON.parse(room.tree_json);
+    } catch {
+      await client.query('ROLLBACK');
+      return { indexed: false, reason: 'bad_tree_json' };
+    }
+
+    const entries = indexGameTree(tree, room.board_size);
+    if (entries.length === 0) {
+      // Empty tree — keep the claim so we don't reprocess.
+      await client.query('COMMIT');
+      return { indexed: true, entries: 0 };
+    }
+
+    const winnerNum = room.winner; // 1 or 2
+    const p1Win = winnerNum === 1 ? 1 : 0;
+    const p2Win = winnerNum === 2 ? 1 : 0;
+    const draw = (winnerNum !== 1 && winnerNum !== 2) ? 1 : 0;
+
     for (const e of entries) {
       const moveJson = JSON.stringify(e.move);
 
@@ -82,10 +103,6 @@ export async function indexRoom(pool, roomId) {
       );
     }
 
-    await client.query(
-      `UPDATE rooms SET explorer_indexed_at = NOW() WHERE id = $1`,
-      [room.id]
-    );
     await client.query('COMMIT');
     return { indexed: true, entries: entries.length };
   } catch (err) {

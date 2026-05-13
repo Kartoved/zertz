@@ -4,6 +4,7 @@ import { authRequired, optionalAuth } from '../middleware/auth.js';
 import { glicko2Update } from '../utils/glicko2.js';
 import { sendPushToUser } from '../utils/pushNotifications.js';
 import { indexRoom } from '../explorer.js';
+import { verifySubmittedState } from '../utils/verifyState.js';
 
 // Fire-and-forget indexer call. We never want explorer-side errors to block
 // the API response, but we still want to know if it failed.
@@ -11,6 +12,77 @@ function fireExplorerIndex(roomId) {
   indexRoom(pool, roomId).catch(err => {
     console.error(`[explorer] indexRoom(${roomId}) failed:`, err);
   });
+}
+
+// Applies Glicko-2 to a finished rated room. Idempotent: uses
+// `rating1_after IS NULL` as a guard so concurrent callers can't double-rate
+// (the second caller's `UPDATE rooms ... WHERE rating1_after IS NULL` will
+// affect 0 rows and skip the rest).
+//
+// Returns the rating delta object or null when no rating change applied
+// (unrated room, missing seats, already rated, or any error).
+async function applyGlickoForFinishedRoom(roomId, winnerNum) {
+  if (winnerNum !== 1 && winnerNum !== 2) return null;
+  try {
+    const roomRow = await pool.query(
+      'SELECT rated, user1_id, user2_id, rating1_after FROM rooms WHERE id = $1',
+      [roomId]
+    );
+    const room = roomRow.rows[0];
+    if (!room) return null;
+    if (!room.rated || !room.user1_id || !room.user2_id) return null;
+    if (room.rating1_after != null) return null; // already rated
+
+    const u1Row = await pool.query(
+      'SELECT id, rating, rating_rd, rating_vol, wins, losses, current_streak, best_streak FROM users WHERE id = $1',
+      [room.user1_id]
+    );
+    const u2Row = await pool.query(
+      'SELECT id, rating, rating_rd, rating_vol, wins, losses, current_streak, best_streak FROM users WHERE id = $1',
+      [room.user2_id]
+    );
+    const u1 = u1Row.rows[0];
+    const u2 = u2Row.rows[0];
+    if (!u1 || !u2) return null;
+
+    const score1 = winnerNum === 1 ? 1 : 0;
+    const score2 = winnerNum === 2 ? 1 : 0;
+
+    const new1 = glicko2Update(u1.rating, u1.rating_rd, u1.rating_vol, u2.rating, u2.rating_rd, score1);
+    const new2 = glicko2Update(u2.rating, u2.rating_rd, u2.rating_vol, u1.rating, u1.rating_rd, score2);
+
+    // Idempotency guard: only the first caller stamps rating1_after.
+    const claim = await pool.query(
+      `UPDATE rooms
+         SET rating1_before=$2, rating2_before=$3, rating1_after=$4, rating2_after=$5
+       WHERE id=$1 AND rating1_after IS NULL
+       RETURNING id`,
+      [roomId, Math.round(u1.rating), Math.round(u2.rating), new1.rating, new2.rating]
+    );
+    if (claim.rowCount === 0) return null; // someone else got here first
+
+    const streak1 = winnerNum === 1 ? u1.current_streak + 1 : 0;
+    const best1 = Math.max(u1.best_streak, streak1);
+    await pool.query(
+      `UPDATE users SET rating=$2, rating_rd=$3, rating_vol=$4, wins=wins+$5, losses=losses+$6, current_streak=$7, best_streak=$8 WHERE id=$1`,
+      [u1.id, new1.rating, new1.rd, new1.vol, score1, score2, streak1, best1]
+    );
+
+    const streak2 = winnerNum === 2 ? u2.current_streak + 1 : 0;
+    const best2 = Math.max(u2.best_streak, streak2);
+    await pool.query(
+      `UPDATE users SET rating=$2, rating_rd=$3, rating_vol=$4, wins=wins+$5, losses=losses+$6, current_streak=$7, best_streak=$8 WHERE id=$1`,
+      [u2.id, new2.rating, new2.rd, new2.vol, score2, score1, streak2, best2]
+    );
+
+    return {
+      player1: { before: Math.round(u1.rating), after: new1.rating, delta: new1.rating - Math.round(u1.rating) },
+      player2: { before: Math.round(u2.rating), after: new2.rating, delta: new2.rating - Math.round(u2.rating) },
+    };
+  } catch (err) {
+    console.error('Glicko update error:', err);
+    return null;
+  }
 }
 
 const router = Router();
@@ -233,6 +305,9 @@ router.get('/:id', async (req, res) => {
 
       if (remaining <= 0) {
         const winner = movingPlayer === 1 ? 2 : 1;
+        // `AND winner IS NULL` makes the timeout transition atomic — two
+        // concurrent readers racing to detect the same timeout won't both
+        // flip the row and won't both trigger explorer indexing / Glicko.
         const timeoutResult = await pool.query(
           `UPDATE rooms
              SET winner = $2,
@@ -242,7 +317,7 @@ router.get('/:id', async (req, res) => {
                  clock_p2_ms = $5,
                  clock_running_since = NULL,
                  updated_at = NOW()
-           WHERE id = $1
+           WHERE id = $1 AND winner IS NULL
            RETURNING *`,
           [
             id,
@@ -255,6 +330,24 @@ router.get('/:id', async (req, res) => {
         if (timeoutResult.rows.length > 0) {
           row = timeoutResult.rows[0];
           fireExplorerIndex(id);
+          // Apply Glicko for timed games — without this, a player losing on
+          // time would skip the rating update entirely.
+          await applyGlickoForFinishedRoom(id, winner);
+          // Re-fetch ratings columns now that they may have been stamped.
+          const refreshed = await pool.query(
+            `SELECT rating1_before, rating1_after, rating2_before, rating2_after FROM rooms WHERE id = $1`,
+            [id]
+          );
+          if (refreshed.rows.length > 0) {
+            row.rating1_before = refreshed.rows[0].rating1_before;
+            row.rating1_after = refreshed.rows[0].rating1_after;
+            row.rating2_before = refreshed.rows[0].rating2_before;
+            row.rating2_after = refreshed.rows[0].rating2_after;
+          }
+        } else {
+          // Another reader already flipped the row — pull the up-to-date copy.
+          const refreshed = await pool.query('SELECT * FROM rooms WHERE id = $1', [id]);
+          if (refreshed.rows.length > 0) row = refreshed.rows[0];
         }
       }
     }
@@ -307,12 +400,13 @@ router.get('/:id', async (req, res) => {
 });
 
 // Update room state (after each move)
-router.put('/:id/state', optionalAuth, async (req, res) => {
+router.put('/:id/state', authRequired, async (req, res) => {
   const { id } = req.params;
-  const { stateJson, treeJson, currentPlayer, winner, winType, playerIndex, isUndo } = req.body;
+  const { stateJson, treeJson, currentPlayer, winner, winType, isUndo } = req.body;
 
   const roomCheck = await pool.query(
     `SELECT
+      board_size,
       current_player,
       winner,
       user1_id,
@@ -339,23 +433,35 @@ router.put('/:id/state', optionalAuth, async (req, res) => {
     return;
   }
 
-  // Turn enforcement: validate the submitting player matches the room's current_player
-  if (playerIndex) {
-    try {
-      const authUserId = req.user ? req.user.id : null;
-      const seatUserId = playerIndex === 1 ? room.user1_id : room.user2_id;
+  // Derive playerIndex from the authenticated user's seat — never trust the body.
+  const authUserId = Number(req.user.id);
+  let playerIndex = null;
+  if (room.user1_id && Number(room.user1_id) === authUserId) playerIndex = 1;
+  else if (room.user2_id && Number(room.user2_id) === authUserId) playerIndex = 2;
 
-      if (!authUserId || !seatUserId || Number(authUserId) !== Number(seatUserId)) {
-        res.status(403).json({ error: 'Нельзя ходить за другого игрока' });
-        return;
-      }
-      if (room.current_player !== playerIndex) {
-        res.status(403).json({ error: 'Не ваш ход' });
-        return;
-      }
-    } catch (err) {
-      console.error('Turn check error:', err);
-    }
+  if (!playerIndex) {
+    res.status(403).json({ error: 'Нельзя ходить за другого игрока' });
+    return;
+  }
+  if (room.current_player !== playerIndex) {
+    res.status(403).json({ error: 'Не ваш ход' });
+    return;
+  }
+
+  // Verify that the client-submitted state matches what we'd derive by replaying
+  // the tree on the server. Prevents tampering with captures/winner/etc on the
+  // way to a rated outcome.
+  const verifyResult = verifySubmittedState({
+    stateJson,
+    treeJson,
+    boardSize: room.board_size,
+    winType,
+    playerIndex,
+  });
+  if (!verifyResult.ok) {
+    console.warn(`[rooms] state verification failed for room ${id}, player ${playerIndex}: ${verifyResult.reason}`);
+    res.status(400).json({ error: 'Состояние не прошло проверку', reason: verifyResult.reason });
+    return;
   }
 
   let nextWinner = winner;
@@ -464,53 +570,7 @@ router.put('/:id/state', optionalAuth, async (req, res) => {
 
   // Glicko-2 rating update for rated games when winner is determined (not for cancelled games)
   if (nextWinner && nextWinType !== 'cancelled') {
-    try {
-      const roomRow = await pool.query('SELECT rated, user1_id, user2_id FROM rooms WHERE id = $1', [id]);
-      const room = roomRow.rows[0];
-      if (room && room.rated && room.user1_id && room.user2_id) {
-        const u1Row = await pool.query('SELECT id, rating, rating_rd, rating_vol, wins, losses, current_streak, best_streak FROM users WHERE id = $1', [room.user1_id]);
-        const u2Row = await pool.query('SELECT id, rating, rating_rd, rating_vol, wins, losses, current_streak, best_streak FROM users WHERE id = $1', [room.user2_id]);
-        const u1 = u1Row.rows[0];
-        const u2 = u2Row.rows[0];
-
-        if (u1 && u2) {
-          const score1 = nextWinner === 1 ? 1 : 0;
-          const score2 = nextWinner === 2 ? 1 : 0;
-
-          const new1 = glicko2Update(u1.rating, u1.rating_rd, u1.rating_vol, u2.rating, u2.rating_rd, score1);
-          const new2 = glicko2Update(u2.rating, u2.rating_rd, u2.rating_vol, u1.rating, u1.rating_rd, score2);
-
-          // Store before/after ratings in room
-          await pool.query(
-            `UPDATE rooms SET rating1_before=$2, rating2_before=$3, rating1_after=$4, rating2_after=$5 WHERE id=$1`,
-            [id, Math.round(u1.rating), Math.round(u2.rating), new1.rating, new2.rating]
-          );
-
-          // Update player 1
-          const streak1 = nextWinner === 1 ? u1.current_streak + 1 : 0;
-          const best1 = Math.max(u1.best_streak, streak1);
-          await pool.query(
-            `UPDATE users SET rating=$2, rating_rd=$3, rating_vol=$4, wins=wins+$5, losses=losses+$6, current_streak=$7, best_streak=$8 WHERE id=$1`,
-            [u1.id, new1.rating, new1.rd, new1.vol, score1, score2, streak1, best1]
-          );
-
-          // Update player 2
-          const streak2 = nextWinner === 2 ? u2.current_streak + 1 : 0;
-          const best2 = Math.max(u2.best_streak, streak2);
-          await pool.query(
-            `UPDATE users SET rating=$2, rating_rd=$3, rating_vol=$4, wins=wins+$5, losses=losses+$6, current_streak=$7, best_streak=$8 WHERE id=$1`,
-            [u2.id, new2.rating, new2.rd, new2.vol, score2, score1, streak2, best2]
-          );
-
-          ratingDelta = {
-            player1: { before: Math.round(u1.rating), after: new1.rating, delta: new1.rating - Math.round(u1.rating) },
-            player2: { before: Math.round(u2.rating), after: new2.rating, delta: new2.rating - Math.round(u2.rating) },
-          };
-        }
-      }
-    } catch (err) {
-      console.error('Glicko update error:', err);
-    }
+    ratingDelta = await applyGlickoForFinishedRoom(id, nextWinner);
   }
 
   // Try to auto-execute a conditional pre-move for the player whose turn just started.
@@ -708,8 +768,8 @@ async function tryAutoExecutePremove(roomId, ownerPlayer, opponentPlayer) {
   return true;
 }
 
-// Update player name
-router.put('/:id/players/:index', async (req, res) => {
+// Update player name — only the user sitting in that seat may rename it.
+router.put('/:id/players/:index', authRequired, async (req, res) => {
   const { id, index } = req.params;
   const { name } = req.body;
   const playerIndex = parseInt(index, 10);
@@ -718,11 +778,34 @@ router.put('/:id/players/:index', async (req, res) => {
     res.status(400).json({ error: 'Invalid player index' });
     return;
   }
+  if (typeof name !== 'string' || !name.trim()) {
+    res.status(400).json({ error: 'Invalid name' });
+    return;
+  }
+
+  const seatResult = await pool.query(
+    `SELECT user1_id, user2_id FROM rooms WHERE id = $1`,
+    [id]
+  );
+  if (seatResult.rows.length === 0) {
+    res.status(404).json({ error: 'Room not found' });
+    return;
+  }
+  const { user1_id, user2_id } = seatResult.rows[0];
+  const seatOwner = playerIndex === 1 ? user1_id : user2_id;
+  const authUserId = Number(req.user.id);
+  // Allow the seat owner to rename; also allow claiming a name on an empty seat
+  // (used by createRoom / joinRoom flows before user1_id/user2_id is set).
+  if (seatOwner != null && Number(seatOwner) !== authUserId) {
+    res.status(403).json({ error: 'Это место занято другим игроком' });
+    return;
+  }
 
   const column = playerIndex === 1 ? 'player1_name' : 'player2_name';
+  const cleanName = name.trim().slice(0, 64);
   await pool.query(
     `UPDATE rooms SET ${column} = $2, updated_at = NOW() WHERE id = $1`,
-    [id, name]
+    [id, cleanName]
   );
 
   res.json({ ok: true });
@@ -799,27 +882,48 @@ router.get('/:id/messages', async (req, res) => {
   })));
 });
 
-// Send chat message to a room
-router.post('/:id/messages', async (req, res) => {
+// Send chat message to a room — only seated players may post, and the
+// playerIndex is derived from the authenticated user (never trusted from body).
+router.post('/:id/messages', authRequired, async (req, res) => {
   const { id } = req.params;
-  const { playerIndex, message, moveNumber } = req.body;
+  const { message, moveNumber } = req.body;
 
-  if (!message || (playerIndex !== 1 && playerIndex !== 2)) {
-    res.status(400).json({ error: 'Invalid message or player' });
+  if (typeof message !== 'string' || !message.trim()) {
+    res.status(400).json({ error: 'Invalid message' });
     return;
   }
+
+  const seatResult = await pool.query(
+    `SELECT user1_id, user2_id FROM rooms WHERE id = $1`,
+    [id]
+  );
+  if (seatResult.rows.length === 0) {
+    res.status(404).json({ error: 'Room not found' });
+    return;
+  }
+  const { user1_id, user2_id } = seatResult.rows[0];
+  const authUserId = Number(req.user.id);
+  const playerIndex =
+    user1_id && Number(user1_id) === authUserId ? 1 :
+    user2_id && Number(user2_id) === authUserId ? 2 : null;
+  if (!playerIndex) {
+    res.status(403).json({ error: 'Только участники игры могут писать в чат' });
+    return;
+  }
+
+  const cleanMessage = String(message).trim().slice(0, 500);
 
   const result = await pool.query(
     `INSERT INTO chat_messages (room_id, player_index, message, move_number)
      VALUES ($1, $2, $3, $4)
      RETURNING id, created_at`,
-    [id, playerIndex, message, moveNumber]
+    [id, playerIndex, cleanMessage, moveNumber]
   );
 
   res.json({
     id: result.rows[0].id,
     playerIndex,
-    message,
+    message: cleanMessage,
     moveNumber,
     createdAt: result.rows[0].created_at.getTime(),
   });
@@ -877,9 +981,39 @@ router.post('/:id/cancel', authRequired, async (req, res) => {
   res.json({ ok: true });
 });
 
-// Delete room (and any linked saved game so it doesn't linger in "current games")
-router.delete('/:id', async (req, res) => {
+// Delete room (and any linked saved game so it doesn't linger in "current games").
+// Auth required: only a seated user may delete, and only when the game has not
+// actually started — i.e. one seat is still empty, OR the game is already
+// finished. In-progress games must use /:id/cancel or finish naturally.
+router.delete('/:id', authRequired, async (req, res) => {
   const { id } = req.params;
+  const authUserId = Number(req.user.id);
+
+  const roomResult = await pool.query(
+    'SELECT user1_id, user2_id, winner FROM rooms WHERE id = $1',
+    [id]
+  );
+  if (roomResult.rows.length === 0) {
+    res.json({ ok: true }); // idempotent — already gone
+    return;
+  }
+  const { user1_id, user2_id, winner } = roomResult.rows[0];
+
+  const isParticipant =
+    (user1_id && Number(user1_id) === authUserId) ||
+    (user2_id && Number(user2_id) === authUserId);
+  if (!isParticipant) {
+    res.status(403).json({ error: 'Только участники могут удалить комнату' });
+    return;
+  }
+
+  const opponentJoined = user1_id != null && user2_id != null;
+  const gameFinished = winner != null;
+  if (opponentJoined && !gameFinished) {
+    res.status(400).json({ error: 'Игра уже идёт — используйте отмену или сдачу' });
+    return;
+  }
+
   await pool.query('DELETE FROM rooms WHERE id = $1', [id]);
   await pool.query('DELETE FROM games WHERE id = $1', [String(id)]);
   res.json({ ok: true });

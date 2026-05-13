@@ -41,18 +41,12 @@ export default function HexRing({
       return;
     }
     
-    // Local mode - use gameStore
+    // Local mode - use gameStore. Match the chain whose *terminal* landing
+    // equals the clicked ring so branching chains can be picked unambiguously.
     if (isCaptureTarget && selectedRingId) {
       const chains = getCaptureChains(state, selectedRingId);
-      // Find the longest chain that ends at this ring (mandatory full capture)
-      const matchingChains = chains.filter(chain => 
-        chain.some(c => c.to === ring.id)
-      );
-      if (matchingChains.length > 0) {
-        // Get the full chain - must capture to the end
-        const fullChain = matchingChains.reduce((longest, current) => 
-          current.length > longest.length ? current : longest
-        );
+      const fullChain = chains.find(c => c[c.length - 1].to === ring.id);
+      if (fullChain) {
         handleCapture(fullChain);
       }
       return;

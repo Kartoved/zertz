@@ -519,9 +519,14 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     if (state.phase === 'capture' && ring.marble) {
       const chains = getCaptureChains(state, ringId);
       if (chains.length > 0) {
+        // Highlight only the *terminal* landing of each chain (Zertz forces a
+        // chain to be played to its end). This also disambiguates branching:
+        // each chain has a unique terminal `to`, so a click commits to a
+        // specific branch instead of executing the first chain that happens
+        // to pass through the clicked ring.
         set({
           selectedRingId: ringId,
-          highlightedCaptures: chains.flat(),
+          highlightedCaptures: chains.map(c => c[c.length - 1]),
           availableCaptureChains: chains,
         });
       }
