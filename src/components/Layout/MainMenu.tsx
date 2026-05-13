@@ -293,14 +293,6 @@ export default function MainMenu() {
 
           {user && (
             <>
-              {/* Friends/Players */}
-              <button
-                className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                title={t.friends}
-                onClick={() => modals.handleNavTab('players')}
-              >
-                <Users size={20} />
-              </button>
               {/* Challenges */}
               <button
                 className={`relative p-2 rounded-lg transition-colors ${incomingChallengesCount > 0 ? 'text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'}`}
@@ -313,6 +305,14 @@ export default function MainMenu() {
                     {incomingChallengesCount}
                   </span>
                 )}
+              </button>
+              {/* Friends/Players */}
+              <button
+                className="p-2 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                title={t.friends}
+                onClick={() => modals.handleNavTab('players')}
+              >
+                <Users size={20} />
               </button>
             </>
           )}
