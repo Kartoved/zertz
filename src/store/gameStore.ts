@@ -170,7 +170,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
             highlightedCaptures: chains.map(c => c[c.length - 1]),
             availableCaptureChains: chains,
           });
+        } else {
+          // Marble with no valid captures — clear any stale selection.
+          set({ selectedRingId: null, highlightedCaptures: [], availableCaptureChains: [] });
         }
+      } else {
+        // Clicked empty ring during mandatory-capture phase — clear selection.
+        set({ selectedRingId: null, highlightedCaptures: [], availableCaptureChains: [] });
       }
       return;
     }

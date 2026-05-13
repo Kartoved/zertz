@@ -231,49 +231,59 @@ router.get('/active', async (req, res) => {
     where += ' AND (player1_name = $1 OR player2_name = $1)';
     params.push(username);
   }
-  const result = await pool.query(
-    `SELECT id, board_size, player1_name, player2_name, updated_at
-       FROM rooms
-       ${where}
-      ORDER BY updated_at DESC
-      LIMIT 100`,
-    params
-  );
-  res.json(result.rows.map(r => ({
-    id: String(r.id),
-    playerNames: { player1: r.player1_name, player2: r.player2_name },
-    updatedAt: r.updated_at.getTime(),
-    moveCount: 0,
-    winner: null,
-    winType: null,
-    boardSize: r.board_size,
-    isOnline: true,
-  })));
+  try {
+    const result = await pool.query(
+      `SELECT id, board_size, player1_name, player2_name, updated_at
+         FROM rooms
+         ${where}
+        ORDER BY updated_at DESC
+        LIMIT 100`,
+      params
+    );
+    res.json(result.rows.map(r => ({
+      id: String(r.id),
+      playerNames: { player1: r.player1_name, player2: r.player2_name },
+      updatedAt: r.updated_at.getTime(),
+      moveCount: 0,
+      winner: null,
+      winType: null,
+      boardSize: r.board_size,
+      isOnline: true,
+    })));
+  } catch (err) {
+    console.error('Get active rooms error:', err);
+    res.status(500).json({ error: 'Failed to get active rooms' });
+  }
 });
 
 // Back-compat: /active/:username — same as /active?username=...
 router.get('/active/:username', async (req, res) => {
   const { username } = req.params;
-  const result = await pool.query(
-    `SELECT id, board_size, player1_name, player2_name, updated_at
-     FROM rooms
-     WHERE winner IS NULL
-       AND user2_id IS NOT NULL
-       AND (player1_name = $1 OR player2_name = $1)
-     ORDER BY updated_at DESC
-     LIMIT 20`,
-    [username]
-  );
-  res.json(result.rows.map(r => ({
-    id: String(r.id),
-    playerNames: { player1: r.player1_name, player2: r.player2_name },
-    updatedAt: r.updated_at.getTime(),
-    moveCount: 0,
-    winner: null,
-    winType: null,
-    boardSize: r.board_size,
-    isOnline: true,
-  })));
+  try {
+    const result = await pool.query(
+      `SELECT id, board_size, player1_name, player2_name, updated_at
+       FROM rooms
+       WHERE winner IS NULL
+         AND user2_id IS NOT NULL
+         AND (player1_name = $1 OR player2_name = $1)
+       ORDER BY updated_at DESC
+       LIMIT 20`,
+      [username]
+    );
+    res.json(result.rows.map(r => ({
+      id: String(r.id),
+      playerNames: { player1: r.player1_name, player2: r.player2_name },
+      updatedAt: r.updated_at.getTime(),
+      moveCount: 0,
+      winner: null,
+      winType: null,
+      boardSize: r.board_size,
+      isOnline: true,
+    })));
+  } catch (err) {
+    console.error('Get active rooms by username error:', err);
+    res.status(500).json({ error: 'Failed to get active rooms' });
+  }
 });
 
 // Lightweight "did anything change?" check used by pollRoom to skip a full
@@ -671,130 +681,163 @@ function movesEqual(a, b) {
 }
 
 function findDeepestMainLineNode(node) {
-  if (!node || !Array.isArray(node.children) || node.children.length === 0) return node;
-  return findDeepestMainLineNode(node.children[0]);
+  let current = node;
+  while (current && Array.isArray(current.children) && current.children.length > 0) {
+    current = current.children[0];
+  }
+  return current;
 }
 
 // Returns true if a pre-move was auto-triggered (and the room state changed).
+// Runs inside a transaction with SELECT FOR UPDATE so concurrent PUT /state
+// calls can't both fire the same pre-move.
 async function tryAutoExecutePremove(roomId, ownerPlayer, opponentPlayer) {
-  const result = await pool.query(
-    `SELECT premoves_json, tree_json, time_control_increment_ms, time_control_base_ms,
-            clock_p1_ms, clock_p2_ms, user1_id, user2_id
-     FROM rooms WHERE id = $1`,
-    [roomId]
-  );
-  if (result.rows.length === 0) return false;
-  const room = result.rows[0];
-
-  // Only correspondence games (clock resets each turn).
-  const incrementMs = Number(room.time_control_increment_ms);
-  if (incrementMs !== -1) return false;
-
-  let premoves;
+  const client = await pool.connect();
   try {
-    premoves = JSON.parse(room.premoves_json || '{}');
-  } catch {
-    return false;
-  }
-  if (!premoves || typeof premoves !== 'object') return false;
-  premoves.player1 = Array.isArray(premoves.player1) ? premoves.player1 : [];
-  premoves.player2 = Array.isArray(premoves.player2) ? premoves.player2 : [];
+    await client.query('BEGIN');
 
-  const variants = ownerPlayer === 1 ? premoves.player1 : premoves.player2;
-  if (variants.length === 0) return false;
-
-  // Extract the just-played move from the tree (last node in the main line).
-  let tree;
-  try {
-    tree = JSON.parse(room.tree_json);
-  } catch {
-    return false;
-  }
-  const lastNode = findDeepestMainLineNode(tree);
-  if (!lastNode || !lastNode.move) return false;
-
-  // Find a variant whose first step matches the just-played move.
-  let matchedIdx = -1;
-  for (let i = 0; i < variants.length; i++) {
-    const seq = variants[i].sequence;
-    if (!Array.isArray(seq) || seq.length < 2) continue;
-    if (movesEqual(seq[0].move, lastNode.move)) {
-      matchedIdx = i;
-      break;
+    const result = await client.query(
+      `SELECT premoves_json, tree_json, time_control_increment_ms, time_control_base_ms,
+              clock_p1_ms, clock_p2_ms, user1_id, user2_id
+       FROM rooms WHERE id = $1
+       FOR UPDATE`,
+      [roomId]
+    );
+    if (result.rows.length === 0) {
+      await client.query('ROLLBACK');
+      return false;
     }
+    const room = result.rows[0];
+
+    // Only correspondence games (clock resets each turn).
+    const incrementMs = Number(room.time_control_increment_ms);
+    if (incrementMs !== -1) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+
+    let premoves;
+    try {
+      premoves = JSON.parse(room.premoves_json || '{}');
+    } catch {
+      await client.query('ROLLBACK');
+      return false;
+    }
+    if (!premoves || typeof premoves !== 'object') {
+      await client.query('ROLLBACK');
+      return false;
+    }
+    premoves.player1 = Array.isArray(premoves.player1) ? premoves.player1 : [];
+    premoves.player2 = Array.isArray(premoves.player2) ? premoves.player2 : [];
+
+    const variants = ownerPlayer === 1 ? premoves.player1 : premoves.player2;
+    if (variants.length === 0) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+
+    // Extract the just-played move from the tree (last node in the main line).
+    let tree;
+    try {
+      tree = JSON.parse(room.tree_json);
+    } catch {
+      await client.query('ROLLBACK');
+      return false;
+    }
+    const lastNode = findDeepestMainLineNode(tree);
+    if (!lastNode || !lastNode.move) {
+      await client.query('ROLLBACK');
+      return false;
+    }
+
+    // Find a variant whose first step matches the just-played move.
+    let matchedIdx = -1;
+    for (let i = 0; i < variants.length; i++) {
+      const seq = variants[i].sequence;
+      if (!Array.isArray(seq) || seq.length < 2) continue;
+      if (movesEqual(seq[0].move, lastNode.move)) {
+        matchedIdx = i;
+        break;
+      }
+    }
+
+    if (matchedIdx === -1) {
+      // No variant matched — invalidate all variants of the owner.
+      if (ownerPlayer === 1) premoves.player1 = [];
+      else premoves.player2 = [];
+      await client.query('UPDATE rooms SET premoves_json = $2 WHERE id = $1', [roomId, JSON.stringify(premoves)]);
+      await client.query('COMMIT');
+      return false;
+    }
+
+    const matched = variants[matchedIdx];
+    const responseStep = matched.sequence[1];
+
+    // Refuse to auto-trigger a winning response.
+    if (responseStep.newWinner != null) {
+      if (ownerPlayer === 1) premoves.player1 = [];
+      else premoves.player2 = [];
+      await client.query('UPDATE rooms SET premoves_json = $2 WHERE id = $1', [roomId, JSON.stringify(premoves)]);
+      await client.query('COMMIT');
+      return false;
+    }
+
+    // Append the response node to the tree.
+    const responseNode = {
+      id: `auto-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      moveNumber: (lastNode.moveNumber ?? 0) + 1,
+      player: responseStep.player,
+      move: responseStep.move,
+      notation: responseStep.notation,
+      children: [],
+      parent: null,
+      isMainLine: lastNode.children.length === 0,
+    };
+    if (!Array.isArray(lastNode.children)) lastNode.children = [];
+    lastNode.children.push(responseNode);
+
+    // Advance the matched variant; drop others (now off-track).
+    const remaining = matched.sequence.slice(2);
+    const newVariants = remaining.length > 0 ? [{ id: matched.id, sequence: remaining }] : [];
+    if (ownerPlayer === 1) premoves.player1 = newVariants;
+    else premoves.player2 = newVariants;
+
+    const baseMs = Number(room.time_control_base_ms);
+    let nextClockP1 = room.clock_p1_ms == null ? baseMs : Number(room.clock_p1_ms);
+    let nextClockP2 = room.clock_p2_ms == null ? baseMs : Number(room.clock_p2_ms);
+    if (opponentPlayer === 1) nextClockP1 = baseMs;
+    else nextClockP2 = baseMs;
+
+    await client.query(
+      `UPDATE rooms SET
+         state_json = $2,
+         tree_json = $3,
+         current_player = $4,
+         clock_p1_ms = $5,
+         clock_p2_ms = $6,
+         clock_running_since = NOW(),
+         premoves_json = $7,
+         updated_at = NOW()
+       WHERE id = $1`,
+      [
+        roomId,
+        responseStep.newStateJson,
+        JSON.stringify(tree),
+        responseStep.newCurrentPlayer,
+        nextClockP1,
+        nextClockP2,
+        JSON.stringify(premoves),
+      ]
+    );
+
+    await client.query('COMMIT');
+    return true;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
   }
-
-  if (matchedIdx === -1) {
-    // No variant matched — invalidate all variants of the owner (their plan is off-track).
-    if (ownerPlayer === 1) premoves.player1 = [];
-    else premoves.player2 = [];
-    await pool.query('UPDATE rooms SET premoves_json = $2 WHERE id = $1', [roomId, JSON.stringify(premoves)]);
-    return false;
-  }
-
-  const matched = variants[matchedIdx];
-  const responseStep = matched.sequence[1];
-
-  // Refuse to auto-trigger a winning response — keep Glicko/rating updates on the
-  // user's explicit move path.
-  if (responseStep.newWinner != null) {
-    if (ownerPlayer === 1) premoves.player1 = [];
-    else premoves.player2 = [];
-    await pool.query('UPDATE rooms SET premoves_json = $2 WHERE id = $1', [roomId, JSON.stringify(premoves)]);
-    return false;
-  }
-
-  // Append a new node for the response under lastNode.
-  const responseNode = {
-    id: `auto-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    moveNumber: (lastNode.moveNumber ?? 0) + 1,
-    player: responseStep.player,
-    move: responseStep.move,
-    notation: responseStep.notation,
-    children: [],
-    parent: null,
-    isMainLine: lastNode.children.length === 0,
-  };
-  if (!Array.isArray(lastNode.children)) lastNode.children = [];
-  lastNode.children.push(responseNode);
-
-  // Advance the matched variant by 2; drop other variants (now off-track).
-  const remaining = matched.sequence.slice(2);
-  const newVariants = remaining.length > 0 ? [{ id: matched.id, sequence: remaining }] : [];
-  if (ownerPlayer === 1) premoves.player1 = newVariants;
-  else premoves.player2 = newVariants;
-
-  // Clock: in correspondence, the moving player's clock resets to base for next turn.
-  // After the auto-response, the OPPONENT moves next, so their clock resets.
-  const baseMs = Number(room.time_control_base_ms);
-  let nextClockP1 = room.clock_p1_ms == null ? baseMs : Number(room.clock_p1_ms);
-  let nextClockP2 = room.clock_p2_ms == null ? baseMs : Number(room.clock_p2_ms);
-  if (opponentPlayer === 1) nextClockP1 = baseMs;
-  else nextClockP2 = baseMs;
-
-  await pool.query(
-    `UPDATE rooms SET
-       state_json = $2,
-       tree_json = $3,
-       current_player = $4,
-       clock_p1_ms = $5,
-       clock_p2_ms = $6,
-       clock_running_since = NOW(),
-       premoves_json = $7,
-       updated_at = NOW()
-     WHERE id = $1`,
-    [
-      roomId,
-      responseStep.newStateJson,
-      JSON.stringify(tree),
-      responseStep.newCurrentPlayer,
-      nextClockP1,
-      nextClockP2,
-      JSON.stringify(premoves),
-    ]
-  );
-
-  return true;
 }
 
 // Update player name — only the user sitting in that seat may rename it.
@@ -830,14 +873,18 @@ router.put('/:id/players/:index', authRequired, async (req, res) => {
     return;
   }
 
-  const column = playerIndex === 1 ? 'player1_name' : 'player2_name';
-  const cleanName = name.trim().slice(0, 64);
-  await pool.query(
-    `UPDATE rooms SET ${column} = $2, updated_at = NOW() WHERE id = $1`,
-    [id, cleanName]
-  );
-
-  res.json({ ok: true });
+  try {
+    const column = playerIndex === 1 ? 'player1_name' : 'player2_name';
+    const cleanName = name.trim().slice(0, 64);
+    await pool.query(
+      `UPDATE rooms SET ${column} = $2, updated_at = NOW() WHERE id = $1`,
+      [id, cleanName]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Update player name error:', err);
+    res.status(500).json({ error: 'Failed to update player name' });
+  }
 });
 
 // Join room as authenticated user (assign user_id to correct slot)
@@ -851,40 +898,45 @@ router.put('/:id/join', optionalAuth, async (req, res) => {
     return;
   }
 
-  const roomResult = await pool.query('SELECT user1_id, user2_id FROM rooms WHERE id = $1', [id]);
-  if (roomResult.rows.length === 0) {
-    res.status(404).json({ error: 'Room not found' });
-    return;
+  try {
+    const roomResult = await pool.query('SELECT user1_id, user2_id FROM rooms WHERE id = $1', [id]);
+    if (roomResult.rows.length === 0) {
+      res.status(404).json({ error: 'Room not found' });
+      return;
+    }
+
+    const room = roomResult.rows[0];
+    const targetSeatUserId = playerIndex === 1 ? room.user1_id : room.user2_id;
+    const otherSeatUserId = playerIndex === 1 ? room.user2_id : room.user1_id;
+
+    if (targetSeatUserId && Number(targetSeatUserId) !== Number(userId)) {
+      res.status(409).json({ error: 'Это место уже занято' });
+      return;
+    }
+    if (otherSeatUserId && Number(otherSeatUserId) === Number(userId)) {
+      res.status(409).json({ error: 'Вы уже заняли другое место в этой комнате' });
+      return;
+    }
+
+    const col = playerIndex === 1 ? 'user1_id' : 'user2_id';
+    await pool.query(`UPDATE rooms SET ${col} = $2 WHERE id = $1`, [id, userId]);
+
+    await pool.query(`
+      UPDATE rooms
+      SET clock_running_since = NOW()
+      WHERE id = $1
+        AND time_control_base_ms IS NOT NULL
+        AND clock_running_since IS NULL
+        AND user1_id IS NOT NULL
+        AND user2_id IS NOT NULL
+        AND winner IS NULL
+    `, [id]);
+
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Join room error:', err);
+    res.status(500).json({ error: 'Failed to join room' });
   }
-
-  const room = roomResult.rows[0];
-  const targetSeatUserId = playerIndex === 1 ? room.user1_id : room.user2_id;
-  const otherSeatUserId = playerIndex === 1 ? room.user2_id : room.user1_id;
-
-  if (targetSeatUserId && Number(targetSeatUserId) !== Number(userId)) {
-    res.status(409).json({ error: 'Это место уже занято' });
-    return;
-  }
-  if (otherSeatUserId && Number(otherSeatUserId) === Number(userId)) {
-    res.status(409).json({ error: 'Вы уже заняли другое место в этой комнате' });
-    return;
-  }
-
-  const col = playerIndex === 1 ? 'user1_id' : 'user2_id';
-  await pool.query(`UPDATE rooms SET ${col} = $2 WHERE id = $1`, [id, userId]);
-
-  await pool.query(`
-    UPDATE rooms
-    SET clock_running_since = NOW()
-    WHERE id = $1
-      AND time_control_base_ms IS NOT NULL
-      AND clock_running_since IS NULL
-      AND user1_id IS NOT NULL
-      AND user2_id IS NOT NULL
-      AND winner IS NULL
-  `, [id]);
-
-  res.json({ ok: true });
 });
 
 // Get chat messages for a room
@@ -901,14 +953,19 @@ router.get('/:id/messages', async (req, res) => {
   }
 
   query += ' ORDER BY created_at ASC';
-  const result = await pool.query(query, params);
-  res.json(result.rows.map(row => ({
-    id: row.id,
-    playerIndex: row.player_index,
-    message: row.message,
-    moveNumber: row.move_number,
-    createdAt: row.created_at.getTime(),
-  })));
+  try {
+    const result = await pool.query(query, params);
+    res.json(result.rows.map(row => ({
+      id: row.id,
+      playerIndex: row.player_index,
+      message: row.message,
+      moveNumber: row.move_number,
+      createdAt: row.created_at.getTime(),
+    })));
+  } catch (err) {
+    console.error('Get chat messages error:', err);
+    res.status(500).json({ error: 'Failed to get messages' });
+  }
 });
 
 // Send chat message to a room — only seated players may post, and the
@@ -1043,9 +1100,14 @@ router.delete('/:id', authRequired, async (req, res) => {
     return;
   }
 
-  await pool.query('DELETE FROM rooms WHERE id = $1', [id]);
-  await pool.query('DELETE FROM games WHERE id = $1', [String(id)]);
-  res.json({ ok: true });
+  try {
+    await pool.query('DELETE FROM rooms WHERE id = $1', [id]);
+    await pool.query('DELETE FROM games WHERE id = $1', [String(id)]);
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Delete room error:', err);
+    res.status(500).json({ error: 'Failed to delete room' });
+  }
 });
 
 // ==================== Conditional pre-moves ====================
@@ -1074,27 +1136,32 @@ router.get('/:id/premoves', authRequired, async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
 
-  const result = await pool.query(
-    'SELECT user1_id, user2_id, premoves_json FROM rooms WHERE id = $1',
-    [id]
-  );
-  if (result.rows.length === 0) {
-    res.status(404).json({ error: 'Room not found' });
-    return;
+  try {
+    const result = await pool.query(
+      'SELECT user1_id, user2_id, premoves_json FROM rooms WHERE id = $1',
+      [id]
+    );
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'Room not found' });
+      return;
+    }
+
+    const room = result.rows[0];
+    const myPlayer =
+      Number(room.user1_id) === Number(userId) ? 1 :
+      Number(room.user2_id) === Number(userId) ? 2 : null;
+
+    if (!myPlayer) {
+      res.status(403).json({ error: 'Not a player in this room' });
+      return;
+    }
+
+    const all = parsePremoves(room.premoves_json);
+    res.json({ variants: myPlayer === 1 ? all.player1 : all.player2 });
+  } catch (err) {
+    console.error('Get premoves error:', err);
+    res.status(500).json({ error: 'Failed to get premoves' });
   }
-
-  const room = result.rows[0];
-  const myPlayer =
-    Number(room.user1_id) === Number(userId) ? 1 :
-    Number(room.user2_id) === Number(userId) ? 2 : null;
-
-  if (!myPlayer) {
-    res.status(403).json({ error: 'Not a player in this room' });
-    return;
-  }
-
-  const all = parsePremoves(room.premoves_json);
-  res.json({ variants: myPlayer === 1 ? all.player1 : all.player2 });
 });
 
 // PUT pre-moves for the authenticated user (replaces all variants)
@@ -1127,16 +1194,20 @@ router.put('/:id/premoves', authRequired, async (req, res) => {
     return;
   }
 
-  const all = parsePremoves(room.premoves_json);
-  if (myPlayer === 1) all.player1 = variants;
-  else all.player2 = variants;
+  try {
+    const all = parsePremoves(room.premoves_json);
+    if (myPlayer === 1) all.player1 = variants;
+    else all.player2 = variants;
 
-  await pool.query(
-    'UPDATE rooms SET premoves_json = $2 WHERE id = $1',
-    [id, JSON.stringify(all)]
-  );
-
-  res.json({ ok: true });
+    await pool.query(
+      'UPDATE rooms SET premoves_json = $2 WHERE id = $1',
+      [id, JSON.stringify(all)]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Put premoves error:', err);
+    res.status(500).json({ error: 'Failed to save premoves' });
+  }
 });
 
 export default router;

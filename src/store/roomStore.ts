@@ -37,6 +37,10 @@ import { buildPremoveSequence, makeVariantId } from './premovesActions';
 import { loadAnalysis, saveAnalysis } from './analysisStorage';
 
 interface RoomStore {
+  // Guard: incremented while a move is being persisted to the server.
+  // pollRoom checks this and skips the fetch while > 0.
+  pendingMoveCount: number;
+
   // Room info
   roomId: number | null;
   myPlayer: 1 | 2 | null;
@@ -133,8 +137,7 @@ interface RoomStore {
   reset: () => void;
 }
 
-// Guard: block polling while a move is being persisted to server
-let pendingMoveCount = 0;
+// pendingMoveCount is now a store field — see RoomStore interface below.
 
 function syncWinnerFromRoom(state: GameState, winnerNum: number | null): GameState {
   if (winnerNum == null || winnerNum === 0) return state; // 0 = cancelled, keep state_json winner
@@ -199,6 +202,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     const defaults = getDefaultPlayerNames();
     return { playerNames: defaults };
   })(),
+  pendingMoveCount: 0,
   roomId: null,
   myPlayer: null,
   creatorPlayer: null,
@@ -388,19 +392,19 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
   pollRoom: async () => {
     const { roomId } = get();
-    if (!roomId || pendingMoveCount > 0) return;
+    if (!roomId || get().pendingMoveCount > 0) return;
 
     try {
       // Fast path: check only updatedAt before pulling the full blob.
       const head = await roomsApi.getRoomHead(roomId);
       if (!head) return;
-      if (pendingMoveCount > 0) return;
+      if (get().pendingMoveCount > 0) return;
 
       const { lastUpdated, myPlayer: myP } = get();
       if (head.updatedAt <= lastUpdated) return; // nothing changed
 
       const room = await roomsApi.getRoom(roomId);
-      if (!room || pendingMoveCount > 0) return;
+      if (!room || get().pendingMoveCount > 0) return;
 
       // Re-check after the full fetch: a concurrent handlePlacement could have
       // updated lastUpdated in the store between the HEAD call and now.
@@ -550,7 +554,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     const myPlayerStr = myPlayer === 1 ? 'player1' : 'player2';
     if (state.currentPlayer !== myPlayerStr) return;
 
-    pendingMoveCount++;
+    set(s => ({ pendingMoveCount: s.pendingMoveCount + 1 }));
     try {
       const result = applyPlacement(state, ringId, selectedMarbleColor);
       if (!result) return;
@@ -579,7 +583,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     } catch (err) {
       console.error('[roomStore.handlePlacement] ERROR:', err);
     } finally {
-      pendingMoveCount--;
+      set(s => ({ pendingMoveCount: s.pendingMoveCount - 1 }));
     }
   },
 
@@ -593,7 +597,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     const validRings = getValidRemovableRings(state.rings);
     if (!validRings.includes(ringId)) return;
 
-    pendingMoveCount++;
+    set(s => ({ pendingMoveCount: s.pendingMoveCount + 1 }));
     try {
       const result = applyRingRemoval(state, currentNode, ringId);
       if (!result) return;
@@ -615,7 +619,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     } catch (err) {
       console.error('[roomStore.handleRingRemoval] ERROR:', err);
     } finally {
-      pendingMoveCount--;
+      set(s => ({ pendingMoveCount: s.pendingMoveCount - 1 }));
     }
   },
 
@@ -626,7 +630,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     const myPlayerStrC = myPlayer === 1 ? 'player1' : 'player2';
     if (state.currentPlayer !== myPlayerStrC) return;
 
-    pendingMoveCount++;
+    set(s => ({ pendingMoveCount: s.pendingMoveCount + 1 }));
     try {
       const { newState, move, previousPlayer, previousMoveNumber, winner, winType } = applyCapture(state, captures);
       normalizePhase(newState);
@@ -647,7 +651,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     } catch (err) {
       console.error('[roomStore.handleCapture] ERROR:', err);
     } finally {
-      pendingMoveCount--;
+      set(s => ({ pendingMoveCount: s.pendingMoveCount - 1 }));
     }
   },
 
@@ -657,7 +661,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     const myPlayerStr = myPlayer === 1 ? 'player1' : 'player2';
     if (!overrideCheck && currentNode.player !== myPlayerStr) return;
 
-    pendingMoveCount++;
+    set(s => ({ pendingMoveCount: s.pendingMoveCount + 1 }));
     try {
       // Walk back to find the first node belonging to myPlayer in their current consecutive turn.
       // A turn may span multiple tree nodes (e.g. placement node + one or more capture nodes).
@@ -698,7 +702,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     } catch (err) {
       console.error('[roomStore.undoLastMove] ERROR:', err);
     } finally {
-      pendingMoveCount--;
+      set(s => ({ pendingMoveCount: s.pendingMoveCount - 1 }));
     }
   },
 
@@ -733,7 +737,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     const { roomId, state, gameTree, myPlayer, playerNames } = get();
     if (!roomId || !myPlayer || state.winner) return;
 
-    pendingMoveCount++;
+    set(s => ({ pendingMoveCount: s.pendingMoveCount + 1 }));
     try {
       const newState = cloneState(state);
       const winnerPlayer = myPlayer === 1 ? 'player2' : 'player1';
@@ -753,7 +757,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     } catch (err) {
       console.error('[roomStore.surrender] ERROR:', err);
     } finally {
-      pendingMoveCount--;
+      set(s => ({ pendingMoveCount: s.pendingMoveCount - 1 }));
     }
   },
 
@@ -761,7 +765,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     const { roomId, state, gameTree, playerNames } = get();
     if (!roomId || state.winner || (state.moveNumber ?? 0) > 2) return;
 
-    pendingMoveCount++;
+    set(s => ({ pendingMoveCount: s.pendingMoveCount + 1 }));
     try {
       await roomsApi.cancelGame(roomId);
       const newState = cloneState(state);
@@ -772,7 +776,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     } catch (err) {
       console.error('[roomStore.cancelGame] ERROR:', err);
     } finally {
-      pendingMoveCount--;
+      set(s => ({ pendingMoveCount: s.pendingMoveCount - 1 }));
     }
   },
 
@@ -1014,6 +1018,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   reset: () => {
     const rootNode = createRootNode();
     set({
+      pendingMoveCount: 0,
       roomId: null,
       myPlayer: null,
       creatorPlayer: null,

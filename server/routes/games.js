@@ -7,24 +7,21 @@ const router = Router();
 router.get('/', authRequired, async (req, res) => {
   const userId = req.user.id;
   const username = req.user.username;
-  // For online in-progress games, ensure a matching room actually exists —
-  // otherwise the record is a phantom (room was deleted) and would show up as
-  // an "active" game forever.
-  const result = await pool.query(
-    `SELECT g.id, g.player1_name, g.player2_name, g.updated_at, g.move_count, g.winner, g.win_type, g.board_size, g.is_online
-       FROM games g
-      WHERE (g.user_id = $1
-             OR (g.player1_name = $2 OR g.player2_name = $2))
-        AND (
-          g.winner IS NOT NULL
-          OR g.is_online = false
-          OR EXISTS (SELECT 1 FROM rooms r WHERE r.id::text = g.id AND r.winner IS NULL)
-        )
-      ORDER BY g.updated_at DESC`,
-    [userId, username]
-  );
-  res.json(
-    result.rows.map(row => ({
+  try {
+    const result = await pool.query(
+      `SELECT g.id, g.player1_name, g.player2_name, g.updated_at, g.move_count, g.winner, g.win_type, g.board_size, g.is_online
+         FROM games g
+        WHERE (g.user_id = $1
+               OR (g.player1_name = $2 OR g.player2_name = $2))
+          AND (
+            g.winner IS NOT NULL
+            OR g.is_online = false
+            OR EXISTS (SELECT 1 FROM rooms r WHERE r.id::text = g.id AND r.winner IS NULL)
+          )
+        ORDER BY g.updated_at DESC`,
+      [userId, username]
+    );
+    res.json(result.rows.map(row => ({
       id: row.id,
       playerNames: { player1: row.player1_name, player2: row.player2_name },
       updatedAt: row.updated_at.getTime(),
@@ -33,8 +30,11 @@ router.get('/', authRequired, async (req, res) => {
       winType: row.win_type,
       boardSize: row.board_size,
       isOnline: row.is_online,
-    }))
-  );
+    })));
+  } catch (err) {
+    console.error('Get games error:', err);
+    res.status(500).json({ error: 'Failed to get games' });
+  }
 });
 
 // Public game archive — returns recent online games, optionally filtered by username
@@ -48,113 +48,109 @@ router.get('/public', async (req, res) => {
     params.push(username);
   }
 
-  const result = await pool.query(
-    `SELECT g.id, g.player1_name, g.player2_name, g.updated_at, g.move_count, g.winner, g.win_type, g.board_size, r.rated
-     FROM games g
-     LEFT JOIN rooms r ON r.id::text = g.id
-     ${whereClause}
-     ORDER BY g.updated_at DESC
-     LIMIT 100`,
-    params
-  );
-
-  res.json(result.rows.map(row => ({
-    id: row.id,
-    playerNames: { player1: row.player1_name, player2: row.player2_name },
-    updatedAt: row.updated_at.getTime(),
-    moveCount: row.move_count,
-    winner: row.winner,
-    winType: row.win_type,
-    boardSize: row.board_size,
-    isOnline: true,
-    rated: row.rated ?? false,
-  })));
+  try {
+    const result = await pool.query(
+      `SELECT g.id, g.player1_name, g.player2_name, g.updated_at, g.move_count, g.winner, g.win_type, g.board_size, r.rated
+       FROM games g
+       LEFT JOIN rooms r ON r.id::text = g.id
+       ${whereClause}
+       ORDER BY g.updated_at DESC
+       LIMIT 100`,
+      params
+    );
+    res.json(result.rows.map(row => ({
+      id: row.id,
+      playerNames: { player1: row.player1_name, player2: row.player2_name },
+      updatedAt: row.updated_at.getTime(),
+      moveCount: row.move_count,
+      winner: row.winner,
+      winType: row.win_type,
+      boardSize: row.board_size,
+      isOnline: true,
+      rated: row.rated ?? false,
+    })));
+  } catch (err) {
+    console.error('Get public games error:', err);
+    res.status(500).json({ error: 'Failed to get games' });
+  }
 });
 
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
-  const result = await pool.query('SELECT * FROM games WHERE id = $1', [id]);
-  if (result.rows.length === 0) {
-    res.status(404).json({ error: 'Not found' });
-    return;
+  try {
+    const result = await pool.query('SELECT * FROM games WHERE id = $1', [id]);
+    if (result.rows.length === 0) {
+      res.status(404).json({ error: 'Not found' });
+      return;
+    }
+    const row = result.rows[0];
+    res.json({
+      id: row.id,
+      playerNames: { player1: row.player1_name, player2: row.player2_name },
+      createdAt: row.created_at.getTime(),
+      updatedAt: row.updated_at.getTime(),
+      moveCount: row.move_count,
+      winner: row.winner,
+      winType: row.win_type,
+      boardSize: row.board_size,
+      stateJson: row.state_json,
+      treeJson: row.tree_json,
+    });
+  } catch (err) {
+    console.error('Get game error:', err);
+    res.status(500).json({ error: 'Failed to get game' });
   }
-  const row = result.rows[0];
-  res.json({
-    id: row.id,
-    playerNames: { player1: row.player1_name, player2: row.player2_name },
-    createdAt: row.created_at.getTime(),
-    updatedAt: row.updated_at.getTime(),
-    moveCount: row.move_count,
-    winner: row.winner,
-    winType: row.win_type,
-    boardSize: row.board_size,
-    stateJson: row.state_json,
-    treeJson: row.tree_json,
-  });
 });
 
 router.post('/', optionalAuth, async (req, res) => {
   const userId = req.user ? req.user.id : null;
-  const {
-    id,
-    playerNames,
-    moveCount,
-    winner,
-    winType,
-    isOnline,
-    boardSize,
-    stateJson,
-    treeJson,
-  } = req.body;
+  const { id, playerNames, moveCount, winner, winType, isOnline, boardSize, stateJson, treeJson } = req.body;
 
   if (!id || !playerNames || !stateJson || !treeJson) {
     res.status(400).json({ error: 'Missing fields' });
     return;
   }
 
-  await pool.query(
-    `INSERT INTO games (id, user_id, player1_name, player2_name, move_count, winner, win_type, is_online, board_size, state_json, tree_json)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-     ON CONFLICT (id) DO UPDATE SET
-       user_id = EXCLUDED.user_id,
-       player1_name = EXCLUDED.player1_name,
-       player2_name = EXCLUDED.player2_name,
-       updated_at = NOW(),
-       move_count = EXCLUDED.move_count,
-       winner = EXCLUDED.winner,
-       win_type = EXCLUDED.win_type,
-       is_online = EXCLUDED.is_online,
-       board_size = EXCLUDED.board_size,
-       state_json = EXCLUDED.state_json,
-       tree_json = EXCLUDED.tree_json
-    `,
-    [
-      id,
-      userId,
-      playerNames.player1,
-      playerNames.player2,
-      moveCount,
-      winner,
-      winType,
-      !!isOnline,
-      boardSize,
-      stateJson,
-      treeJson,
-    ]
-  );
-
-  res.json({ ok: true });
+  try {
+    await pool.query(
+      `INSERT INTO games (id, user_id, player1_name, player2_name, move_count, winner, win_type, is_online, board_size, state_json, tree_json)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       ON CONFLICT (id) DO UPDATE SET
+         user_id = EXCLUDED.user_id,
+         player1_name = EXCLUDED.player1_name,
+         player2_name = EXCLUDED.player2_name,
+         updated_at = NOW(),
+         move_count = EXCLUDED.move_count,
+         winner = EXCLUDED.winner,
+         win_type = EXCLUDED.win_type,
+         is_online = EXCLUDED.is_online,
+         board_size = EXCLUDED.board_size,
+         state_json = EXCLUDED.state_json,
+         tree_json = EXCLUDED.tree_json`,
+      [id, userId, playerNames.player1, playerNames.player2, moveCount,
+       winner, winType, !!isOnline, boardSize, stateJson, treeJson]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Save game error:', err);
+    res.status(500).json({ error: 'Failed to save game' });
+  }
 });
 
 router.delete('/:id', optionalAuth, async (req, res) => {
   const { id } = req.params;
   const userId = req.user ? req.user.id : null;
-  if (userId) {
-     await pool.query('DELETE FROM games WHERE id = $1 AND (user_id = $2 OR user_id IS NULL)', [id, userId]);
-  } else {
-     await pool.query('DELETE FROM games WHERE id = $1 AND user_id IS NULL', [id]);
+  try {
+    if (userId) {
+      await pool.query('DELETE FROM games WHERE id = $1 AND (user_id = $2 OR user_id IS NULL)', [id, userId]);
+    } else {
+      await pool.query('DELETE FROM games WHERE id = $1 AND user_id IS NULL', [id]);
+    }
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Delete game error:', err);
+    res.status(500).json({ error: 'Failed to delete game' });
   }
-  res.json({ ok: true });
 });
 
 export default router;

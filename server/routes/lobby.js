@@ -5,9 +5,11 @@ import { sendPushToUser } from '../utils/pushNotifications.js';
 
 const router = Router();
 
-// GET /api/lobby — list all open, non-expired slots
+// GET /api/lobby — list all open, non-expired slots.
+// Also purges stale rows opportunistically so the table doesn't grow unbounded.
 router.get('/', optionalAuth, async (req, res) => {
   try {
+    pool.query('DELETE FROM lobby_slots WHERE expires_at <= NOW()').catch(() => {});
     const result = await pool.query(
       `SELECT id, user_id, username, rating, country,
               board_size, time_control_id, time_control_base_ms, time_control_increment_ms,
