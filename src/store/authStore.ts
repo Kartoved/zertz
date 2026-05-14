@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import * as authApi from '../db/authApi';
+import { AuthError } from '../db/authApi';
 import type { User } from '../db/authApi';
 
 const TOKEN_KEY = 'zertz_auth_token';
@@ -65,9 +66,15 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     try {
       const user = await authApi.getMe(token);
       set({ user, isLoading: false });
-    } catch {
-      localStorage.removeItem(TOKEN_KEY);
-      set({ token: null, user: null, isLoading: false });
+    } catch (err) {
+      set({ isLoading: false });
+      // Only log out on 401 (token invalid/expired). Transient errors like
+      // 429 (rate limit), 503 (server restart) or network failures should
+      // never end the session — the token is still valid.
+      if (err instanceof AuthError && err.status === 401) {
+        localStorage.removeItem(TOKEN_KEY);
+        set({ token: null, user: null });
+      }
     }
   },
 

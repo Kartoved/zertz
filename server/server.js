@@ -36,7 +36,7 @@ app.get('/api/health', async (_req, res) => {
 });
 
 // Mount route modules
-app.use('/api/auth', authLimiter, authRouter);
+app.use('/api/auth', authRouter); // per-route limiters applied inside
 app.use('/api/players', playersRouter);
 app.use('/api/follows', followsRouter);
 app.use('/api/challenges', challengesRouter);

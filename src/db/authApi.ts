@@ -81,16 +81,24 @@ export async function login(username: string, password: string): Promise<{ token
   return data;
 }
 
+export class AuthError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
 export async function getMe(token: string): Promise<User> {
   const response = await fetch(`${API_BASE}/api/auth/me`, {
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
   });
 
-  const data = await response.json();
   if (!response.ok) {
-    throw new Error(data.error || 'serverError');
+    const data = await response.json().catch(() => ({}));
+    throw new AuthError(data.error || 'serverError', response.status);
   }
-  return data;
+  return response.json();
 }
 
 export async function updateProfile(

@@ -5,12 +5,13 @@ import crypto from 'crypto';
 import { pool } from '../db.js';
 import { authRequired, JWT_SECRET } from '../middleware/auth.js';
 import { sendEmail } from '../utils/mailer.js';
+import { authLimiter } from '../middleware/rateLimits.js';
 
 const router = Router();
 
 const SPECIAL_CHARS = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/;
 
-router.post('/register', async (req, res) => {
+router.post('/register', authLimiter, async (req, res) => {
   const { username, password, email } = req.body;
 
   if (!username || !password) {
@@ -83,7 +84,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
@@ -250,7 +251,7 @@ router.put('/profile', authRequired, async (req, res) => {
 });
 
 // POST /api/auth/magic-link/request — send magic link to email
-router.post('/magic-link/request', async (req, res) => {
+router.post('/magic-link/request', authLimiter, async (req, res) => {
   const { email } = req.body;
   if (!email) {
     res.status(400).json({ error: 'fillAllFields' });
