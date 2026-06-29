@@ -32,6 +32,7 @@ export function RoomScreen() {
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showSurrenderConfirm, setShowSurrenderConfirm] = useState(false);
   const [clockNowMs, setClockNowMs] = useState(() => Date.now());
+  const [addTimeCooldown, setAddTimeCooldown] = useState(false);
 
   const navTabs: Array<{ id: string; label: string; authOnly?: boolean }> = [
     { id: 'playLocal', label: t.playLocal },
@@ -83,6 +84,7 @@ export function RoomScreen() {
     clockP2Ms,
     clockRunningSince,
     surrender,
+    addTime,
     cancelGame,
     isAnalyzing,
     analysisState,
@@ -217,6 +219,20 @@ export function RoomScreen() {
   // Correspondence games are marked with incrementMs === -1 (clock resets each turn).
   // BIGINT columns come back as strings from node-postgres, so coerce.
   const isCorrespondence = timeControlIncrementMs != null && Number(timeControlIncrementMs) === -1;
+
+  // "Give opponent more time": only in an ongoing timed game, only as a seated
+  // player, and only ever applied to the opponent's clock (never your own).
+  const canGiveTime = isTimedGame && !state.winner && !isSpectator && myPlayer != null;
+  const addTimeLabel = isCorrespondence ? t.addTimeCorr : t.addTimeBlitz;
+  const handleAddTime = async () => {
+    if (addTimeCooldown) return;
+    setAddTimeCooldown(true);
+    try {
+      await addTime();
+    } finally {
+      setTimeout(() => setAddTimeCooldown(false), 3000);
+    }
+  };
 
   // The first move in the analysis line must belong to the opponent for the variant
   // to be auto-triggerable. We walk from analysisCurrentNode up to the start anchor,
@@ -432,6 +448,18 @@ export function RoomScreen() {
           }`}>
             {formatClock(clockMs)}
           </div>
+        )}
+        {/* Give opponent more time — only on the opponent's strip */}
+        {!isMine && canGiveTime && (
+          <button
+            type="button"
+            onClick={handleAddTime}
+            disabled={addTimeCooldown}
+            title={t.addTime}
+            className="flex-shrink-0 px-1.5 py-0.5 rounded text-[11px] font-medium bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800 disabled:opacity-40 disabled:cursor-default"
+          >
+            ⏱ {addTimeLabel}
+          </button>
         )}
         {/* Action menu — only on bottom strip */}
         {isBottom && isAuthed && (
@@ -686,12 +714,25 @@ export function RoomScreen() {
               )}
             </div>
             {p1ClockMs != null && (
-              <div className={`mb-1 text-lg font-mono font-bold ${
-                p1ClockMs <= LOW_TIME_THRESHOLD_MS
-                  ? 'text-red-600 dark:text-red-400'
-                  : 'text-gray-900 dark:text-gray-100'
-              }`}>
-                {formatClock(p1ClockMs)}
+              <div className="mb-1 flex items-center gap-2">
+                <span className={`text-lg font-mono font-bold ${
+                  p1ClockMs <= LOW_TIME_THRESHOLD_MS
+                    ? 'text-red-600 dark:text-red-400'
+                    : 'text-gray-900 dark:text-gray-100'
+                }`}>
+                  {formatClock(p1ClockMs)}
+                </span>
+                {myPlayer !== 1 && canGiveTime && (
+                  <button
+                    type="button"
+                    onClick={handleAddTime}
+                    disabled={addTimeCooldown}
+                    title={t.addTime}
+                    className="px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800 disabled:opacity-40 disabled:cursor-default"
+                  >
+                    ⏱ {addTimeLabel}
+                  </button>
+                )}
               </div>
             )}
             {ratingDelta && state.winner && rated && (
@@ -747,12 +788,25 @@ export function RoomScreen() {
               )}
             </div>
             {p2ClockMs != null && (
-              <div className={`mb-1 text-lg font-mono font-bold ${
-                p2ClockMs <= LOW_TIME_THRESHOLD_MS
-                  ? 'text-red-600 dark:text-red-400'
-                  : 'text-gray-900 dark:text-gray-100'
-              }`}>
-                {formatClock(p2ClockMs)}
+              <div className="mb-1 flex items-center gap-2">
+                <span className={`text-lg font-mono font-bold ${
+                  p2ClockMs <= LOW_TIME_THRESHOLD_MS
+                    ? 'text-red-600 dark:text-red-400'
+                    : 'text-gray-900 dark:text-gray-100'
+                }`}>
+                  {formatClock(p2ClockMs)}
+                </span>
+                {myPlayer !== 2 && canGiveTime && (
+                  <button
+                    type="button"
+                    onClick={handleAddTime}
+                    disabled={addTimeCooldown}
+                    title={t.addTime}
+                    className="px-1.5 py-0.5 rounded text-xs font-medium bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 hover:bg-blue-200 dark:hover:bg-blue-800 disabled:opacity-40 disabled:cursor-default"
+                  >
+                    ⏱ {addTimeLabel}
+                  </button>
+                )}
               </div>
             )}
             {ratingDelta && state.winner && rated && (

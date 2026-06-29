@@ -27,6 +27,15 @@ export const moveLimiter = rateLimit({
   message: { error: 'Too many move submissions' },
 });
 
+// "Give opponent more time" limiter — prevents spamming the increment button.
+export const addTimeLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 min
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Слишком часто, подождите немного' },
+});
+
 // Room / lobby creation limiter.
 export const createRoomLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 min

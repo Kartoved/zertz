@@ -118,6 +118,7 @@ interface RoomStore {
   setPlayerName: (player: 1 | 2, name: string) => Promise<void>;
   surrender: () => Promise<void>;
   cancelGame: () => Promise<void>;
+  addTime: () => Promise<void>;
 
   // Analysis actions
   enterAnalysis: () => void;
@@ -804,6 +805,24 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       console.error('[roomStore.cancelGame] ERROR:', err);
     } finally {
       set(s => ({ pendingMoveCount: s.pendingMoveCount - 1 }));
+    }
+  },
+
+  addTime: async () => {
+    const { roomId, myPlayer, state, timeControlBaseMs } = get();
+    // Only meaningful in an ongoing timed game where I'm a seated player.
+    if (!roomId || !myPlayer || state.winner || timeControlBaseMs == null) return;
+
+    try {
+      const result = await roomsApi.addTime(roomId);
+      // Server returns the authoritative post-add clock values; mirror them
+      // optimistically so the opponent's clock jumps without waiting for poll.
+      set({
+        clockP1Ms: result.clockP1Ms,
+        clockP2Ms: result.clockP2Ms,
+      });
+    } catch (err) {
+      console.error('[roomStore.addTime] ERROR:', err);
     }
   },
 

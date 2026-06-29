@@ -330,3 +330,22 @@ export async function cancelGame(id: number | string): Promise<void> {
     throw new Error(err.error || 'Failed to cancel game');
   }
 }
+
+// Add time to the opponent's clock. Server decides the amount (+15s blitz /
+// +1 day correspondence) and which clock to credit.
+export async function addTime(id: number | string): Promise<{
+  opponentPlayer: 1 | 2;
+  deltaMs: number;
+  clockP1Ms: number | null;
+  clockP2Ms: number | null;
+}> {
+  const response = await fetch(`${API_BASE}/api/rooms/${id}/add-time`, {
+    method: 'POST',
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.error || 'Failed to add time');
+  }
+  return response.json();
+}

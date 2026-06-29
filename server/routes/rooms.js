@@ -5,7 +5,13 @@ import { glicko2Update } from '../utils/glicko2.js';
 import { sendPushToUser } from '../utils/pushNotifications.js';
 import { indexRoom } from '../explorer.js';
 import { verifySubmittedState } from '../utils/verifyState.js';
-import { moveLimiter, createRoomLimiter, chatLimiter } from '../middleware/rateLimits.js';
+import { moveLimiter, createRoomLimiter, chatLimiter, addTimeLimiter } from '../middleware/rateLimits.js';
+
+// How much time a "give opponent more time" press adds, by control type.
+// Correspondence games are flagged by increment_ms === -1 (per-move clock that
+// resets each turn) → grant a whole extra day; everything else is blitz/rapid → +15s.
+const ADD_TIME_CORRESPONDENCE_MS = 24 * 60 * 60 * 1000;
+const ADD_TIME_BLITZ_MS = 15 * 1000;
 
 // Fire-and-forget indexer call. We never want explorer-side errors to block
 // the API response, but we still want to know if it failed.
@@ -1208,6 +1214,89 @@ router.put('/:id/premoves', authRequired, async (req, res) => {
     console.error('Put premoves error:', err);
     res.status(500).json({ error: 'Failed to save premoves' });
   }
+});
+
+// Give the opponent more time on their clock. Always a gift in the opponent's
+// favour (you can never add to your own clock), so it's allowed in rated games
+// too and never touches ratings. Only valid for ongoing timed games.
+router.post('/:id/add-time', addTimeLimiter, authRequired, async (req, res) => {
+  const { id } = req.params;
+
+  const roomRes = await pool.query(
+    `SELECT winner, user1_id, user2_id, time_control_base_ms, time_control_increment_ms
+     FROM rooms WHERE id = $1`,
+    [id]
+  );
+  if (roomRes.rows.length === 0) {
+    res.status(404).json({ error: 'Room not found' });
+    return;
+  }
+  const room = roomRes.rows[0];
+
+  if (room.winner !== null) {
+    res.status(400).json({ error: 'Игра уже завершена' });
+    return;
+  }
+
+  const isTimed =
+    room.time_control_base_ms != null && room.time_control_increment_ms != null;
+  if (!isTimed) {
+    res.status(400).json({ error: 'В этой партии нет контроля времени' });
+    return;
+  }
+
+  // Derive the caller's seat from the authenticated user — never trust the body.
+  const authUserId = Number(req.user.id);
+  let playerIndex = null;
+  if (room.user1_id && Number(room.user1_id) === authUserId) playerIndex = 1;
+  else if (room.user2_id && Number(room.user2_id) === authUserId) playerIndex = 2;
+  if (!playerIndex) {
+    res.status(403).json({ error: 'Вы не участник партии' });
+    return;
+  }
+
+  // Time is only ever added to the opponent's clock.
+  const opponentPlayer = playerIndex === 1 ? 2 : 1;
+  const incrementMs = Number(room.time_control_increment_ms);
+  const deltaMs = incrementMs === -1 ? ADD_TIME_CORRESPONDENCE_MS : ADD_TIME_BLITZ_MS;
+  const baseMs = Number(room.time_control_base_ms);
+  // Column name is derived from a server-side ternary, not user input.
+  const col = opponentPlayer === 1 ? 'clock_p1_ms' : 'clock_p2_ms';
+
+  // `AND winner IS NULL` keeps this from racing the lazy flag-fall detection:
+  // if the opponent already timed out and the row was finalized, this no-ops;
+  // if this lands first, the remaining time goes positive and no timeout fires.
+  // COALESCE handles the pre-first-move case where the clock column is still null.
+  const upd = await pool.query(
+    `UPDATE rooms
+       SET ${col} = COALESCE(${col}, $2) + $3, updated_at = NOW()
+     WHERE id = $1 AND winner IS NULL
+     RETURNING clock_p1_ms, clock_p2_ms`,
+    [id, baseMs, deltaMs]
+  );
+  if (upd.rows.length === 0) {
+    res.status(400).json({ error: 'Игра уже завершена' });
+    return;
+  }
+
+  // Let the opponent know (especially useful in correspondence when they're offline).
+  const opponentId = opponentPlayer === 1 ? room.user1_id : room.user2_id;
+  if (opponentId) {
+    sendPushToUser(opponentId, {
+      type: 'time_added',
+      title: 'Zertz',
+      body: 'Соперник добавил вам время',
+      roomId: id,
+    });
+  }
+
+  res.json({
+    ok: true,
+    opponentPlayer,
+    deltaMs,
+    clockP1Ms: upd.rows[0].clock_p1_ms,
+    clockP2Ms: upd.rows[0].clock_p2_ms,
+  });
 });
 
 export default router;
