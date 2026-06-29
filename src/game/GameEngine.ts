@@ -236,38 +236,28 @@ function handleIsolation(state: GameState): MarbleColor[] {
   const captured: MarbleColor[] = [];
   const groups = getIsolatedGroups(state.rings);
 
-  if (groups.length <= 1) return captured;
-
-  let mainGroupIndex = 0;
-  let maxSize = 0;
-
-  for (let i = 0; i < groups.length; i++) {
-    if (groups[i].length > maxSize) {
-      maxSize = groups[i].length;
-      mainGroupIndex = i;
-    }
-  }
-
-  for (let i = 0; i < groups.length; i++) {
-    if (i === mainGroupIndex) continue;
-
-    const group = groups[i];
+  // Any isolated group whose rings are ALL occupied is captured by the player
+  // who just removed the ring. The board continues on the group(s) that still
+  // have an empty ring. This must run even when there is a single remaining
+  // group: if the last ring removal leaves the whole board fully filled, those
+  // final marbles are captured (otherwise the win was never awarded).
+  for (const group of groups) {
     const hasEmpty = group.some(id => {
       const ring = state.rings.get(id);
       return ring && !ring.marble;
     });
 
-    if (!hasEmpty) {
-      for (const ringId of group) {
-        const ring = state.rings.get(ringId);
-        if (ring && ring.marble) {
-          captured.push(ring.marble.color);
-          state.captures[state.currentPlayer][ring.marble.color]++;
-          ring.marble = null;
-        }
-        if (ring) {
-          ring.isRemoved = true;
-        }
+    if (hasEmpty) continue;
+
+    for (const ringId of group) {
+      const ring = state.rings.get(ringId);
+      if (ring && ring.marble) {
+        captured.push(ring.marble.color);
+        state.captures[state.currentPlayer][ring.marble.color]++;
+        ring.marble = null;
+      }
+      if (ring) {
+        ring.isRemoved = true;
       }
     }
   }

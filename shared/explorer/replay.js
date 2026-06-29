@@ -93,22 +93,14 @@ function getIsolatedGroups(rings) {
   return groups;
 }
 
-// Mirror of GameEngine.handleIsolation: when removing a ring splits the board
-// into multiple groups, the smaller group(s) — provided they're fully filled
-// (no empty rings) — are awarded to the current player and removed from play.
+// Mirror of GameEngine.handleIsolation: any isolated group whose rings are all
+// occupied (no empty rings) is awarded to the current player and removed from
+// play. Runs even for a single remaining group: if the last ring removal leaves
+// the whole board fully filled, those final marbles are captured.
 function handleIsolation(state) {
   const groups = getIsolatedGroups(state.rings);
-  if (groups.length <= 1) return;
 
-  let mainIdx = 0;
-  let maxSize = 0;
-  for (let i = 0; i < groups.length; i++) {
-    if (groups[i].length > maxSize) { maxSize = groups[i].length; mainIdx = i; }
-  }
-
-  for (let i = 0; i < groups.length; i++) {
-    if (i === mainIdx) continue;
-    const g = groups[i];
+  for (const g of groups) {
     let hasEmpty = false;
     for (const id of g) {
       const ring = state.rings.get(id);
