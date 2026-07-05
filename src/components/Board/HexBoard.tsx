@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, type WheelEvent } from 'react';
+import { useState, useMemo, useRef, useId, type WheelEvent } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { hexToPixel } from '../../game/Board';
 import { getValidRemovableRings } from '../../game/Board';
@@ -19,6 +19,8 @@ interface HexBoardProps {
   highlightedCaptures?: CaptureMove[];
   validRemovableRings?: string[];
   onRingClick?: (ringId: string) => void;
+  /** Static thumbnail mode: fills its parent, no zoom/pan, no zoom badge. */
+  preview?: boolean;
 }
 
 export default function HexBoard(props: HexBoardProps = {}) {
@@ -26,6 +28,12 @@ export default function HexBoard(props: HexBoardProps = {}) {
   const state = props.state || gameStore.state;
   const selectedRingId = props.selectedRingId !== undefined ? props.selectedRingId : gameStore.selectedRingId;
   const highlightedCaptures = props.highlightedCaptures || gameStore.highlightedCaptures;
+  // Unique per-instance prefix for SVG gradient ids. Multiple HexBoards can be on
+  // one page (e.g. the menu current-games previews + the hidden mobile carousel);
+  // without a unique prefix their duplicate gradient ids collide and `url(#id)`
+  // fails to resolve, leaving ring fills transparent. Strip colons so the id is
+  // safe inside url(#...).
+  const gradPrefix = `hb${useId().replace(/:/g, '')}`;
   const [zoom, setZoom] = useState(1);
   const pinchRef = useRef<{ dist: number; zoom: number } | null>(null);
 
@@ -76,10 +84,13 @@ export default function HexBoard(props: HexBoardProps = {}) {
     };
   }, [state.rings]);
   
-  const width = bounds.maxX - bounds.minX + BOARD_PADDING * 2;
-  const height = bounds.maxY - bounds.minY + BOARD_PADDING * 2;
-  const offsetX = -bounds.minX + BOARD_PADDING;
-  const offsetY = -bounds.minY + BOARD_PADDING;
+  // In preview (thumbnail) mode the board should fill the square edge-to-edge,
+  // so pad only by a ring radius instead of the full interactive breathing room.
+  const pad = props.preview ? HEX_SIZE + 6 : BOARD_PADDING;
+  const width = bounds.maxX - bounds.minX + pad * 2;
+  const height = bounds.maxY - bounds.minY + pad * 2;
+  const offsetX = -bounds.minX + pad;
+  const offsetY = -bounds.minY + pad;
 
   const viewWidth = width / zoom;
   const viewHeight = height / zoom;
@@ -116,18 +127,21 @@ export default function HexBoard(props: HexBoardProps = {}) {
     setZoom(newZoom);
   };
 
+  const { preview } = props;
+
   return (
-    <div className="flex items-center justify-center p-2 sm:p-3 md:p-4 w-full">
-      <div className="relative w-full max-w-[1100px] rounded-2xl bg-[radial-gradient(circle_at_center,_#8A9AAB_0%,_#5A6978_100%)] p-3 sm:p-4 shadow-lg overflow-hidden">
+    <div className={preview ? 'flex items-center justify-center w-full h-full' : 'flex items-center justify-center p-2 sm:p-3 md:p-4 w-full'}>
+      <div className={`relative rounded-2xl bg-[radial-gradient(circle_at_center,_#8A9AAB_0%,_#5A6978_100%)] shadow-lg overflow-hidden ${preview ? 'w-full h-full p-0' : 'w-full max-w-[1100px] p-3 sm:p-4'}`}>
         <svg
           // Camera zoom: change viewBox, keep geometry (spacing) intact
           viewBox={`${viewX} ${viewY} ${viewWidth} ${viewHeight}`}
-          className="w-full h-[46vh] sm:h-[56vh] md:h-[64vh] lg:h-[80vh] max-h-[760px] cursor-move"
+          preserveAspectRatio="xMidYMid meet"
+          className={preview ? 'w-full h-full' : 'w-full h-[46vh] sm:h-[56vh] md:h-[64vh] lg:h-[80vh] max-h-[760px] cursor-move'}
           style={{ touchAction: 'none' }}
-          onWheel={handleWheel}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
+          onWheel={preview ? undefined : handleWheel}
+          onTouchStart={preview ? undefined : handleTouchStart}
+          onTouchMove={preview ? undefined : handleTouchMove}
+          onTouchEnd={preview ? undefined : handleTouchEnd}
         >
           <g transform={`translate(${offsetX}, ${offsetY})`}>
             {rings.map(ring => {
@@ -144,6 +158,7 @@ export default function HexBoard(props: HexBoardProps = {}) {
                 <HexRing
                   key={ring.id}
                   ring={ring}
+                  idPrefix={gradPrefix}
                   x={pos.x}
                   y={pos.y}
                   size={HEX_SIZE}
@@ -158,9 +173,11 @@ export default function HexBoard(props: HexBoardProps = {}) {
             })}
           </g>
         </svg>
-        <div className="absolute bottom-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-xs">
-          Zoom: {Math.round(zoom * 100)}%
-        </div>
+        {!preview && (
+          <div className="absolute bottom-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-xs">
+            Zoom: {Math.round(zoom * 100)}%
+          </div>
+        )}
       </div>
     </div>
   );

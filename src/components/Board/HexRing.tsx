@@ -3,6 +3,8 @@ import { useGameStore } from '../../store/gameStore';
 
 interface HexRingProps {
   ring: Ring;
+  /** Per-HexBoard-instance prefix so gradient ids stay unique across multiple boards on one page. */
+  idPrefix?: string;
   x: number;
   y: number;
   size: number;
@@ -16,6 +18,7 @@ interface HexRingProps {
 
 export default function HexRing({
   ring,
+  idPrefix = '',
   x,
   y,
   size,
@@ -50,6 +53,9 @@ export default function HexRing({
     selectRing(ring.id);
   };
   
+  // Unique gradient id base for this ring within its board instance.
+  const gid = `${idPrefix}${ring.id}`;
+
   // Ring visual styling
   // Pure black rings with gradient for contrast with marbles
   let ringStrokeColor = '#1a1a1a';
@@ -105,14 +111,14 @@ export default function HexRing({
         pointerEvents="all"
       />
       <defs>
-        <radialGradient id={`ring-gradient-${ring.id}`}>
+        <radialGradient id={`ring-gradient-${gid}`}>
           <stop offset="0%" stopColor="#4a4a4a" />
           <stop offset="100%" stopColor="#000000" />
         </radialGradient>
         {ring.marble && (
           <>
             <radialGradient
-              id={`marble-gradient-${ring.id}`}
+              id={`marble-gradient-${gid}`}
               cx="35%"
               cy="35%"
               r="65%"
@@ -145,7 +151,7 @@ export default function HexRing({
             </radialGradient>
             {/* Specular highlight */}
             <radialGradient
-              id={`marble-highlight-${ring.id}`}
+              id={`marble-highlight-${gid}`}
               cx="30%"
               cy="25%"
               r="30%"
@@ -176,7 +182,7 @@ export default function HexRing({
       </defs>
       <path
         d={ringPath}
-        fill={`url(#ring-gradient-${ring.id})`}
+        fill={`url(#ring-gradient-${gid})`}
         fillRule="evenodd"
         stroke={ringStrokeColor}
         strokeWidth={ringStrokeWidth}
@@ -192,7 +198,7 @@ export default function HexRing({
             cx={0}
             cy={0}
             r={marbleRadius}
-            fill={`url(#marble-gradient-${ring.id})`}
+            fill={`url(#marble-gradient-${gid})`}
             stroke={
               ring.marble.color === 'white' ? '#b0b0b0' :
               ring.marble.color === 'gray' ? '#3d4350' :
@@ -205,7 +211,7 @@ export default function HexRing({
             cx={0}
             cy={0}
             r={marbleRadius}
-            fill={`url(#marble-highlight-${ring.id})`}
+            fill={`url(#marble-highlight-${gid})`}
           />
         </g>
       )}

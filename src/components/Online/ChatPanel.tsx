@@ -9,11 +9,18 @@ interface ChatPanelProps {
 
 export function ChatPanel({ inputBottomOffset = 0 }: ChatPanelProps) {
   const { t, locale } = useI18n();
-  const {
-    messages, playerNames, myPlayer, sendMessage, state, undoLastMove,
-    gameTree, navigateToNode,
-    isAnalyzing, analysisGameTree, analysisNavigateToNode,
-  } = useRoomStore();
+  // Select only the individual fields this component needs — deliberately NOT the
+  // whole store via `useRoomStore()`. The store holds GameNode trees (gameTree /
+  // analysisGameTree / currentNode) with circular parent↔children references; if
+  // the entire store lands in this component's hook snapshot, a deep property
+  // walk (e.g. by the React DevTools browser extension) follows the cycle and
+  // blows the call stack. Narrow selectors keep those trees out of here entirely.
+  const messages = useRoomStore(s => s.messages);
+  const playerNames = useRoomStore(s => s.playerNames);
+  const myPlayer = useRoomStore(s => s.myPlayer);
+  const sendMessage = useRoomStore(s => s.sendMessage);
+  const state = useRoomStore(s => s.state);
+  const undoLastMove = useRoomStore(s => s.undoLastMove);
   const [text, setText] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -84,11 +91,14 @@ export function ChatPanel({ inputBottomOffset = 0 }: ChatPanelProps) {
     // msg.moveNumber === state.moveNumber at send time; the board position at
     // that moment is represented by the node with moveNumber = msgMoveNumber - 1.
     const target = msgMoveNumber - 1;
-    const activeTree = isAnalyzing && analysisGameTree ? analysisGameTree : gameTree;
-    const activeNavigate = isAnalyzing ? analysisNavigateToNode : navigateToNode;
+    // Read the (circular) trees on demand so they never enter this component's
+    // hook dependency memory — see the note on the useRoomStore destructure.
+    const s = useRoomStore.getState();
+    const activeTree = s.isAnalyzing && s.analysisGameTree ? s.analysisGameTree : s.gameTree;
+    const activeNavigate = s.isAnalyzing ? s.analysisNavigateToNode : s.navigateToNode;
     const node = findNodeByMoveNumber(activeTree, target);
     activeNavigate(node);
-  }, [isAnalyzing, analysisGameTree, gameTree, analysisNavigateToNode, navigateToNode, findNodeByMoveNumber]);
+  }, [findNodeByMoveNumber]);
 
   return (
     <div className="flex flex-col h-full bg-white dark:bg-gray-800 rounded-lg shadow-md">

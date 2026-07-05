@@ -13,7 +13,7 @@ interface AuthStore {
   incomingChallengesCount: number;
 
   login: (username: string, password: string) => Promise<void>;
-  register: (username: string, password: string) => Promise<void>;
+  register: (username: string, password: string, email?: string) => Promise<void>;
   logout: () => void;
   fetchMe: () => Promise<void>;
   updateProfile: (updates: { quote?: string; country?: string; contactLink?: string; email?: string; oldPassword?: string; newPassword?: string }) => Promise<void>;
@@ -41,10 +41,10 @@ export const useAuthStore = create<AuthStore>((set, get) => ({
     }
   },
 
-  register: async (username, password) => {
+  register: async (username, password, email) => {
     set({ isLoading: true, error: null });
     try {
-      const { token, user } = await authApi.register(username, password);
+      const { token, user } = await authApi.register(username, password, email);
       localStorage.setItem(TOKEN_KEY, token);
       set({ token, user, isLoading: false });
     } catch (err: any) {

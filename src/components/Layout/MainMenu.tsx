@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUIStore, Language } from '../../store/uiStore';
 import { useGameStore } from '../../store/gameStore';
@@ -20,7 +20,6 @@ import BoardSelectionModal from './BoardSelectionModal';
 import BotGameModal from './BotGameModal';
 import SearchingMatchOverlay from './SearchingMatchOverlay';
 import OnlineChallengeModal from './OnlineChallengeModal';
-import ActiveGamesWidget from './ActiveGamesWidget';
 import { useMainMenuModals, NavTab } from './useMainMenuModals';
 import { useMatchmaking } from './useMatchmaking';
 import MiniGamePreview from '../UI/MiniGamePreview';
@@ -55,6 +54,22 @@ export const TIME_CONTROLS = [
   { id: 'long', icon: '⏳', enabled: true, preset: '30+0' as TimePresetId },
   { id: 'correspondence', icon: '∞', enabled: true, preset: '7d' as TimePresetId },
 ] as const;
+
+// Whose turn is it in an online game, from the current user's point of view.
+// Returns null when not applicable (local hot-seat game, or a spectator who
+// isn't one of the two named players). moveCount reflects moveNumber, which
+// starts at 1 — odd count means it's player1's move.
+export function isMyTurnInGame(
+  game: { isOnline: boolean; playerNames: { player1: string; player2: string }; moveCount: number },
+  username: string | undefined
+): boolean | null {
+  if (!game.isOnline || !username) return null;
+  const isP1 = game.playerNames.player1 === username;
+  const isP2 = game.playerNames.player2 === username;
+  if (!isP1 && !isP2) return null;
+  const isP1Turn = game.moveCount % 2 === 1;
+  return (isP1 && isP1Turn) || (isP2 && !isP1Turn);
+}
 
 export default function MainMenu() {
   const navigate = useNavigate();
@@ -148,7 +163,17 @@ export default function MainMenu() {
     { id: 'challenges', label: t.challenges, authOnly: true },
     { id: 'lobby', label: t.lobby },
   ];
-  const currentGames = savedGames.filter(g => !g.winner);
+  const currentGames = useMemo(() => savedGames.filter(g => !g.winner), [savedGames]);
+
+  // Order for the current-games list: games where it's your move first, then
+  // other online games (waiting on opponent), then local hot-seat games last.
+  const sortedCurrentGames = useMemo(() => {
+    const rank = (g: typeof currentGames[number]): number => {
+      if (!g.isOnline) return 2;
+      return isMyTurnInGame(g, user?.username) ? 0 : 1;
+    };
+    return [...currentGames].sort((a, b) => rank(a) - rank(b));
+  }, [currentGames, user?.username]);
 
   return (
     <div className="h-screen h-[100dvh] overflow-hidden flex flex-col bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-900 dark:to-gray-800">
@@ -536,30 +561,25 @@ export default function MainMenu() {
               onLoginClick={() => modals.setShowAuthModal(true)}
             />
           </div>
-          
-          <ActiveGamesWidget
-            currentGames={currentGames}
-            user={user}
-            onLoadGame={handleLoadGame}
-          />
         </aside>
 
         {/* CENTER: Time control modes */}
         <section className={`flex-1 flex flex-col min-w-0 order-1 lg:order-2 ${mobileMainTab !== 'play' ? 'hidden lg:flex' : ''}`}>
           {/* Mobile: current games carousel */}
-          {currentGames.length > 0 && (
+          {sortedCurrentGames.length > 0 && (
             <div className="lg:hidden mb-3">
               <div
                 className="flex gap-2 overflow-x-auto pb-1"
                 style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}
               >
-                {currentGames.map(game => (
+                {sortedCurrentGames.map(game => (
                   <MiniGamePreview
                     key={game.id}
                     gameId={game.id}
                     playerNames={game.playerNames}
                     moveCount={game.moveCount}
                     isOnline={game.isOnline}
+                    isMyTurn={isMyTurnInGame(game, user?.username)}
                     onClick={() => handleLoadGame(game.id)}
                   />
                 ))}
@@ -568,6 +588,30 @@ export default function MainMenu() {
           )}
 
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 flex-1 flex flex-col overflow-y-auto">
+            {/* Desktop: current games — wrapping grid of mini previews (your-turn first) */}
+            {sortedCurrentGames.length > 0 && (
+              <div className="hidden lg:block mb-5">
+                <h2 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
+                  {t.loadCurrent} ({sortedCurrentGames.length})
+                </h2>
+                <div className="flex flex-wrap gap-2.5">
+                  {sortedCurrentGames.map(game => (
+                    <MiniGamePreview
+                      key={game.id}
+                      gameId={game.id}
+                      playerNames={game.playerNames}
+                      moveCount={game.moveCount}
+                      isOnline={game.isOnline}
+                      size={140}
+                      isMyTurn={isMyTurnInGame(game, user?.username)}
+                      onClick={() => handleLoadGame(game.id)}
+                    />
+                  ))}
+                </div>
+                <div className="border-t border-gray-200 dark:border-gray-700 mt-5" />
+              </div>
+            )}
+
             {/* Center tabs */}
             <div className="grid grid-cols-2 bg-gray-100 dark:bg-gray-700 rounded-xl p-1 mb-5">
               <button
@@ -611,8 +655,6 @@ export default function MainMenu() {
                   modals.setOnlineModalInitialStep('board');
                   modals.setShowOnlineDialog(true);
                 }}
-                currentGames={currentGames}
-                onLoadGame={handleLoadGame}
               />
             )}
 

@@ -1,7 +1,16 @@
 import dotenv from 'dotenv';
-import { Pool } from 'pg';
+import { Pool, types } from 'pg';
 
 dotenv.config();
+
+// All TIMESTAMP columns store UTC wall-clock values (the DB session runs in UTC
+// and every write uses NOW()). By default node-postgres parses a bare
+// `timestamp without time zone` (OID 1114) in the Node process's LOCAL timezone,
+// which shifts every value by the host's UTC offset. On a non-UTC host (e.g. a
+// dev machine at UTC+3) that made `Date.now() - new Date(clock_running_since)`
+// off by hours — instantly timing out fresh timed games. Parse these as UTC so
+// clock math is correct regardless of the server's local timezone.
+types.setTypeParser(1114, (str) => new Date(str.replace(' ', 'T') + 'Z'));
 
 const pool = new Pool(
   process.env.DATABASE_URL

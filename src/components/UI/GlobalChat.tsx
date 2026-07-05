@@ -44,10 +44,11 @@ export default function GlobalChat() {
     const loadInitial = async () => {
       try {
         const page = await getGlobalChatMessages();
+        const msgs = Array.isArray(page?.messages) ? page.messages : [];
         if (!cancelled) {
-          setMessages(page.messages);
-          setHasMore(page.hasMore);
-          setLastMessageId(page.messages.length > 0 ? page.messages[page.messages.length - 1].id : 0);
+          setMessages(msgs);
+          setHasMore(page?.hasMore ?? false);
+          setLastMessageId(msgs.length > 0 ? msgs[msgs.length - 1].id : 0);
         }
       } catch {
         // ignore initial load errors
@@ -62,9 +63,10 @@ export default function GlobalChat() {
     const interval = setInterval(async () => {
       try {
         const page = await getGlobalChatMessages(lastMessageId || undefined);
-        if (page.messages.length > 0) {
-          setMessages((prev) => [...prev, ...page.messages].slice(-MAX_STORED_MESSAGES));
-          setLastMessageId(page.messages[page.messages.length - 1].id);
+        const msgs = Array.isArray(page?.messages) ? page.messages : [];
+        if (msgs.length > 0) {
+          setMessages((prev) => [...prev, ...msgs].slice(-MAX_STORED_MESSAGES));
+          setLastMessageId(msgs[msgs.length - 1].id);
         }
       } catch {
         // ignore polling errors

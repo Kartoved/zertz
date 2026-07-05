@@ -9,8 +9,6 @@ import { TIME_CONTROLS } from '../Layout/MainMenu';
 
 interface RoomsPanelProps {
   onCreateGame: () => void;
-  currentGames: any[];
-  onLoadGame: (gameId: string) => void;
 }
 
 function formatTimeControl(baseMs: number | null, incMs: number | null): string {
@@ -43,7 +41,7 @@ function RoomMeta({ room, t }: { room: PendingRoom; t: any }) {
   );
 }
 
-export default function RoomsPanel({ onCreateGame, currentGames, onLoadGame }: RoomsPanelProps) {
+export default function RoomsPanel({ onCreateGame }: RoomsPanelProps) {
   const { t } = useI18n();
   const navigate = useNavigate();
   const { user } = useAuthStore();
@@ -93,7 +91,6 @@ export default function RoomsPanel({ onCreateGame, currentGames, onLoadGame }: R
     } catch { /* ignore */ }
   }, [refreshSavedGames]);
 
-  const onlineCurrent = currentGames.filter(g => g.isOnline);
   const myRoomIds = new Set(myRooms.map(r => r.id));
   // Others' rooms = open rooms that aren't mine
   const othersRooms = openRooms.filter(r => !myRoomIds.has(r.id));
@@ -187,40 +184,7 @@ export default function RoomsPanel({ onCreateGame, currentGames, onLoadGame }: R
         </div>
       )}
 
-      {/* Current online games */}
-      {onlineCurrent.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
-            {t.loadCurrent} ({onlineCurrent.length})
-          </p>
-          {onlineCurrent.map(game => {
-            let isMyTurn = false;
-            if (user) {
-              const isPlayer1 = game.playerNames.player1 === user.username;
-              const isPlayer2 = game.playerNames.player2 === user.username;
-              const isPlayer1Turn = game.moveCount % 2 === 1;
-              isMyTurn = (isPlayer1 && isPlayer1Turn) || (isPlayer2 && !isPlayer1Turn);
-            }
-            return (
-              <button key={game.id} onClick={() => onLoadGame(game.id)}
-                className="w-full px-4 py-3 text-left rounded-xl bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700 border border-gray-200 dark:border-gray-700 transition-colors">
-                <div className="flex items-center gap-1.5 text-sm font-semibold text-gray-800 dark:text-gray-100">
-                  <span className="truncate">{game.playerNames.player1}</span>
-                  <span className="text-gray-400 text-xs font-normal">vs</span>
-                  <span className="truncate">{game.playerNames.player2}</span>
-                </div>
-                <div className="flex items-center gap-1.5 mt-1">
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-300">{t.onlineLabel}</span>
-                  {isMyTurn && <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-300">{t.yourTurn}</span>}
-                  <span className="text-[10px] text-gray-400 ml-auto">{game.moveCount - 1} {t.moves.toLowerCase()}</span>
-                </div>
-              </button>
-            );
-          })}
-        </div>
-      )}
-
-      {openRooms.length === 0 && onlineCurrent.length === 0 && myRooms.length === 0 && (
+      {openRooms.length === 0 && myRooms.length === 0 && (
         <p className="text-center text-sm text-gray-400 dark:text-gray-500 py-8">{t.lobbyEmpty}</p>
       )}
     </div>

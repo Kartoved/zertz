@@ -8,6 +8,7 @@ import { RoomScreen } from './components/Online/RoomScreen';
 import MagicLinkPage from './components/Auth/MagicLinkPage';
 import BlogList from './components/Blog/BlogList';
 import BlogPostPage from './components/Blog/BlogPostPage';
+import ErrorBoundary from './components/UI/ErrorBoundary';
 
 function LocalApp() {
   const { screen, initPush } = useUIStore();
@@ -27,15 +28,17 @@ function LocalApp() {
 
 function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<LocalApp />} />
-        <Route path="/room/:roomId" element={<RoomScreen />} />
-        <Route path="/magic" element={<MagicLinkPage />} />
-        <Route path="/news" element={<BlogList />} />
-        <Route path="/news/:slug" element={<BlogPostPage />} />
-      </Routes>
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Routes>
+          <Route path="/" element={<LocalApp />} />
+          <Route path="/room/:roomId" element={<RoomScreen />} />
+          <Route path="/magic" element={<MagicLinkPage />} />
+          <Route path="/news" element={<BlogList />} />
+          <Route path="/news/:slug" element={<BlogPostPage />} />
+        </Routes>
+      </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 
