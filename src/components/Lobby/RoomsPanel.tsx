@@ -102,7 +102,7 @@ export default function RoomsPanel({ onCreateGame, onPlayLocal }: RoomsPanelProp
   const XIcon = () => <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
 
   return (
-    <div className="flex flex-col gap-3 mt-6">
+    <div className="flex flex-col gap-3">
       {/* Play actions: create an online game (needs auth) + local hot-seat (always available) */}
       <div className="flex gap-2">
         <button
@@ -176,7 +176,13 @@ export default function RoomsPanel({ onCreateGame, onPlayLocal }: RoomsPanelProp
             return (
               <div key={room.id} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-700">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate mb-1">{creatorName}</p>
+                  <div className="flex items-center gap-1.5 mb-1 min-w-0">
+                    {room.creatorCountry && <span className="flex-shrink-0 text-sm leading-none">{room.creatorCountry}</span>}
+                    <span className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">{creatorName}</span>
+                    {room.creatorRating != null && (
+                      <span className="text-xs font-semibold text-indigo-500 dark:text-indigo-300 flex-shrink-0">{room.creatorRating}</span>
+                    )}
+                  </div>
                   <RoomMeta room={room} t={t} />
                 </div>
                 <button

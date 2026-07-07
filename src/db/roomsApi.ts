@@ -260,6 +260,9 @@ export interface PendingRoom {
   timeControlBaseMs: number | null;
   timeControlIncrementMs: number | null;
   createdAt: number;
+  /** Creator's rating/country — populated by /open (others' rooms), absent on /pending. */
+  creatorRating?: number | null;
+  creatorCountry?: string | null;
 }
 
 export async function getPendingRooms(): Promise<PendingRoom[]> {

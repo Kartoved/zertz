@@ -585,7 +585,7 @@ export default function MainMenu() {
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-md p-6 flex-1 flex flex-col overflow-y-auto">
             {/* Desktop: current games — wrapping grid of mini previews (your-turn first) */}
             {sortedCurrentGames.length > 0 && (
-              <div className="hidden lg:block mb-5">
+              <div className="hidden lg:block mb-4">
                 <h2 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
                   {t.loadCurrent} ({sortedCurrentGames.length})
                 </h2>
@@ -603,7 +603,7 @@ export default function MainMenu() {
                     />
                   ))}
                 </div>
-                <div className="border-t border-gray-200 dark:border-gray-700 mt-5" />
+                <div className="border-t border-gray-200 dark:border-gray-700 mt-4" />
               </div>
             )}
 

@@ -61,9 +61,14 @@ export default function MiniGamePreview({ gameId, playerNames, moveCount, isOnli
           {playerNames.player1} vs {playerNames.player2}
         </div>
         <div className="flex items-center gap-1.5">
-          {isMyTurn && (
+          {isMyTurn === true && (
             <span className="text-[9px] px-1 py-0.5 rounded bg-green-100 dark:bg-green-900/40 text-green-600 dark:text-green-300 font-semibold leading-none">
               {t.yourTurn}
+            </span>
+          )}
+          {isMyTurn === false && (
+            <span className="text-[9px] px-1 py-0.5 rounded bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-300 font-semibold leading-none">
+              {t.opponentTurn}
             </span>
           )}
           <span className="text-[9px] text-gray-400 dark:text-gray-500">

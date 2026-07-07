@@ -235,7 +235,6 @@ describe('getAvailableCaptures', () => {
     state.rings.get('1,0')!.marble = { color: 'gray' };
     state.rings.get('2,0')!.marble = { color: 'black' };
 
-    expect(captures => captures.some((c: any) => c.from === '0,0' && c.to === '2,0')).toBeDefined();
     expect(getAvailableCaptures(state).some(c => c.from === '0,0' && c.to === '2,0')).toBe(false);
   });
 

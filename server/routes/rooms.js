@@ -129,11 +129,14 @@ router.get('/pending', authRequired, async (req, res) => {
 router.get('/open', async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, board_size, creator_player, player1_name, player2_name, rated,
-              time_control_base_ms, time_control_increment_ms, created_at
-       FROM rooms
-       WHERE winner IS NULL AND (user1_id IS NULL OR user2_id IS NULL)
-       ORDER BY created_at DESC
+      `SELECT r.id, r.board_size, r.creator_player, r.player1_name, r.player2_name, r.rated,
+              r.time_control_base_ms, r.time_control_increment_ms, r.created_at,
+              u.rating AS creator_rating, u.country AS creator_country
+       FROM rooms r
+       LEFT JOIN users u
+         ON u.id = CASE WHEN r.creator_player = 1 THEN r.user1_id ELSE r.user2_id END
+       WHERE r.winner IS NULL AND (r.user1_id IS NULL OR r.user2_id IS NULL)
+       ORDER BY r.created_at DESC
        LIMIT 50`
     );
     res.json(result.rows.map(r => ({
@@ -146,6 +149,8 @@ router.get('/open', async (req, res) => {
       timeControlBaseMs: r.time_control_base_ms,
       timeControlIncrementMs: r.time_control_increment_ms,
       createdAt: r.created_at.getTime(),
+      creatorRating: r.creator_rating != null ? Math.round(r.creator_rating) : null,
+      creatorCountry: r.creator_country || null,
     })));
   } catch (err) {
     console.error('Get open rooms error:', err);
