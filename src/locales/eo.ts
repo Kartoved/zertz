@@ -339,6 +339,8 @@ export const eo = {
   premovesHint: 'Se via kontraŭulo movos kiel vi antaŭdiris, via respondo aŭtomate efektiviĝos.',
   statusOnline: 'Konektita',
   statusOffline: 'Nekonektita',
+  onlinePlayers: 'Konektitaj ludantoj',
+  noOneOnline: 'Neniu nun konektita',
   playersTotal: 'Entute',
   playersOnline: 'Konektitaj',
 };

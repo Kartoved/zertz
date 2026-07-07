@@ -24,12 +24,12 @@ npm run test         # Vitest (unit tests)
 npm run test:watch   # Vitest in watch mode
 
 # Local DB via Docker
-docker compose up -d  # starts postgres on port 5432
-
-# Deployment (Railway)
-npm run railway:build
-npm run railway:start
+docker compose up -d db   # postgres on 5432 (db service only — see note below)
 ```
+
+`docker-compose.yml` defines **two** services: `db` (postgres) and `web` (the full app image). For local development run only `db` in Docker, plus `npm run dev` (Vite) + `npm run dev:server` (Express on 5050); the `web` image is for production and, if left running locally, squats port 5050 with a possibly-stale build. The Vite dev proxy forwards `/api` → `127.0.0.1:5050`.
+
+**Deployment: Docker Compose on a VDS.** Production now runs `docker compose up -d` (both `web` + `db`) on a self-hosted VDS — no longer Railway. Containers default to UTC (no `TZ` set), which the clock logic relies on (see the timestamp convention below). The `railway:*` package scripts are legacy.
 
 Environment: copy `.env.example` → `.env`, set `JWT_SECRET`. Backend connects to Postgres via `DATABASE_URL` or individual `PG*` env vars.
 
@@ -103,7 +103,7 @@ Express app with JWT auth middleware. All routes under `/api`, static `dist/` se
 | Route prefix | File | Purpose |
 |---|---|---|
 | `/api/auth` | `routes/auth.js` | Register, login, magic-link passwordless auth, profile |
-| `/api/rooms` | `routes/rooms.js` | Room CRUD, state sync, Glicko-2 rating update on finish |
+| `/api/rooms` | `routes/rooms.js` | Room CRUD, state sync, Glicko-2 rating update on finish, `POST /:id/add-time` (gift time to opponent's clock) |
 | `/api/matchmake` | `routes/matchmaking.js` | In-memory queue, adaptive rating tolerance |
 | `/api/challenges` | `routes/challenges.js` | Game invitations |
 | `/api/players` | `routes/players.js` | Profiles, leaderboard, follows |
@@ -134,13 +134,19 @@ Express app with JWT auth middleware. All routes under `/api`, static `dist/` se
 
 **Mobile game screens use compact strips.** Both `RoomScreen` (online) and `GameScreen` (local) hide their desktop side panels on `<lg` and render: move-history strip under the header → opponent/player1 strip → board (flex-1) → you/player2 strip + ⋯ menu → marble picker (only during placement). Action buttons (Undo, Resign, Analysis, Cancel) live in a bottom-sheet popover triggered by the ⋯ icon in the bottom strip. Pre-moves are rendered in a separate "Plan" tab in the right sidebar / bottom nav, visible only for correspondence participants in analysis mode.
 
+**All `TIMESTAMP` columns are UTC; `server/db.js` forces node-postgres to parse them as UTC.** The tables use `timestamp without time zone`, every write uses SQL `NOW()`, and the DB session runs in UTC. By default node-postgres parses a bare timestamp in the **Node process's local timezone**, so on a non-UTC host `new Date(row.clock_running_since).getTime()` is off by the UTC offset — which made timed games instantly flag-fall on a dev machine at UTC+3. `server/db.js` sets `types.setTypeParser(1114, …)` to read these as UTC. Never compare a raw pg timestamp against `Date.now()` without that in place; prod containers run UTC so it was previously masked. Clock math lives in `server/routes/rooms.js` (read-time flag-fall in `GET /:id`, per-move deduction in `PUT /:id/state`).
+
+**Top-level `ErrorBoundary` (`src/components/UI/ErrorBoundary.tsx`).** Wraps the router in `App.tsx` so a render-time throw shows a recoverable fallback (with the stack in a `<details>`) instead of a blank white screen. Note it only catches render/lifecycle errors, not event-handler errors.
+
+**Board previews reuse `HexBoard` in `preview` mode.** `MiniGamePreview` renders `<HexBoard state=… preview />` — a static, non-interactive fit-to-container variant (no zoom/pan, tighter padding). Gradient ids in `HexRing` are prefixed with a per-`HexBoard` `useId()` so multiple boards on one page (e.g. the menu's current-games grid) don't collide on duplicate `url(#…)` refs and render transparent. The desktop main-menu center shows current games as a wrapping grid of these previews (your-turn games first, green border), inside the same card as the Rooms/Ladder panel.
+
 ### Game rules summary (for engine work)
 
 **Turn phases:** `placement` → `ringRemoval` → `capture` → back to `placement`
 
 - **Mandatory captures**: if any capture exists, player must capture (no placement allowed)
 - **Free ring**: empty ring with ≥2 adjacent free edges — eligible for removal
-- **Isolation auto-capture**: removing a ring that disconnects a fully-filled group awards those marbles to the removing player
+- **Isolation auto-capture**: after a ring removal, **every** fully-occupied isolated group is captured by the removing player (play continues on whichever group still has an empty ring). This includes the case where the split leaves *all* remaining marbles in one filled group — those are captured and can trigger the win. Mirrored in `shared/explorer/replay.js` (`handleIsolation`).
 - **Win**: 4 white, 5 gray, 6 black, OR 3 of each color in captures
 
 **Board sizes** (axial hex, flat-top): 37 rings (7 rows), 48 rings (8 rows), 61 rings (9 rows). Coordinates precomputed in `Board.ts`.

@@ -339,6 +339,8 @@ export const ru = {
   premovesHint: 'Если соперник сходит так, как ты предположил — твой ответ выполнится автоматически.',
   statusOnline: 'Онлайн',
   statusOffline: 'Не в сети',
+  onlinePlayers: 'Игроки онлайн',
+  noOneOnline: 'Сейчас никого нет',
   playersTotal: 'Всего',
   playersOnline: 'Онлайн',
 };

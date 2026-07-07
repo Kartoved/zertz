@@ -24,6 +24,7 @@ import { useMainMenuModals, NavTab } from './useMainMenuModals';
 import { useMatchmaking } from './useMatchmaking';
 import MiniGamePreview from '../UI/MiniGamePreview';
 import RoomsPanel from '../Lobby/RoomsPanel';
+import OnlinePlayersPanel from '../Lobby/OnlinePlayersPanel';
 
 export type TimePresetId = '5+5' | '15+0' | '30+0' | '7d';
 
@@ -561,6 +562,11 @@ export default function MainMenu() {
               onLoginClick={() => modals.setShowAuthModal(true)}
             />
           </div>
+          {user && (
+            <div className="w-full">
+              <OnlinePlayersPanel />
+            </div>
+          )}
         </aside>
 
         {/* CENTER: Time control modes */}

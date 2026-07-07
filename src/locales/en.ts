@@ -339,6 +339,8 @@ export const en = {
   premovesHint: 'If your opponent plays as you predicted, your reply will be played automatically.',
   statusOnline: 'Online',
   statusOffline: 'Offline',
+  onlinePlayers: 'Online players',
+  noOneOnline: 'No one online right now',
   playersTotal: 'Total',
   playersOnline: 'Online',
 };
