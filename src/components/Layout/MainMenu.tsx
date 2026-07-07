@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useUIStore, Language } from '../../store/uiStore';
 import { useGameStore } from '../../store/gameStore';
 import { useAuthStore } from '../../store/authStore';
-import { getPendingRooms } from '../../db/roomsApi';
 import { useI18n } from '../../i18n';
 import { APP_VERSION } from '../../version';
 import AuthModal from '../Auth/AuthModal';
@@ -79,14 +78,17 @@ export default function MainMenu() {
   const { newGame, newBotGame, savedGames, refreshSavedGames, loadSavedGame } = useGameStore();
 
   const modals = useMainMenuModals();
-  const { isSearchingMatch, cancelSearch, startSearch } = useMatchmaking();
+  // Matchmaking is kept in the codebase but not currently exposed in the UI
+  // (too few active players); only the overlay for an in-flight search remains.
+  const { isSearchingMatch, cancelSearch } = useMatchmaking();
 
-  const [selectedBoardSize, setSelectedBoardSize] = useState<37 | 48 | 61>(37);
+  // Board size / time control are no longer chosen on the menu (that lived in the
+  // removed "Ladder" tab) — the create-game modal collects them. Kept as fixed
+  // defaults that seed the modal and the (dormant) matchmaking overlay.
+  const selectedBoardSize: 37 | 48 | 61 = 37;
   const [selectedPreset, setSelectedPreset] = useState<TimePresetId>('5+5');
-  const [selectedTimeControl, setSelectedTimeControl] = useState<'blitz' | 'rapid' | 'long' | 'correspondence'>('blitz');
+  const selectedTimeControl: 'blitz' | 'rapid' | 'long' | 'correspondence' = 'blitz';
   const [mobileMainTab, setMobileMainTab] = useState<'play' | 'chat'>('play');
-  const [centerTab, setCenterTab] = useState<'ladder' | 'rooms'>('rooms');
-  const [pendingRoomsCount, setPendingRoomsCount] = useState(0);
 
   const { user, fetchMe, incomingChallengesCount } = useAuthStore();
   const boardLabels: Record<number, string> = { 37: t.board37, 48: t.board48, 61: t.board61 };
@@ -96,19 +98,6 @@ export default function MainMenu() {
     fetchMe();
   }, [refreshSavedGames, fetchMe, user?.id]);
 
-  useEffect(() => {
-    if (!user) { setPendingRoomsCount(0); return; }
-    let cancelled = false;
-    const refresh = async () => {
-      try {
-        const rooms = await getPendingRooms();
-        if (!cancelled) setPendingRoomsCount(rooms.length);
-      } catch { /* ignore */ }
-    };
-    refresh();
-    const id = setInterval(refresh, 5000);
-    return () => { cancelled = true; clearInterval(id); };
-  }, [user?.id]);
 
   const handleSelectBoard = (boardSize: 37 | 48 | 61) => {
     newGame(boardSize);
@@ -618,192 +607,15 @@ export default function MainMenu() {
               </div>
             )}
 
-            {/* Center tabs */}
-            <div className="grid grid-cols-2 bg-gray-100 dark:bg-gray-700 rounded-xl p-1 mb-5">
-              <button
-                type="button"
-                onClick={() => setCenterTab('rooms')}
-                className={`py-2 text-sm font-semibold rounded-lg transition-colors ${
-                  centerTab === 'rooms'
-                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                }`}
-              >
-                {t.tabRooms}
-                {pendingRoomsCount > 0 && (
-                  <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full font-semibold ${
-                    centerTab === 'rooms'
-                      ? 'bg-indigo-100 dark:bg-indigo-900/50 text-indigo-600 dark:text-indigo-300'
-                      : 'bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300'
-                  }`}>
-                    {pendingRoomsCount}
-                  </span>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setCenterTab('ladder')}
-                className={`py-2 text-sm font-semibold rounded-lg transition-colors ${
-                  centerTab === 'ladder'
-                    ? 'bg-white dark:bg-gray-800 text-gray-900 dark:text-white shadow-sm'
-                    : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-                }`}
-              >
-                {t.tabLadder}
-              </button>
-            </div>
-
-            {centerTab === 'rooms' && (
-              <RoomsPanel
-                onCreateGame={() => {
-                  const tc = TIME_CONTROLS.find(c => c.id === selectedTimeControl);
-                  if (tc && tc.preset !== null) setSelectedPreset(tc.preset);
-                  modals.setOnlineModalInitialStep('board');
-                  modals.setShowOnlineDialog(true);
-                }}
-              />
-            )}
-
-            {centerTab === 'ladder' && (
-              <>
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
-              {t.selectBoard}
-            </h2>
-            <div className="grid grid-cols-3 gap-3 mb-6">
-              {([37, 48, 61] as const).map(size => (
-                <button
-                  key={size}
-                  disabled={!user}
-                  onClick={() => user && setSelectedBoardSize(size)}
-                  className={`py-3 rounded-xl font-bold bg-white dark:bg-gray-800 transition-colors border-2
-                    ${!user
-                      ? 'opacity-50 cursor-not-allowed border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500'
-                      : selectedBoardSize === size
-                        ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 text-gray-900 dark:text-white shadow-sm'
-                        : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
-                    }`}
-                >
-                  <div className="text-xl mb-1">
-                    {size === 37 ? t.boardSizeSmall : size === 48 ? t.boardSizeMedium : t.boardSizeLarge}
-                  </div>
-                  <div className="text-xs font-normal text-gray-500 dark:text-gray-400">
-                    {boardLabels[size]}
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-6">
-              {t.selectTimeControl}
-            </h2>
-
-            {/* Optional generic button for inviting (hidden as we use direct buttons now) */}
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
-              {TIME_CONTROLS.map((tc) => {
-                const label = t[tc.id as keyof typeof t] as string || tc.id;
-                const desc = t[`${tc.id}Desc` as keyof typeof t] as string || '';
-                return (
-                  <button
-                    key={tc.id}
-                    disabled={!tc.enabled || (!user && tc.preset !== null)}
-                    onClick={() => {
-                      if (!user && tc.preset !== null) {
-                        modals.setShowAuthModal(true);
-                        return;
-                      }
-                      setSelectedTimeControl(tc.id);
-                    }}
-                    className={`relative flex flex-col items-center justify-center sm:p-6 p-2 rounded-2xl border-2 transition-all
-                      ${(!tc.enabled || (!user && tc.preset !== null))
-                        ? 'border-dashed border-gray-300 dark:border-gray-600 opacity-60 cursor-not-allowed bg-gray-50 dark:bg-gray-800'
-                        : selectedTimeControl === tc.id
-                          ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 ring-2 ring-indigo-500/50 scale-[1.02] shadow-md'
-                          : 'border-gray-200 dark:border-gray-600 hover:border-indigo-300 dark:hover:border-indigo-500 hover:bg-gray-50 dark:hover:bg-gray-700 bg-white dark:bg-gray-800'
-                      }`}
-                  >
-                    {!tc.enabled && (
-                      <span className="absolute top-1 right-1 sm:top-3 sm:right-3 text-[9px] sm:text-[10px] bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-400 px-1.5 py-0.5 rounded-full uppercase tracking-wide font-semibold">
-                        {t.comingSoon}
-                      </span>
-                    )}
-                    <span className={`sm:text-4xl text-2xl sm:mb-3 mb-1 ${selectedTimeControl === tc.id ? 'scale-110' : ''} transition-transform`}>{tc.icon}</span>
-                    <span className="sm:text-lg text-sm font-bold text-gray-900 dark:text-white uppercase tracking-wide">
-                      {label}
-                    </span>
-                    <span className="sm:text-sm text-xs text-gray-500 dark:text-gray-400 sm:mt-1 text-center font-medium">
-                      {desc}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="mt-6 flex flex-col gap-3 items-center">
-                <div className="flex gap-2 w-full sm:w-2/3 lg:w-1/2">
-                  <button
-                    type="button"
-                    disabled={!user}
-                    className={`flex-1 py-3.5 px-3 rounded-xl font-bold sm:text-lg text-base transition-all shadow-md
-                      ${user
-                        ? 'hover:shadow-lg active:scale-95 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white'
-                        : 'opacity-50 cursor-not-allowed bg-gradient-to-r from-blue-500 to-indigo-600 text-white'
-                      }`}
-                    onClick={() => startSearch(selectedBoardSize, selectedTimeControl, () => modals.setShowAuthModal(true))}
-                  >
-                    {t.searchGame}
-                  </button>
-
-                  <button
-                    type="button"
-                    disabled={!user}
-                    className={`flex-1 py-3.5 px-3 rounded-xl font-bold sm:text-lg text-base transition-all shadow-md
-                      ${user
-                        ? 'hover:shadow-lg active:scale-95 bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800 hover:bg-gray-50 dark:hover:bg-gray-700'
-                        : 'opacity-50 cursor-not-allowed bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800'
-                      }`}
-                    onClick={() => {
-                      if (!user) return;
-                      const tc = TIME_CONTROLS.find(c => c.id === selectedTimeControl);
-                      if (!tc) return;
-                      if (tc.preset !== null) setSelectedPreset(tc.preset);
-                      modals.setOnlineModalInitialStep('board');
-                      modals.setShowOnlineDialog(true);
-                    }}
-                  >
-                    {t.playByLink}
-                  </button>
-                </div>
-
-                {!user && (
-                  <p className="text-sm text-gray-500 dark:text-gray-400 text-center mt-1">
-                    🔒 {t.onlineRequiresAuth}
-                  </p>
-                )}
-
-                <div className="flex gap-2 w-full sm:w-2/3 lg:w-1/2">
-                  <button
-                    type="button"
-                    disabled
-                    className="flex-1 py-2.5 px-3 rounded-xl font-semibold text-sm shadow-sm
-                      bg-gray-100 dark:bg-gray-700 opacity-50 cursor-not-allowed
-                      text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-600"
-                  >
-                    🤖 {t.playVsBot} <span className="text-xs font-normal">({t.comingSoon})</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => modals.setShowBoardDialog(true)}
-                    className="flex-1 py-2.5 px-3 rounded-xl font-semibold text-sm transition-all shadow-sm
-                      bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600
-                      text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-600"
-                  >
-                    👥 {t.playLocal}
-                  </button>
-                </div>
-              </div>
-              </>
-            )}
+            <RoomsPanel
+              onCreateGame={() => {
+                const tc = TIME_CONTROLS.find(c => c.id === selectedTimeControl);
+                if (tc && tc.preset !== null) setSelectedPreset(tc.preset);
+                modals.setOnlineModalInitialStep('board');
+                modals.setShowOnlineDialog(true);
+              }}
+              onPlayLocal={() => modals.setShowBoardDialog(true)}
+            />
 
           </div>
 

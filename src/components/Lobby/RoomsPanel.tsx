@@ -9,6 +9,7 @@ import { TIME_CONTROLS } from '../Layout/MainMenu';
 
 interface RoomsPanelProps {
   onCreateGame: () => void;
+  onPlayLocal: () => void;
 }
 
 function formatTimeControl(baseMs: number | null, incMs: number | null): string {
@@ -41,7 +42,7 @@ function RoomMeta({ room, t }: { room: PendingRoom; t: any }) {
   );
 }
 
-export default function RoomsPanel({ onCreateGame }: RoomsPanelProps) {
+export default function RoomsPanel({ onCreateGame, onPlayLocal }: RoomsPanelProps) {
   const { t } = useI18n();
   const navigate = useNavigate();
   const { user } = useAuthStore();
@@ -102,19 +103,30 @@ export default function RoomsPanel({ onCreateGame }: RoomsPanelProps) {
 
   return (
     <div className="flex flex-col gap-3 mt-6">
-      {/* Create game */}
-      <button
-        type="button"
-        disabled={!user}
-        onClick={() => user && onCreateGame()}
-        className={`w-full py-3.5 px-3 rounded-xl font-bold sm:text-lg text-base transition-all shadow-md
-          ${user
-            ? 'hover:shadow-lg active:scale-95 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white'
-            : 'opacity-50 cursor-not-allowed bg-gradient-to-r from-blue-500 to-indigo-600 text-white'
-          }`}
-      >
-        + {t.createGame}
-      </button>
+      {/* Play actions: create an online game (needs auth) + local hot-seat (always available) */}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          disabled={!user}
+          onClick={() => user && onCreateGame()}
+          className={`flex-1 py-3.5 px-3 rounded-xl font-bold sm:text-lg text-base transition-all shadow-md
+            ${user
+              ? 'hover:shadow-lg active:scale-95 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white'
+              : 'opacity-50 cursor-not-allowed bg-gradient-to-r from-blue-500 to-indigo-600 text-white'
+            }`}
+        >
+          + {t.createGame}
+        </button>
+        <button
+          type="button"
+          onClick={onPlayLocal}
+          className="flex-1 py-3.5 px-3 rounded-xl font-bold sm:text-lg text-base transition-all shadow-md
+            bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800
+            hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-95"
+        >
+          👥 {t.playLocal}
+        </button>
+      </div>
 
       {!user && (
         <p className="text-sm text-gray-500 dark:text-gray-400 text-center">
