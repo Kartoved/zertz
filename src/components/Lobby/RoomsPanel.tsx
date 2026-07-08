@@ -136,10 +136,11 @@ export default function RoomsPanel({ onCreateGame, onPlayLocal }: RoomsPanelProp
 
       {/* My waiting rooms */}
       {myRooms.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+        <div>
+          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
             {t.lobbyWaiting}
           </p>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
           {myRooms.map(room => (
             <div key={room.id} className="flex items-center gap-3 px-4 py-3 rounded-xl bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700">
               <div className="flex-1 min-w-0">
@@ -162,15 +163,17 @@ export default function RoomsPanel({ onCreateGame, onPlayLocal }: RoomsPanelProp
               </div>
             </div>
           ))}
+          </div>
         </div>
       )}
 
       {/* Others' open rooms */}
       {othersRooms.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">
+        <div>
+          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
             {t.openRooms ?? 'Открытые комнаты'}
           </p>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-2">
           {othersRooms.map(room => {
             const creatorName = room.creatorPlayer === 1 ? room.player1Name : room.player2Name;
             return (
@@ -199,6 +202,7 @@ export default function RoomsPanel({ onCreateGame, onPlayLocal }: RoomsPanelProp
               </div>
             );
           })}
+          </div>
         </div>
       )}
 
