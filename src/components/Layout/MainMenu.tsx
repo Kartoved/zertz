@@ -24,6 +24,7 @@ import { useMatchmaking } from './useMatchmaking';
 import MiniGamePreview from '../UI/MiniGamePreview';
 import RoomsPanel from '../Lobby/RoomsPanel';
 import OnlinePlayersPanel from '../Lobby/OnlinePlayersPanel';
+import IncomingChallengesBanner from './IncomingChallengesBanner';
 
 export type TimePresetId = '5+5' | '15+0' | '30+0' | '7d';
 
@@ -560,6 +561,9 @@ export default function MainMenu() {
 
         {/* CENTER: Time control modes */}
         <section className={`flex-1 flex flex-col min-w-0 order-1 lg:order-2 ${mobileMainTab !== 'play' ? 'hidden lg:flex' : ''}`}>
+          {/* Incoming challenges — prominent so they aren't missed */}
+          <IncomingChallengesBanner />
+
           {/* Mobile: current games carousel */}
           {sortedCurrentGames.length > 0 && (
             <div className="lg:hidden mb-3">

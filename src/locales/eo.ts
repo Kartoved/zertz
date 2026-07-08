@@ -124,6 +124,7 @@ export const eo = {
   unfollowed: 'Malabono farita',
   followed: 'Abono farita',
   incoming: 'Envenaj',
+  incomingChallenges: 'Envenaj defioj',
   outgoing: 'Elvenaj',
   noIncoming: 'Neniuj envenaj defioj',
   noOutgoing: 'Neniuj elvenaj defioj',

@@ -124,6 +124,7 @@ export const ru = {
   unfollowed: 'Отписка оформлена',
   followed: 'Подписка оформлена',
   incoming: 'Входящие',
+  incomingChallenges: 'Входящие вызовы',
   outgoing: 'Исходящие',
   noIncoming: 'Нет входящих вызовов',
   noOutgoing: 'Нет исходящих вызовов',

@@ -124,6 +124,7 @@ export const en = {
   unfollowed: 'Unfollowed',
   followed: 'Followed',
   incoming: 'Incoming',
+  incomingChallenges: 'Incoming challenges',
   outgoing: 'Outgoing',
   noIncoming: 'No incoming challenges',
   noOutgoing: 'No outgoing challenges',
