@@ -4,7 +4,7 @@ import { authRequired, optionalAuth } from '../middleware/auth.js';
 import { glicko2Update } from '../utils/glicko2.js';
 import { sendPushToUser } from '../utils/pushNotifications.js';
 import { indexRoom } from '../explorer.js';
-import { verifySubmittedState } from '../utils/verifyState.js';
+import { verifySubmittedState, computePremoveResponse } from '../utils/verifyState.js';
 import { moveLimiter, createRoomLimiter, chatLimiter, addTimeLimiter } from '../middleware/rateLimits.js';
 
 // How much time a "give opponent more time" press adds, by control type.
@@ -708,7 +708,7 @@ async function tryAutoExecutePremove(roomId, ownerPlayer, opponentPlayer) {
     await client.query('BEGIN');
 
     const result = await client.query(
-      `SELECT premoves_json, tree_json, time_control_increment_ms, time_control_base_ms,
+      `SELECT premoves_json, tree_json, board_size, time_control_increment_ms, time_control_base_ms,
               clock_p1_ms, clock_p2_ms, user1_id, user2_id
        FROM rooms WHERE id = $1
        FOR UPDATE`,
@@ -784,8 +784,28 @@ async function tryAutoExecutePremove(roomId, ownerPlayer, opponentPlayer) {
     const matched = variants[matchedIdx];
     const responseStep = matched.sequence[1];
 
-    // Refuse to auto-trigger a winning response.
-    if (responseStep.newWinner != null) {
+    // Server-authoritative: replay the tree, confirm the live position matches
+    // what the pre-move was built against, and compute the response state with
+    // the shared engine — never trust the client-precomputed state.
+    const computed = computePremoveResponse({
+      treeJson: room.tree_json,
+      boardSize: room.board_size,
+      expectedPreStateJson: matched.sequence[0].newStateJson,
+      responseMove: responseStep.move,
+    });
+    if (!computed.ok) {
+      // Position diverged (transposition / stale anchor) or move inapplicable —
+      // drop this owner's variants rather than fire a stale/illegal move.
+      console.warn(`[premove] not fired (room ${roomId}, player ${ownerPlayer}): ${computed.reason}`);
+      if (ownerPlayer === 1) premoves.player1 = [];
+      else premoves.player2 = [];
+      await client.query('UPDATE rooms SET premoves_json = $2 WHERE id = $1', [roomId, JSON.stringify(premoves)]);
+      await client.query('COMMIT');
+      return false;
+    }
+
+    // Refuse to auto-trigger a winning response — let the player deliver the win.
+    if (computed.winner != null) {
       if (ownerPlayer === 1) premoves.player1 = [];
       else premoves.player2 = [];
       await client.query('UPDATE rooms SET premoves_json = $2 WHERE id = $1', [roomId, JSON.stringify(premoves)]);
@@ -832,9 +852,9 @@ async function tryAutoExecutePremove(roomId, ownerPlayer, opponentPlayer) {
        WHERE id = $1`,
       [
         roomId,
-        responseStep.newStateJson,
+        computed.stateJson,
         JSON.stringify(tree),
-        responseStep.newCurrentPlayer,
+        computed.currentPlayer,
         nextClockP1,
         nextClockP2,
         JSON.stringify(premoves),
