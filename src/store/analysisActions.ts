@@ -1,4 +1,4 @@
-import { GameState, GameNode, MarbleColor, CaptureMove, PreMoveVariant } from '../game/types';
+import { GameState, GameNode, MarbleColor, CaptureMove, PreMoveNode, PreMoveTree } from '../game/types';
 import { getCaptureChains } from '../game/GameEngine';
 import { getValidRemovableRings } from '../game/Board';
 import { applyPlacement, applyRingRemoval, applyCapture, normalizePhase } from '../utils/moveActions';
@@ -15,35 +15,33 @@ export interface AnalysisMoveResult {
   analysisCurrentNode?: GameNode;
 }
 
-// Mutates `startNode` in place: injects saved pre-move variants as branches so
-// the user can navigate them in the move-history widget. Variants sharing a
-// prefix collapse into the same nodes.
-export function injectPremovesIntoTree(startNode: GameNode, premoves: PreMoveVariant[]): void {
-  for (const variant of premoves) {
-    let parent = startNode;
-    for (let i = 0; i < variant.sequence.length; i++) {
-      const step = variant.sequence[i];
-      const existing = parent.children.find(c =>
-        c.move && JSON.stringify(c.move) === JSON.stringify(step.move)
+// Mutates `startNode` in place: injects the saved pre-move tree as branches so
+// the user can navigate them in the move-history widget. Pre-move nodes sharing
+// a prefix collapse onto the same game-tree nodes.
+export function injectPremovesIntoTree(startNode: GameNode, premoves: PreMoveTree | null): void {
+  if (!premoves) return;
+  const walk = (parent: GameNode, pmNodes: PreMoveNode[]): void => {
+    for (const pm of pmNodes) {
+      let target = parent.children.find(c =>
+        c.move && JSON.stringify(c.move) === JSON.stringify(pm.move)
       );
-      if (existing) {
-        parent = existing;
-        continue;
+      if (!target) {
+        target = {
+          id: `pm-${pm.id}`,
+          moveNumber: parent.moveNumber + 1,
+          player: pm.player,
+          move: pm.move,
+          notation: pm.notation,
+          children: [],
+          parent,
+          isMainLine: parent.children.length === 0,
+        };
+        parent.children.push(target);
       }
-      const newNode: GameNode = {
-        id: `pm-${variant.id}-${i}`,
-        moveNumber: parent.moveNumber + 1,
-        player: step.player,
-        move: step.move,
-        notation: step.notation,
-        children: [],
-        parent,
-        isMainLine: parent.children.length === 0,
-      };
-      parent.children.push(newNode);
-      parent = newNode;
+      walk(target, pm.children);
     }
-  }
+  };
+  walk(startNode, premoves.children);
 }
 
 // Returns the selection slice to apply, or null when the input is invalid and

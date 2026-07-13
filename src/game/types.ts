@@ -82,11 +82,18 @@ export const WIN_CONDITIONS = {
   allColors: 3,
 };
 
-// Conditional pre-moves for correspondence games.
-// A variant is a sequence of moves alternating expected-opponent / my-response.
-// `sequence[0]` is what I expect the opponent to play next from the live position.
-// `sequence[1]` is the move I want auto-played in response. And so on for chains.
-export interface PreMoveStep {
+// Conditional pre-moves for correspondence games — modelled as a TREE.
+//
+// Invariant (alternating levels): a node's children are the moves that follow
+// it. A tree is rooted at the live position, so `PreMoveTree.children` and the
+// children of any "my" node are OPPONENT moves — many, one per branch I plan a
+// reply for. The children of any OPPONENT node are MY response — exactly one,
+// because from a given position I only ever play one move (the server must know
+// what to auto-fire). Arm-from-own-move is handled by playing my first move
+// immediately as a real move, so a stored tree's root children are always
+// opponent moves.
+export interface PreMoveNode {
+  id: string;
   move: Move;
   notation: string;
   player: Player;          // who makes this move (player1 or player2)
@@ -94,14 +101,25 @@ export interface PreMoveStep {
   newCurrentPlayer: 1 | 2; // whose turn AFTER this move
   newWinner: number | null;
   newWinType: string | null;
+  children: PreMoveNode[]; // my node ⇒ ≤1 child; opponent node ⇒ ≥0 children
 }
 
-export interface PreMoveVariant {
-  id: string;
-  sequence: PreMoveStep[];
+export interface PreMoveTree {
+  anchorStateJson: string; // live position this tree is rooted at (staleness check)
+  children: PreMoveNode[]; // expected opponent moves (branches) from the anchor
 }
 
 export interface PreMovesByPlayer {
-  player1: PreMoveVariant[];
-  player2: PreMoveVariant[];
+  player1: PreMoveTree | null;
+  player2: PreMoveTree | null;
+}
+
+// Transient server → client message about what happened to my pre-move tree
+// (auto-fired a reply, or got pruned because the game diverged). Surfaced as a
+// toast; deduped by `at`.
+export interface PreMoveNotice {
+  type: 'fired' | 'pruned';
+  reason?: string;
+  notation?: string;
+  at: number;
 }

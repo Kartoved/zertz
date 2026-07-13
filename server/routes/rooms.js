@@ -5,6 +5,7 @@ import { glicko2Update } from '../utils/glicko2.js';
 import { sendPushToUser } from '../utils/pushNotifications.js';
 import { indexRoom } from '../explorer.js';
 import { verifySubmittedState, computePremoveResponse } from '../utils/verifyState.js';
+import { parsePremoves, selectPremoveResponse, setNotice, clearNotice } from '../utils/premoveTree.js';
 import { moveLimiter, createRoomLimiter, chatLimiter, addTimeLimiter } from '../middleware/rateLimits.js';
 
 // How much time a "give opponent more time" press adds, by control type.
@@ -667,30 +668,6 @@ router.put('/:id/state', moveLimiter, authRequired, async (req, res) => {
 
 // ==================== Pre-move auto-execution ====================
 
-function movesEqual(a, b) {
-  if (!a || !b || a.type !== b.type) return false;
-  if (a.type === 'placement') {
-    return a.data.marbleColor === b.data.marbleColor
-      && a.data.ringId === b.data.ringId
-      && (a.data.removedRingId ?? null) === (b.data.removedRingId ?? null);
-  }
-  if (a.type === 'capture') {
-    if (a.data.from !== b.data.from || a.data.to !== b.data.to || a.data.captured !== b.data.captured) {
-      return false;
-    }
-    const aChain = a.data.chain || [];
-    const bChain = b.data.chain || [];
-    if (aChain.length !== bChain.length) return false;
-    for (let i = 0; i < aChain.length; i++) {
-      if (aChain[i].from !== bChain[i].from || aChain[i].to !== bChain[i].to || aChain[i].captured !== bChain[i].captured) {
-        return false;
-      }
-    }
-    return true;
-  }
-  return false;
-}
-
 function findDeepestMainLineNode(node) {
   let current = node;
   while (current && Array.isArray(current.children) && current.children.length > 0) {
@@ -727,62 +704,43 @@ async function tryAutoExecutePremove(roomId, ownerPlayer, opponentPlayer) {
       return false;
     }
 
-    let premoves;
-    try {
-      premoves = JSON.parse(room.premoves_json || '{}');
-    } catch {
-      await client.query('ROLLBACK');
-      return false;
-    }
-    if (!premoves || typeof premoves !== 'object') {
-      await client.query('ROLLBACK');
-      return false;
-    }
-    premoves.player1 = Array.isArray(premoves.player1) ? premoves.player1 : [];
-    premoves.player2 = Array.isArray(premoves.player2) ? premoves.player2 : [];
-
-    const variants = ownerPlayer === 1 ? premoves.player1 : premoves.player2;
-    if (variants.length === 0) {
+    const premoves = parsePremoves(room.premoves_json);
+    const ownerSide = ownerPlayer === 1 ? 'player1' : 'player2';
+    const tree = premoves[ownerSide];
+    if (!tree || !Array.isArray(tree.children) || tree.children.length === 0) {
       await client.query('ROLLBACK');
       return false;
     }
 
-    // Extract the just-played move from the tree (last node in the main line).
-    let tree;
+    // Extract the just-played move from the game tree (deepest main-line node).
+    let gameTree;
     try {
-      tree = JSON.parse(room.tree_json);
+      gameTree = JSON.parse(room.tree_json);
     } catch {
       await client.query('ROLLBACK');
       return false;
     }
-    const lastNode = findDeepestMainLineNode(tree);
+    const lastNode = findDeepestMainLineNode(gameTree);
     if (!lastNode || !lastNode.move) {
       await client.query('ROLLBACK');
       return false;
     }
 
-    // Find a variant whose first step matches the just-played move.
-    let matchedIdx = -1;
-    for (let i = 0; i < variants.length; i++) {
-      const seq = variants[i].sequence;
-      if (!Array.isArray(seq) || seq.length < 2) continue;
-      if (movesEqual(seq[0].move, lastNode.move)) {
-        matchedIdx = i;
-        break;
-      }
-    }
+    const selection = selectPremoveResponse(tree, lastNode.move);
 
-    if (matchedIdx === -1) {
-      // No variant matched — invalidate all variants of the owner.
-      if (ownerPlayer === 1) premoves.player1 = [];
-      else premoves.player2 = [];
+    // No reply to fire: opponent went off-plan (prune + notify) or the branch
+    // simply ran out (end quietly). Either way clear the owner's tree.
+    if (selection.action !== 'fire') {
+      premoves[ownerSide] = null;
+      if (selection.action === 'prune') {
+        setNotice(premoves, ownerSide, { type: 'pruned', reason: selection.reason });
+      }
       await client.query('UPDATE rooms SET premoves_json = $2 WHERE id = $1', [roomId, JSON.stringify(premoves)]);
       await client.query('COMMIT');
       return false;
     }
 
-    const matched = variants[matchedIdx];
-    const responseStep = matched.sequence[1];
+    const response = selection.response;
 
     // Server-authoritative: replay the tree, confirm the live position matches
     // what the pre-move was built against, and compute the response state with
@@ -790,15 +748,15 @@ async function tryAutoExecutePremove(roomId, ownerPlayer, opponentPlayer) {
     const computed = computePremoveResponse({
       treeJson: room.tree_json,
       boardSize: room.board_size,
-      expectedPreStateJson: matched.sequence[0].newStateJson,
-      responseMove: responseStep.move,
+      expectedPreStateJson: selection.expectedPreStateJson,
+      responseMove: response.move,
     });
     if (!computed.ok) {
       // Position diverged (transposition / stale anchor) or move inapplicable —
-      // drop this owner's variants rather than fire a stale/illegal move.
+      // drop the owner's tree rather than fire a stale/illegal move.
       console.warn(`[premove] not fired (room ${roomId}, player ${ownerPlayer}): ${computed.reason}`);
-      if (ownerPlayer === 1) premoves.player1 = [];
-      else premoves.player2 = [];
+      premoves[ownerSide] = null;
+      setNotice(premoves, ownerSide, { type: 'pruned', reason: computed.reason });
       await client.query('UPDATE rooms SET premoves_json = $2 WHERE id = $1', [roomId, JSON.stringify(premoves)]);
       await client.query('COMMIT');
       return false;
@@ -806,20 +764,20 @@ async function tryAutoExecutePremove(roomId, ownerPlayer, opponentPlayer) {
 
     // Refuse to auto-trigger a winning response — let the player deliver the win.
     if (computed.winner != null) {
-      if (ownerPlayer === 1) premoves.player1 = [];
-      else premoves.player2 = [];
+      premoves[ownerSide] = null;
+      setNotice(premoves, ownerSide, { type: 'pruned', reason: 'winning-move-not-auto-fired' });
       await client.query('UPDATE rooms SET premoves_json = $2 WHERE id = $1', [roomId, JSON.stringify(premoves)]);
       await client.query('COMMIT');
       return false;
     }
 
-    // Append the response node to the tree.
+    // Append the response node to the game tree.
     const responseNode = {
       id: `auto-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
       moveNumber: (lastNode.moveNumber ?? 0) + 1,
-      player: responseStep.player,
-      move: responseStep.move,
-      notation: responseStep.notation,
+      player: response.player,
+      move: response.move,
+      notation: response.notation,
       children: [],
       parent: null,
       isMainLine: lastNode.children.length === 0,
@@ -827,11 +785,10 @@ async function tryAutoExecutePremove(roomId, ownerPlayer, opponentPlayer) {
     if (!Array.isArray(lastNode.children)) lastNode.children = [];
     lastNode.children.push(responseNode);
 
-    // Advance the matched variant; drop others (now off-track).
-    const remaining = matched.sequence.slice(2);
-    const newVariants = remaining.length > 0 ? [{ id: matched.id, sequence: remaining }] : [];
-    if (ownerPlayer === 1) premoves.player1 = newVariants;
-    else premoves.player2 = newVariants;
+    // Shift the tree down: the subtree below the fired response becomes the new
+    // root (deeper branches preserved); off-track opponent siblings are pruned.
+    premoves[ownerSide] = selection.newTree;
+    setNotice(premoves, ownerSide, { type: 'fired', notation: response.notation });
 
     const baseMs = Number(room.time_control_base_ms);
     let nextClockP1 = room.clock_p1_ms == null ? baseMs : Number(room.clock_p1_ms);
@@ -853,7 +810,7 @@ async function tryAutoExecutePremove(roomId, ownerPlayer, opponentPlayer) {
       [
         roomId,
         computed.stateJson,
-        JSON.stringify(tree),
+        JSON.stringify(gameTree),
         computed.currentPlayer,
         nextClockP1,
         nextClockP2,
@@ -1142,27 +1099,13 @@ router.delete('/:id', authRequired, async (req, res) => {
 });
 
 // ==================== Conditional pre-moves ====================
-// Pre-moves are alternating sequences of (expected opponent move, my response).
-// Stored per player as JSON: { player1: Variant[], player2: Variant[] }
-// Only the player who owns a slot can read/write their own pre-moves.
+// Conditional pre-moves are stored per player as a TREE (see
+// server/utils/premoveTree.js). Only the player who owns a slot can read/write
+// their own pre-moves — the opponent's tree is never exposed (it would leak
+// their plan).
 
-function emptyPremoves() {
-  return { player1: [], player2: [] };
-}
-
-function parsePremoves(json) {
-  try {
-    const parsed = JSON.parse(json || '{}');
-    return {
-      player1: Array.isArray(parsed.player1) ? parsed.player1 : [],
-      player2: Array.isArray(parsed.player2) ? parsed.player2 : [],
-    };
-  } catch {
-    return emptyPremoves();
-  }
-}
-
-// GET pre-moves for the authenticated user
+// GET the authenticated user's own pre-move tree (+ any pending notice).
+// Shaped as { player1, player2 } but only the caller's own side is populated.
 router.get('/:id/premoves', authRequired, async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
@@ -1188,21 +1131,27 @@ router.get('/:id/premoves', authRequired, async (req, res) => {
     }
 
     const all = parsePremoves(room.premoves_json);
-    res.json({ variants: myPlayer === 1 ? all.player1 : all.player2 });
+    const side = myPlayer === 1 ? 'player1' : 'player2';
+    res.json({
+      player1: myPlayer === 1 ? all.player1 : null,
+      player2: myPlayer === 2 ? all.player2 : null,
+      notice: all.notices ? (all.notices[side] || null) : null,
+    });
   } catch (err) {
     console.error('Get premoves error:', err);
     res.status(500).json({ error: 'Failed to get premoves' });
   }
 });
 
-// PUT pre-moves for the authenticated user (replaces all variants)
+// PUT the authenticated user's own pre-move tree (replaces it entirely).
+// Body: { tree: PreMoveTree | null }. Saving also clears any stale notice.
 router.put('/:id/premoves', authRequired, async (req, res) => {
   const { id } = req.params;
   const userId = req.user.id;
-  const { variants } = req.body;
+  const { tree } = req.body;
 
-  if (!Array.isArray(variants)) {
-    res.status(400).json({ error: 'variants must be an array' });
+  if (tree !== null && (typeof tree !== 'object' || !Array.isArray(tree.children))) {
+    res.status(400).json({ error: 'tree must be a PreMoveTree or null' });
     return;
   }
 
@@ -1227,8 +1176,9 @@ router.put('/:id/premoves', authRequired, async (req, res) => {
 
   try {
     const all = parsePremoves(room.premoves_json);
-    if (myPlayer === 1) all.player1 = variants;
-    else all.player2 = variants;
+    const side = myPlayer === 1 ? 'player1' : 'player2';
+    all[side] = tree;
+    clearNotice(all, side);
 
     await pool.query(
       'UPDATE rooms SET premoves_json = $2 WHERE id = $1',

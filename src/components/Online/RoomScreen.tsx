@@ -8,6 +8,7 @@ import { ChatPanel } from './ChatPanel';
 import MarbleSelector from '../UI/MarbleSelector';
 import { getValidRemovableRings } from '../../game/Board';
 import { getWinType } from '../../game/GameEngine';
+import { PreMoveNode } from '../../game/types';
 import PlayerProfileModal from '../Auth/PlayerProfileModal';
 import RulesContent from '../UI/RulesContent';
 import OnlineMoveHistory from '../UI/OnlineMoveHistory';
@@ -100,8 +101,11 @@ export function RoomScreen() {
     analysisHandleCapture,
     analysisNavigateToNode,
     premoves,
-    addCurrentVariantAsPremove,
-    deletePremoveVariant,
+    premoveNotice,
+    savePremovePath,
+    armFromOwnMove,
+    deletePremoveBranch,
+    clearPremoves,
   } = useRoomStore();
   const { user } = useAuthStore();
   const isAuthed = !!user;
@@ -141,6 +145,22 @@ export function RoomScreen() {
     }
     prevLiveMergeRef.current = lastLiveMergeAt;
   }, [lastLiveMergeAt, isAnalyzing]);
+
+  // Toast when the server reports a pre-move event (auto-fired / pruned).
+  // Deduped by the notice's `at` timestamp.
+  const [premoveToast, setPremoveToast] = useState<string | null>(null);
+  const prevNoticeAtRef = useRef<number>(0);
+  useEffect(() => {
+    if (!premoveNotice || premoveNotice.at === prevNoticeAtRef.current) return;
+    prevNoticeAtRef.current = premoveNotice.at;
+    const msg =
+      premoveNotice.type === 'fired'
+        ? t.premoveFiredToast.replace('{move}', premoveNotice.notation || '')
+        : t.premovePrunedToast;
+    setPremoveToast(msg);
+    const timer = setTimeout(() => setPremoveToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [premoveNotice, t]);
 
   const isTimedGame = timeControlBaseMs != null;
 
@@ -256,21 +276,45 @@ export function RoomScreen() {
     }
     return node.player === 'player1' ? 1 : 2;
   })();
-  const analysisHasMoves = analysisPathLength >= 2;
-  const analysisStartsWithOpponent = !!myPlayer && analysisFirstMoveBy !== null && analysisFirstMoveBy !== myPlayer;
-  const canSaveCurrentVariant = isAnalyzing && analysisHasMoves && analysisStartsWithOpponent;
-  // Notations of every move in the current analysis path (from start anchor to current node),
-  // in chronological order. Used to preview the would-be variant before saving.
-  const analysisDraftNotations = (() => {
-    if (!isAnalyzing || !analysisCurrentNode || !analysisStartNodeId) return [] as string[];
-    const items: string[] = [];
+  const myPlayerStr = myPlayer === 1 ? 'player1' : 'player2';
+  // The path starts with MY move → arming it plays that move immediately.
+  const analysisStartsWithMe = !!myPlayer && analysisFirstMoveBy !== null && analysisFirstMoveBy === myPlayer;
+  // Opponent-first needs a reply queued (≥2 moves) to be worth storing;
+  // own-first only needs the single move (played immediately).
+  const canSaveCurrentVariant =
+    isAnalyzing && (analysisStartsWithMe ? analysisPathLength >= 1 : analysisPathLength >= 2);
+  // Every move in the current analysis path (anchor → current node), in order,
+  // tagged by who plays it. Used to preview the would-be variant before saving.
+  const analysisDraftSteps = (() => {
+    if (!isAnalyzing || !analysisCurrentNode || !analysisStartNodeId) {
+      return [] as { notation: string; isOpponent: boolean }[];
+    }
+    const items: { notation: string; isOpponent: boolean }[] = [];
     let node: typeof analysisCurrentNode | null = analysisCurrentNode;
     while (node && node.id !== analysisStartNodeId) {
-      if (node.move) items.unshift(node.notation);
+      if (node.move) items.unshift({ notation: node.notation, isOpponent: node.player !== myPlayerStr });
       node = node.parent;
     }
     return items;
   })();
+  const analysisDraftFirstNotation = analysisDraftSteps.length > 0 ? analysisDraftSteps[0].notation : '';
+
+  // Save the current analysis path as a pre-move. Routes own-first paths through
+  // arm-from-own (plays my move now) and confirms overwrites/own-move plays.
+  const handleSavePremove = async () => {
+    if (!canSaveCurrentVariant) return;
+    if (analysisStartsWithMe) {
+      const msg = t.confirmPlayOwnMove.replace('{move}', analysisDraftFirstNotation);
+      if (!window.confirm(msg)) return;
+      await armFromOwnMove();
+      return;
+    }
+    const res = await savePremovePath();
+    if (!res.ok && res.reason === 'conflict') {
+      const msg = t.confirmOverwriteReply.replace('{existing}', res.existingNotation);
+      if (window.confirm(msg)) await savePremovePath(true);
+    }
+  };
   const effectiveSelectRing = isAnalyzing ? analysisSelectRing : selectRing;
   const effectiveHandlePlacement = isAnalyzing ? analysisHandlePlacement : handlePlacement;
   const effectiveHandleRingRemoval = isAnalyzing ? analysisHandleRingRemoval : handleRingRemoval;
@@ -287,36 +331,64 @@ export function RoomScreen() {
     }
   }, [planTabAvailable]);
 
+  // Recursively renders the pre-move tree: opponent branches (⟵) and my single
+  // replies (⟶), indented by depth, each with a delete-subtree button.
+  const renderPmNodes = (nodes: PreMoveNode[], depth: number): JSX.Element[] =>
+    nodes.map(n => {
+      const isOpponent = n.player !== myPlayerStr;
+      return (
+        <div key={n.id}>
+          <div className="flex items-center gap-1" style={{ paddingLeft: depth * 12 }}>
+            <span
+              className={`flex-1 min-w-0 font-mono text-[11px] leading-snug ${
+                isOpponent
+                  ? 'text-gray-500 dark:text-gray-400 italic'
+                  : 'text-blue-700 dark:text-blue-300 font-semibold'
+              }`}
+            >
+              {isOpponent ? '⟵ ' : '⟶ '}{n.notation}
+            </span>
+            <button
+              type="button"
+              onClick={() => deletePremoveBranch(n.id)}
+              title={t.deleteVariant}
+              className="flex-shrink-0 text-red-500 hover:text-red-600 px-1"
+            >
+              ✕
+            </button>
+          </div>
+          {n.children.length > 0 && renderPmNodes(n.children, depth + 1)}
+        </div>
+      );
+    });
+
   const preMovesPanelContent = (
     <div className="h-full overflow-y-auto p-3">
-      {isAnalyzing && analysisDraftNotations.length > 0 && (
+      {isAnalyzing && analysisDraftSteps.length > 0 && (
         <div className="mb-2 flex items-start gap-1 px-2 py-1.5 bg-green-50 dark:bg-green-900/20 border border-dashed border-green-400 dark:border-green-700 rounded text-xs">
           <div className="flex-1 min-w-0 font-mono text-[11px] leading-snug">
-            {analysisDraftNotations.map((notation, i) => {
-              const isOpponent = i % 2 === 0;
-              return (
-                <div
-                  key={i}
-                  className={
-                    isOpponent
-                      ? 'text-gray-500 dark:text-gray-400 italic'
-                      : 'text-blue-700 dark:text-blue-300 font-semibold'
-                  }
-                >
-                  {isOpponent ? '⟵ ' : '⟶ '}{notation}
-                </div>
-              );
-            })}
+            {analysisDraftSteps.map((s, i) => (
+              <div
+                key={i}
+                className={
+                  s.isOpponent
+                    ? 'text-gray-500 dark:text-gray-400 italic'
+                    : 'text-blue-700 dark:text-blue-300 font-semibold'
+                }
+              >
+                {s.isOpponent ? '⟵ ' : '⟶ '}{s.notation}
+              </div>
+            ))}
           </div>
           <button
             type="button"
-            onClick={addCurrentVariantAsPremove}
+            onClick={handleSavePremove}
             disabled={!canSaveCurrentVariant}
             title={
-              !analysisHasMoves
+              !canSaveCurrentVariant
                 ? t.variantNeedsAtLeastTwoMoves
-                : !analysisStartsWithOpponent
-                ? t.variantNeedsOpponentFirst
+                : analysisStartsWithMe
+                ? t.armFromOwnMoveHint
                 : t.addCurrentVariant
             }
             className="flex-shrink-0 px-2 py-0.5 rounded bg-green-500 hover:bg-green-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold"
@@ -325,50 +397,26 @@ export function RoomScreen() {
           </button>
         </div>
       )}
-      {isAnalyzing && analysisDraftNotations.length === 0 && (
+      {isAnalyzing && analysisDraftSteps.length === 0 && (
         <div className="mb-2 text-xs text-gray-500 dark:text-gray-400 italic">
           {t.variantNeedsAtLeastTwoMoves}
         </div>
       )}
-      {premoves.length === 0 ? (
+      {!premoves || premoves.children.length === 0 ? (
         <div className="text-xs text-gray-500 dark:text-gray-400 italic">
           {t.noVariantsYet}
         </div>
       ) : (
-        <ul className="space-y-2">
-          {premoves.map(v => (
-            <li
-              key={v.id}
-              className="flex items-start gap-1 px-2 py-1.5 bg-gray-50 dark:bg-gray-700/50 rounded text-xs"
-            >
-              <div className="flex-1 min-w-0 font-mono text-[11px] leading-snug">
-                {v.sequence.map((s, i) => {
-                  const isOpponent = i % 2 === 0;
-                  return (
-                    <div
-                      key={i}
-                      className={
-                        isOpponent
-                          ? 'text-gray-500 dark:text-gray-400 italic'
-                          : 'text-blue-700 dark:text-blue-300 font-semibold'
-                      }
-                    >
-                      {isOpponent ? '⟵ ' : '⟶ '}{s.notation}
-                    </div>
-                  );
-                })}
-              </div>
-              <button
-                type="button"
-                onClick={() => deletePremoveVariant(v.id)}
-                title={t.deleteVariant}
-                className="flex-shrink-0 text-red-500 hover:text-red-600 px-1"
-              >
-                ✕
-              </button>
-            </li>
-          ))}
-        </ul>
+        <>
+          <div className="space-y-0.5">{renderPmNodes(premoves.children, 0)}</div>
+          <button
+            type="button"
+            onClick={() => clearPremoves()}
+            className="mt-2 text-[10px] text-red-500 hover:text-red-600"
+          >
+            {t.clearAllVariants}
+          </button>
+        </>
       )}
       <div className="mt-2 text-[10px] text-gray-500 dark:text-gray-400 leading-snug">
         <div>⟵ — {t.opponentTurn.toLowerCase()}</div>
@@ -1276,6 +1324,20 @@ export function RoomScreen() {
       {liveMoveToast && (
         <div className="fixed top-20 left-1/2 -translate-x-1/2 z-[90] px-4 py-2 bg-amber-500 text-white rounded-lg shadow-lg text-sm font-medium animate-pulse pointer-events-none">
           ⚡ {t.liveMoveDuringAnalysis}
+        </div>
+      )}
+
+      {premoveToast && (
+        <div className="fixed top-32 left-1/2 -translate-x-1/2 z-[90] px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-lg text-sm font-medium pointer-events-none">
+          {premoveToast}
+        </div>
+      )}
+
+      {/* "Pre-move armed" indicator — shown while waiting on the opponent. */}
+      {!isAnalyzing && !state.winner && !isSpectator && premoves && premoves.children.length > 0 &&
+        state.currentPlayer !== myPlayerStr && (
+        <div className="fixed bottom-24 lg:bottom-6 right-4 z-[80] px-3 py-1.5 bg-indigo-600/90 text-white rounded-full shadow-lg text-xs font-medium flex items-center gap-1 pointer-events-none">
+          ⚡ {t.premoveArmed}
         </div>
       )}
 

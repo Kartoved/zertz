@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { GameState, GameNode, MarbleColor, CaptureMove, Player, PreMoveVariant } from '../game/types';
+import { GameState, GameNode, MarbleColor, CaptureMove, Move, Player, PreMoveTree, PreMoveNotice } from '../game/types';
 import {
   createInitialState,
   cloneState,
@@ -34,7 +34,8 @@ import {
   applyAnalysisCapture,
   mergeLiveTreeIntoAnalysis,
 } from './analysisActions';
-import { buildPremoveSequence, makeVariantId } from './premovesActions';
+import { pathFromAnchor, mergePathIntoTree, removeBranch, SavePremoveResult } from './premovesActions';
+import { serializeState } from '../db/apiClient';
 import { loadAnalysis, saveAnalysis } from './analysisStorage';
 
 interface RoomStore {
@@ -91,7 +92,10 @@ interface RoomStore {
   // Bumped to Date.now() each time pollRoom merges new live moves into the
   // analysis tree. The UI watches this to surface a toast.
   lastLiveMergeAt: number;
-  premoves: PreMoveVariant[];
+  // The current player's conditional pre-move tree (correspondence only).
+  premoves: PreMoveTree | null;
+  // Latest server notice about my pre-move tree (fired / pruned) — drives a toast.
+  premoveNotice: PreMoveNotice | null;
 
   // Actions
   createRoom: (
@@ -132,8 +136,9 @@ interface RoomStore {
 
   // Pre-moves actions
   loadPremoves: () => Promise<void>;
-  addCurrentVariantAsPremove: () => Promise<void>;
-  deletePremoveVariant: (id: string) => Promise<void>;
+  savePremovePath: (overwrite?: boolean) => Promise<SavePremoveResult>;
+  armFromOwnMove: (overwrite?: boolean) => Promise<SavePremoveResult>;
+  deletePremoveBranch: (nodeId: string) => Promise<void>;
   clearPremoves: () => Promise<void>;
 
   reset: () => void;
@@ -267,7 +272,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   analysisCurrentNode: null,
   analysisStartNodeId: null,
   lastLiveMergeAt: 0,
-  premoves: [],
+  premoves: null,
+  premoveNotice: null,
 
   createRoom: async (boardSize, creatorPlayer = 1, rated = true, timeControl = null) => {
     set({ isLoading: true, error: null });
@@ -403,8 +409,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       // Load this player's pre-moves (no-op if not in any seat)
       if (myPlayer) {
         try {
-          const variants = await premovesApi.getPremoves(numericRoomId);
-          set({ premoves: variants });
+          const { trees, notice } = await premovesApi.getPremoves(numericRoomId);
+          set({ premoves: myPlayer === 1 ? trees.player1 : trees.player2, premoveNotice: notice });
         } catch { /* ignore */ }
       }
 
@@ -439,11 +445,11 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         if (syncedState.winner && !prevWinner && get().rated) {
           useAuthStore.getState().fetchMe();
         }
-        // Refresh pre-moves: a variant might have just auto-fired (its sequence
-        // would have advanced or the variant got removed) and we need to mirror that.
+        // Refresh pre-moves: the tree might have just shifted down (a branch
+        // auto-fired) or been pruned, and we need to mirror that.
         if (myP) {
-          premovesApi.getPremoves(roomId).then(variants => {
-            set({ premoves: variants });
+          premovesApi.getPremoves(roomId).then(({ trees, notice }) => {
+            set({ premoves: myP === 1 ? trees.player1 : trees.player2, premoveNotice: notice });
           }).catch(() => { /* ignore */ });
         }
 
@@ -1009,55 +1015,137 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   // ==================== Pre-moves ====================
 
   loadPremoves: async () => {
-    const { roomId } = get();
-    if (!roomId) return;
+    const { roomId, myPlayer } = get();
+    if (!roomId || !myPlayer) return;
     try {
-      const variants = await premovesApi.getPremoves(roomId);
-      set({ premoves: variants });
+      const { trees, notice } = await premovesApi.getPremoves(roomId);
+      set({ premoves: myPlayer === 1 ? trees.player1 : trees.player2, premoveNotice: notice });
     } catch {
       // ignore
     }
   },
 
-  addCurrentVariantAsPremove: async () => {
-    const { roomId, analysisGameTree, analysisCurrentNode, analysisStartNodeId, premoves, state } = get();
-    if (!roomId || !analysisGameTree || !analysisCurrentNode || !analysisStartNodeId) return;
+  // Merges the current analysis path into the pre-move tree. Returns a result
+  // the UI acts on: `conflict` (a differing reply is already planned — re-call
+  // with overwrite=true to confirm) or `ownMoveFirst` (the path starts with my
+  // own move — Phase 3 plays it immediately, not stored here).
+  savePremovePath: async (overwrite = false): Promise<SavePremoveResult> => {
+    const { roomId, myPlayer, analysisGameTree, analysisCurrentNode, analysisStartNodeId, premoves, state } = get();
+    if (!roomId || !myPlayer || !analysisGameTree || !analysisCurrentNode || !analysisStartNodeId) {
+      return { ok: false, reason: 'empty' };
+    }
 
-    const sequence = buildPremoveSequence(analysisCurrentNode, analysisStartNodeId, state.boardSize);
-    if (sequence.length === 0) return;
+    const steps = pathFromAnchor(analysisCurrentNode, analysisStartNodeId, state.boardSize);
+    if (steps.length === 0) return { ok: false, reason: 'empty' };
 
-    const newVariant: PreMoveVariant = { id: makeVariantId(), sequence };
-    const updated = [...premoves, newVariant];
-    set({ premoves: updated });
+    const ownerStr: Player = myPlayer === 1 ? 'player1' : 'player2';
+    // Arm-from-own: the first planned move is mine → it must be played as a real
+    // move now (handled by the caller), not stored as a conditional pre-move.
+    if (steps[0].player === ownerStr) {
+      return { ok: false, reason: 'ownMoveFirst', firstMoveNotation: steps[0].notation };
+    }
+
+    const anchorStateJson = serializeState(state);
+    const merged = mergePathIntoTree(premoves, steps, anchorStateJson, ownerStr, overwrite);
+    if (!merged.ok) {
+      return {
+        ok: false,
+        reason: 'conflict',
+        existingNotation: merged.conflict.existingNotation,
+        newNotation: merged.conflict.newNotation,
+      };
+    }
+
+    const prev = premoves;
+    set({ premoves: merged.tree });
     try {
-      await premovesApi.setPremoves(roomId, updated);
+      await premovesApi.setPremoves(roomId, merged.tree);
+      return { ok: true };
     } catch {
-      // revert on error
-      set({ premoves });
+      set({ premoves: prev }); // revert on error
+      return { ok: false, reason: 'error' };
     }
   },
 
-  deletePremoveVariant: async (id) => {
+  // Arm-from-own: the analysis path starts with MY move. Play that move for
+  // real on the live board now, then store the remainder (which starts with the
+  // opponent's reply) as my pre-move tree. Reuses the interactive live handlers
+  // so tree/clock/persist logic isn't duplicated.
+  armFromOwnMove: async (overwrite = false): Promise<SavePremoveResult> => {
+    const { roomId, myPlayer, analysisCurrentNode, analysisStartNodeId, state } = get();
+    if (!roomId || !myPlayer || !analysisCurrentNode || !analysisStartNodeId) {
+      return { ok: false, reason: 'empty' };
+    }
+    const steps = pathFromAnchor(analysisCurrentNode, analysisStartNodeId, state.boardSize);
+    if (steps.length === 0) return { ok: false, reason: 'empty' };
+
+    const ownerStr: Player = myPlayer === 1 ? 'player1' : 'player2';
+    // Not actually own-first → fall back to the normal (store-only) save.
+    if (steps[0].player !== ownerStr) return get().savePremovePath(overwrite);
+    // Must be my live turn to play the first move.
+    if (state.currentPlayer !== ownerStr || state.winner) return { ok: false, reason: 'error' };
+
+    // Build the remainder tree (opponent reply onward), anchored at the position
+    // after my move. A single linear path never self-conflicts, so this is safe.
+    const remainder = steps.slice(1);
+    let remainderTree: PreMoveTree | null = null;
+    if (remainder.length > 0) {
+      const merged = mergePathIntoTree(null, remainder, steps[0].newStateJson, ownerStr, true);
+      if (merged.ok) remainderTree = merged.tree;
+    }
+
+    // Play my first move for real, reusing the interactive handlers.
+    const first: Move = steps[0].move;
+    if (first.type === 'placement') {
+      set({ selectedMarbleColor: first.data.marbleColor });
+      await get().handlePlacement(first.data.ringId);
+      if (first.data.removedRingId) await get().handleRingRemoval(first.data.removedRingId);
+    } else if (first.type === 'capture') {
+      const { chain, ...firstCapture } = first.data;
+      await get().handleCapture([firstCapture as CaptureMove, ...((chain as CaptureMove[]) || [])]);
+    } else {
+      return { ok: false, reason: 'error' };
+    }
+
+    // The move succeeded iff the turn passed (or the game ended).
+    const after = get().state;
+    if (after.currentPlayer === ownerStr && !after.winner) {
+      return { ok: false, reason: 'error' };
+    }
+
+    // Store the remainder as my new pre-move tree (replaces the now-stale one).
+    set({ premoves: remainderTree });
+    try {
+      await premovesApi.setPremoves(roomId, remainderTree);
+      return { ok: true };
+    } catch {
+      return { ok: false, reason: 'error' };
+    }
+  },
+
+  deletePremoveBranch: async (nodeId) => {
     const { roomId, premoves } = get();
-    if (!roomId) return;
-    const updated = premoves.filter(v => v.id !== id);
-    if (updated.length === premoves.length) return;
+    if (!roomId || !premoves) return;
+    const updated = removeBranch(premoves, nodeId);
+    if (updated === premoves) return;
+    const prev = premoves;
     set({ premoves: updated });
     try {
       await premovesApi.setPremoves(roomId, updated);
     } catch {
-      set({ premoves });
+      set({ premoves: prev });
     }
   },
 
   clearPremoves: async () => {
     const { roomId, premoves } = get();
-    if (!roomId || premoves.length === 0) return;
-    set({ premoves: [] });
+    if (!roomId || !premoves) return;
+    const prev = premoves;
+    set({ premoves: null });
     try {
-      await premovesApi.setPremoves(roomId, []);
+      await premovesApi.setPremoves(roomId, null);
     } catch {
-      set({ premoves });
+      set({ premoves: prev });
     }
   },
 
@@ -1100,7 +1188,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       analysisCurrentNode: null,
       analysisStartNodeId: null,
       lastLiveMergeAt: 0,
-      premoves: [],
+      premoves: null,
+      premoveNotice: null,
     });
   },
 }));

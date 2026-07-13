@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { GameNode, PreMoveVariant } from '../../game/types';
+import { GameNode, PreMoveNode, PreMoveTree } from '../../game/types';
 import { useRoomStore } from '../../store/roomStore';
 import { useI18n } from '../../i18n';
 
@@ -78,34 +78,60 @@ function renderMoveTree(
   return elements;
 }
 
-function renderPremoveVariants(premoves: PreMoveVariant[]): JSX.Element[] {
-  if (premoves.length === 0) return [];
+// Renders the pre-move tree as amber ghost text: the main line inline, with
+// alternative opponent branches in parentheses (mirrors renderMoveTree).
+function renderPremoveNodes(nodes: PreMoveNode[], keyPrefix: string): JSX.Element[] {
+  if (nodes.length === 0) return [];
   const elements: JSX.Element[] = [];
-  for (const v of premoves) {
+  const [main, ...rest] = nodes;
+  elements.push(
+    <span
+      key={`${keyPrefix}-${main.id}`}
+      className="text-amber-700 dark:text-amber-300 italic px-1"
+      title="Conditional pre-move"
+    >
+      {main.notation}
+    </span>
+  );
+  for (const branch of rest) {
     elements.push(
-      <span key={`pm-open-${v.id}`} className="text-amber-600 dark:text-amber-400 italic">
+      <span key={`pm-open-${branch.id}`} className="text-amber-600 dark:text-amber-400 italic">
         {' '}
         (
       </span>
     );
-    v.sequence.forEach((step, i) => {
-      elements.push(
-        <span
-          key={`pm-${v.id}-${i}`}
-          className="text-amber-700 dark:text-amber-300 italic px-1"
-          title="Conditional pre-move"
-        >
-          {step.notation}
-        </span>
-      );
-    });
     elements.push(
-      <span key={`pm-close-${v.id}`} className="text-amber-600 dark:text-amber-400 italic">
+      <span
+        key={`pm-b-${branch.id}`}
+        className="text-amber-700 dark:text-amber-300 italic px-1"
+        title="Conditional pre-move"
+      >
+        {branch.notation}
+      </span>
+    );
+    elements.push(...renderPremoveNodes(branch.children, `pm-${branch.id}`));
+    elements.push(
+      <span key={`pm-close-${branch.id}`} className="text-amber-600 dark:text-amber-400 italic">
         )
       </span>
     );
   }
+  elements.push(...renderPremoveNodes(main.children, `pm-${main.id}`));
   return elements;
+}
+
+function renderPremoveTree(tree: PreMoveTree | null): JSX.Element[] {
+  if (!tree || tree.children.length === 0) return [];
+  return [
+    <span key="pm-root-open" className="text-amber-600 dark:text-amber-400 italic">
+      {' '}
+      (
+    </span>,
+    ...renderPremoveNodes(tree.children, 'pm-root'),
+    <span key="pm-root-close" className="text-amber-600 dark:text-amber-400 italic">
+      )
+    </span>,
+  ];
 }
 
 // Compact symbol summarising how the game ended. Title carries the long form.
@@ -178,7 +204,7 @@ export default function OnlineMoveHistory() {
   const moves = renderMoveTree(activeTree, activeCurrentNode.id, activeNavigate, activeRef);
   // In analysis mode pre-moves are already merged into the active tree as
   // navigable branches, so don't render them as ghost text again.
-  const premoveElements = isAnalyzing ? [] : renderPremoveVariants(premoves);
+  const premoveElements = isAnalyzing ? [] : renderPremoveTree(premoves);
   const isAtStart = activeCurrentNode.id === activeTree.id;
   // Append a victory marker after the move list when the (live) game has ended.
   // In analysis mode different branches end differently, so don't show.
