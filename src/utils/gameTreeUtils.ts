@@ -101,6 +101,26 @@ export function rebuildStateFromNode(targetNode: GameNode, boardSize: 37 | 48 | 
   return nextState;
 }
 
+// Depth of a node from the root (root === 0, first move === 1, …).
+export function nodeDepth(node: GameNode): number {
+  let d = 0;
+  let n = node.parent;
+  while (n) {
+    d++;
+    n = n.parent;
+  }
+  return d;
+}
+
+// Walks `steps` main-line (children[0]) hops down from `root`, stopping early if
+// the line ends. Used to locate the live position inside the analysis tree
+// (whose children[0] chain mirrors the live main line).
+export function mainLineNodeAtDepth(root: GameNode, steps: number): GameNode {
+  let n = root;
+  for (let i = 0; i < steps && n.children[0]; i++) n = n.children[0];
+  return n;
+}
+
 export function findNodeAndParent(root: GameNode, targetId: string): { node: GameNode; parent: GameNode | null } | null {
   const stack: Array<{ node: GameNode; parent: GameNode | null }> = [{ node: root, parent: null }];
   while (stack.length > 0) {

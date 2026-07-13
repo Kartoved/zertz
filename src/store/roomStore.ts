@@ -25,6 +25,9 @@ import {
   findDeepestMainLine,
   findNodeAndParent,
   syncMainLineFlags,
+  isDescendant,
+  nodeDepth,
+  mainLineNodeAtDepth,
 } from '../utils/gameTreeUtils';
 import {
   injectPremovesIntoTree,
@@ -34,7 +37,7 @@ import {
   applyAnalysisCapture,
   mergeLiveTreeIntoAnalysis,
 } from './analysisActions';
-import { pathFromAnchor, mergePathIntoTree, removeBranch, SavePremoveResult } from './premovesActions';
+import { removeBranch, analysisSubtreeToTree, SavePremoveResult } from './premovesActions';
 import { serializeState } from '../db/apiClient';
 import { loadAnalysis, saveAnalysis } from './analysisStorage';
 
@@ -133,11 +136,11 @@ interface RoomStore {
   analysisHandleRingRemoval: (ringId: string) => void;
   analysisHandleCapture: (captures: CaptureMove[]) => void;
   analysisNavigateToNode: (targetNode: GameNode) => void;
+  deleteAnalysisBranch: (nodeId: string) => void;
 
   // Pre-moves actions
   loadPremoves: () => Promise<void>;
-  savePremovePath: (overwrite?: boolean) => Promise<SavePremoveResult>;
-  armFromOwnMove: (overwrite?: boolean) => Promise<SavePremoveResult>;
+  armAnalysisSubtree: (playOwnMove?: boolean) => Promise<SavePremoveResult & { droppedMyAlternatives?: boolean }>;
   deletePremoveBranch: (nodeId: string) => Promise<void>;
   clearPremoves: () => Promise<void>;
 
@@ -1001,10 +1004,45 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     const { analysisState } = get();
     if (!analysisState) return;
     const newState = rebuildStateFromNode(targetNode, analysisState.boardSize);
+    // rebuildStateFromNode replays moves but doesn't recompute phase after
+    // captures — without this the navigated position can sit in 'placement'
+    // when a capture is actually mandatory, which breaks capture selection
+    // (e.g. building a second opponent-capture branch after navigating back).
+    normalizePhase(newState);
     set({
       analysisState: newState,
       analysisCurrentNode: targetNode,
       selectedMarbleColor: null,
+      selectedRingId: null,
+      highlightedCaptures: [],
+      availableCaptureChains: [],
+    });
+    persistAnalysisLocal(get());
+  },
+
+  // Prunes a variation from the analysis tree. If the viewed node was inside the
+  // removed subtree, the view rewinds to its parent.
+  deleteAnalysisBranch: (nodeId) => {
+    const { analysisGameTree, analysisCurrentNode, state } = get();
+    if (!analysisGameTree) return;
+    const found = findNodeAndParent(analysisGameTree, nodeId);
+    if (!found || !found.parent) return;
+
+    const { node, parent } = found;
+    parent.children = parent.children.filter(c => c.id !== nodeId);
+    syncMainLineFlags(parent);
+
+    let newCurrent = analysisCurrentNode;
+    if (analysisCurrentNode && isDescendant(node, analysisCurrentNode.id)) {
+      newCurrent = parent;
+    }
+    const newState = newCurrent ? rebuildStateFromNode(newCurrent, state.boardSize) : null;
+    if (newState) normalizePhase(newState);
+
+    set({
+      analysisGameTree: { ...analysisGameTree },
+      analysisCurrentNode: newCurrent,
+      analysisState: newState ?? get().analysisState,
       selectedRingId: null,
       highlightedCaptures: [],
       availableCaptureChains: [],
@@ -1025,102 +1063,88 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     }
   },
 
-  // Merges the current analysis path into the pre-move tree. Returns a result
-  // the UI acts on: `conflict` (a differing reply is already planned — re-call
-  // with overwrite=true to confirm) or `ownMoveFirst` (the path starts with my
-  // own move — Phase 3 plays it immediately, not stored here).
-  savePremovePath: async (overwrite = false): Promise<SavePremoveResult> => {
-    const { roomId, myPlayer, analysisGameTree, analysisCurrentNode, analysisStartNodeId, premoves, state } = get();
-    if (!roomId || !myPlayer || !analysisGameTree || !analysisCurrentNode || !analysisStartNodeId) {
-      return { ok: false, reason: 'empty' };
+  // Snapshots the variations built in the analysis board into the pre-move tree
+  // — the single "arm my plan" flow. The anchor is the live position:
+  //  - opponent to move → arm all opponent branches + my replies directly.
+  //  - my move to play (arm-from-own) → returns `ownMoveFirst` so the UI can
+  //    confirm; call again with playOwnMove=true to play my main-line move live
+  //    (reusing the interactive handlers) and arm the subtree that follows.
+  // Replaces whatever was armed (WYSIWYG from analysis).
+  armAnalysisSubtree: async (playOwnMove = false) => {
+    const { roomId, myPlayer, analysisGameTree, currentNode, state } = get();
+    if (!roomId || !myPlayer || !analysisGameTree) {
+      return { ok: false as const, reason: 'empty' as const };
+    }
+    // The plan is always rooted at the LIVE position (the analysis node at the
+    // live game's depth), so already-played moves are never re-armed.
+    const anchor = mainLineNodeAtDepth(analysisGameTree, nodeDepth(currentNode));
+
+    const owner: Player = myPlayer === 1 ? 'player1' : 'player2';
+    const firstMoves = anchor.children.filter(c => c.move);
+    const mainFirst = firstMoves[0];
+    const ownFirst = !!mainFirst && mainFirst.player === owner;
+
+    const persist = async (tree: PreMoveTree | null, droppedMyAlternatives: boolean) => {
+      const prev = get().premoves;
+      set({ premoves: tree });
+      try {
+        await premovesApi.setPremoves(roomId, tree);
+        return { ok: true as const, droppedMyAlternatives };
+      } catch {
+        set({ premoves: prev });
+        return { ok: false as const, reason: 'error' as const };
+      }
+    };
+
+    // Arm-from-own: my move leads. Play it live, then arm its subtree.
+    if (ownFirst && mainFirst.move) {
+      if (!playOwnMove) {
+        return { ok: false as const, reason: 'ownMoveFirst' as const, firstMoveNotation: mainFirst.notation };
+      }
+      if (state.currentPlayer !== owner || state.winner) return { ok: false as const, reason: 'error' as const };
+
+      // Build the tree from the position AFTER my move, before mutating the game.
+      const afterState = rebuildStateFromNode(mainFirst, state.boardSize);
+      normalizePhase(afterState);
+      const built = analysisSubtreeToTree(mainFirst, owner, state.boardSize, serializeState(afterState));
+      if (built.hasIncompleteMove) return { ok: false as const, reason: 'incompleteMove' as const };
+
+      // Play my move for real, reusing the interactive handlers.
+      const move: Move = mainFirst.move;
+      if (move.type === 'placement') {
+        // Guard: a placement that needs a ring removal MUST carry it, or we'd
+        // submit a half-move and hang the game. Reject before touching the board.
+        const beforeState = rebuildStateFromNode(anchor, state.boardSize);
+        normalizePhase(beforeState);
+        const placed = applyPlacement(beforeState, move.data.ringId, move.data.marbleColor);
+        if (!placed) return { ok: false as const, reason: 'error' as const };
+        if (placed.needsRingRemoval && !move.data.removedRingId) {
+          return { ok: false as const, reason: 'incompleteMove' as const };
+        }
+        set({ selectedMarbleColor: move.data.marbleColor });
+        await get().handlePlacement(move.data.ringId);
+        if (move.data.removedRingId) await get().handleRingRemoval(move.data.removedRingId);
+      } else if (move.type === 'capture') {
+        const { chain, ...firstCapture } = move.data;
+        await get().handleCapture([firstCapture as CaptureMove, ...((chain as CaptureMove[]) || [])]);
+      } else {
+        return { ok: false as const, reason: 'error' as const };
+      }
+      // Succeeded iff the turn passed (or the game ended).
+      if (get().state.currentPlayer === owner && !get().state.winner) {
+        return { ok: false as const, reason: 'error' as const };
+      }
+      return persist(built.tree, built.droppedMyAlternatives);
     }
 
-    const steps = pathFromAnchor(analysisCurrentNode, analysisStartNodeId, state.boardSize);
-    if (steps.length === 0) return { ok: false, reason: 'empty' };
-
-    const ownerStr: Player = myPlayer === 1 ? 'player1' : 'player2';
-    // Arm-from-own: the first planned move is mine → it must be played as a real
-    // move now (handled by the caller), not stored as a conditional pre-move.
-    if (steps[0].player === ownerStr) {
-      return { ok: false, reason: 'ownMoveFirst', firstMoveNotation: steps[0].notation };
-    }
-
-    const anchorStateJson = serializeState(state);
-    const merged = mergePathIntoTree(premoves, steps, anchorStateJson, ownerStr, overwrite);
-    if (!merged.ok) {
-      return {
-        ok: false,
-        reason: 'conflict',
-        existingNotation: merged.conflict.existingNotation,
-        newNotation: merged.conflict.newNotation,
-      };
-    }
-
-    const prev = premoves;
-    set({ premoves: merged.tree });
-    try {
-      await premovesApi.setPremoves(roomId, merged.tree);
-      return { ok: true };
-    } catch {
-      set({ premoves: prev }); // revert on error
-      return { ok: false, reason: 'error' };
-    }
-  },
-
-  // Arm-from-own: the analysis path starts with MY move. Play that move for
-  // real on the live board now, then store the remainder (which starts with the
-  // opponent's reply) as my pre-move tree. Reuses the interactive live handlers
-  // so tree/clock/persist logic isn't duplicated.
-  armFromOwnMove: async (overwrite = false): Promise<SavePremoveResult> => {
-    const { roomId, myPlayer, analysisCurrentNode, analysisStartNodeId, state } = get();
-    if (!roomId || !myPlayer || !analysisCurrentNode || !analysisStartNodeId) {
-      return { ok: false, reason: 'empty' };
-    }
-    const steps = pathFromAnchor(analysisCurrentNode, analysisStartNodeId, state.boardSize);
-    if (steps.length === 0) return { ok: false, reason: 'empty' };
-
-    const ownerStr: Player = myPlayer === 1 ? 'player1' : 'player2';
-    // Not actually own-first → fall back to the normal (store-only) save.
-    if (steps[0].player !== ownerStr) return get().savePremovePath(overwrite);
-    // Must be my live turn to play the first move.
-    if (state.currentPlayer !== ownerStr || state.winner) return { ok: false, reason: 'error' };
-
-    // Build the remainder tree (opponent reply onward), anchored at the position
-    // after my move. A single linear path never self-conflicts, so this is safe.
-    const remainder = steps.slice(1);
-    let remainderTree: PreMoveTree | null = null;
-    if (remainder.length > 0) {
-      const merged = mergePathIntoTree(null, remainder, steps[0].newStateJson, ownerStr, true);
-      if (merged.ok) remainderTree = merged.tree;
-    }
-
-    // Play my first move for real, reusing the interactive handlers.
-    const first: Move = steps[0].move;
-    if (first.type === 'placement') {
-      set({ selectedMarbleColor: first.data.marbleColor });
-      await get().handlePlacement(first.data.ringId);
-      if (first.data.removedRingId) await get().handleRingRemoval(first.data.removedRingId);
-    } else if (first.type === 'capture') {
-      const { chain, ...firstCapture } = first.data;
-      await get().handleCapture([firstCapture as CaptureMove, ...((chain as CaptureMove[]) || [])]);
-    } else {
-      return { ok: false, reason: 'error' };
-    }
-
-    // The move succeeded iff the turn passed (or the game ended).
-    const after = get().state;
-    if (after.currentPlayer === ownerStr && !after.winner) {
-      return { ok: false, reason: 'error' };
-    }
-
-    // Store the remainder as my new pre-move tree (replaces the now-stale one).
-    set({ premoves: remainderTree });
-    try {
-      await premovesApi.setPremoves(roomId, remainderTree);
-      return { ok: true };
-    } catch {
-      return { ok: false, reason: 'error' };
-    }
+    // Opponent to move: arm the anchor's subtree directly.
+    const anchorState = rebuildStateFromNode(anchor, state.boardSize);
+    normalizePhase(anchorState);
+    const { tree, droppedMyAlternatives, hasIncompleteMove } =
+      analysisSubtreeToTree(anchor, owner, state.boardSize, serializeState(anchorState));
+    if (hasIncompleteMove) return { ok: false as const, reason: 'incompleteMove' as const };
+    if (!tree) return { ok: false as const, reason: 'empty' as const };
+    return persist(tree, droppedMyAlternatives);
   },
 
   deletePremoveBranch: async (nodeId) => {

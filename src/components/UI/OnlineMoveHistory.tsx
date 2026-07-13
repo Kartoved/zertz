@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { GameNode, PreMoveNode, PreMoveTree } from '../../game/types';
+import { GameNode } from '../../game/types';
 import { useRoomStore } from '../../store/roomStore';
 import { useI18n } from '../../i18n';
 
@@ -28,110 +28,24 @@ function MoveElement({ node, isCurrentMove, onNavigate, activeRef }: MoveElement
   );
 }
 
-function renderMoveTree(
-  node: GameNode,
-  currentNodeId: string,
-  onNavigate: (node: GameNode) => void,
-  activeRef: React.RefObject<HTMLSpanElement>
-): JSX.Element[] {
-  const elements: JSX.Element[] = [];
-  const mainChild = node.children[0];
-
-  if (!mainChild) return elements;
-
-  elements.push(
-    <MoveElement
-      key={mainChild.id}
-      node={mainChild}
-      isCurrentMove={mainChild.id === currentNodeId}
-      onNavigate={onNavigate}
-      activeRef={activeRef}
-    />
-  );
-
-  const variations = node.children.slice(1);
-  for (const variation of variations) {
-    elements.push(
-      <span key={`var-open-${variation.id}`} className="text-gray-500">
-        {' '}
-        (
-      </span>
-    );
-    elements.push(
-      <MoveElement
-        key={variation.id}
-        node={variation}
-        isCurrentMove={variation.id === currentNodeId}
-        onNavigate={onNavigate}
-        activeRef={activeRef}
-      />
-    );
-    elements.push(...renderMoveTree(variation, currentNodeId, onNavigate, activeRef));
-    elements.push(
-      <span key={`var-close-${variation.id}`} className="text-gray-500">
-        )
-      </span>
-    );
+// The single linear line that runs THROUGH `current`: its ancestors (root →
+// current) followed by the main-line continuation after it (children[0] chain).
+// Branches are not shown here — they live in the navigable tree in the Plan tab.
+// This keeps the top strip a clean, readable line even deep in analysis.
+function lineThroughNode(current: GameNode): GameNode[] {
+  const up: GameNode[] = [];
+  let n: GameNode | null = current;
+  while (n) {
+    up.unshift(n);
+    n = n.parent;
   }
-
-  elements.push(...renderMoveTree(mainChild, currentNodeId, onNavigate, activeRef));
-  return elements;
-}
-
-// Renders the pre-move tree as amber ghost text: the main line inline, with
-// alternative opponent branches in parentheses (mirrors renderMoveTree).
-function renderPremoveNodes(nodes: PreMoveNode[], keyPrefix: string): JSX.Element[] {
-  if (nodes.length === 0) return [];
-  const elements: JSX.Element[] = [];
-  const [main, ...rest] = nodes;
-  elements.push(
-    <span
-      key={`${keyPrefix}-${main.id}`}
-      className="text-amber-700 dark:text-amber-300 italic px-1"
-      title="Conditional pre-move"
-    >
-      {main.notation}
-    </span>
-  );
-  for (const branch of rest) {
-    elements.push(
-      <span key={`pm-open-${branch.id}`} className="text-amber-600 dark:text-amber-400 italic">
-        {' '}
-        (
-      </span>
-    );
-    elements.push(
-      <span
-        key={`pm-b-${branch.id}`}
-        className="text-amber-700 dark:text-amber-300 italic px-1"
-        title="Conditional pre-move"
-      >
-        {branch.notation}
-      </span>
-    );
-    elements.push(...renderPremoveNodes(branch.children, `pm-${branch.id}`));
-    elements.push(
-      <span key={`pm-close-${branch.id}`} className="text-amber-600 dark:text-amber-400 italic">
-        )
-      </span>
-    );
+  const down: GameNode[] = [];
+  let m: GameNode | undefined = current.children[0];
+  while (m) {
+    down.push(m);
+    m = m.children[0];
   }
-  elements.push(...renderPremoveNodes(main.children, `pm-${main.id}`));
-  return elements;
-}
-
-function renderPremoveTree(tree: PreMoveTree | null): JSX.Element[] {
-  if (!tree || tree.children.length === 0) return [];
-  return [
-    <span key="pm-root-open" className="text-amber-600 dark:text-amber-400 italic">
-      {' '}
-      (
-    </span>,
-    ...renderPremoveNodes(tree.children, 'pm-root'),
-    <span key="pm-root-close" className="text-amber-600 dark:text-amber-400 italic">
-      )
-    </span>,
-  ];
+  return [...up, ...down]; // up[0] is the root (move === null)
 }
 
 // Compact symbol summarising how the game ended. Title carries the long form.
@@ -155,15 +69,14 @@ export default function OnlineMoveHistory() {
     gameTree,
     currentNode,
     navigateToNode,
-    premoves,
     isAnalyzing,
     analysisGameTree,
     analysisCurrentNode,
     analysisNavigateToNode,
   } = useRoomStore();
 
-  // In analysis mode the widget walks the analysis tree (which includes saved
-  // pre-move variants as branches), so the user can click any node freely.
+  // In analysis the strip shows the line through the position you're viewing;
+  // in the live game it's the game's main line (currentNode is its tip).
   const activeTree = isAnalyzing && analysisGameTree ? analysisGameTree : gameTree;
   const activeCurrentNode = isAnalyzing && analysisCurrentNode ? analysisCurrentNode : currentNode;
   const activeNavigate = isAnalyzing ? analysisNavigateToNode : navigateToNode;
@@ -201,16 +114,14 @@ export default function OnlineMoveHistory() {
     didInitialScrollRef.current = true;
   }, [activeCurrentNode.id]);
 
-  const moves = renderMoveTree(activeTree, activeCurrentNode.id, activeNavigate, activeRef);
-  // In analysis mode pre-moves are already merged into the active tree as
-  // navigable branches, so don't render them as ghost text again.
-  const premoveElements = isAnalyzing ? [] : renderPremoveTree(premoves);
+  // Skip the root (move === null); it's rendered as the "0. start" crumb.
+  const lineMoves = lineThroughNode(activeCurrentNode).filter(n => n.move);
   const isAtStart = activeCurrentNode.id === activeTree.id;
   // Append a victory marker after the move list when the (live) game has ended.
-  // In analysis mode different branches end differently, so don't show.
+  // In analysis different branches end differently, so don't show.
   const marker = !isAnalyzing ? winMarker(state.winner, winType, t) : null;
 
-  if (moves.length === 0 && premoveElements.length === 0) {
+  if (lineMoves.length === 0) {
     return <div className="p-1 text-xs text-gray-500 dark:text-gray-400">{t.noMovesYet}</div>;
   }
 
@@ -226,8 +137,15 @@ export default function OnlineMoveHistory() {
       >
         {`0. ${t.moveStart}`}
       </span>
-      {moves}
-      {premoveElements}
+      {lineMoves.map(node => (
+        <MoveElement
+          key={node.id}
+          node={node}
+          isCurrentMove={node.id === activeCurrentNode.id}
+          onNavigate={activeNavigate}
+          activeRef={activeRef}
+        />
+      ))}
       {marker && (
         <span
           title={marker.title}
