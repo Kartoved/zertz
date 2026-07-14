@@ -6,6 +6,7 @@ import { useUIStore } from '../../store/uiStore';
 import HexBoard from '../Board/HexBoard';
 import { ChatPanel } from './ChatPanel';
 import MarbleSelector from '../UI/MarbleSelector';
+import SaveToStudy from '../Studies/SaveToStudy';
 import { getValidRemovableRings } from '../../game/Board';
 import { getWinType } from '../../game/GameEngine';
 import { GameNode } from '../../game/types';
@@ -914,6 +915,7 @@ export function RoomScreen() {
                   🔬 {t.analysis}
                 </button>
               )}
+              <SaveToStudy state={boardState} />
             </div>
           )}
 
@@ -1163,6 +1165,7 @@ export function RoomScreen() {
                 >
                   🔬 {t.analysis}
                 </button>
+                <SaveToStudy state={boardState} className="w-full px-3 py-2.5 text-sm rounded-lg bg-indigo-100 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-200 hover:bg-indigo-200 dark:hover:bg-indigo-900/70" />
                 {canCancel && (
                   <button
                     type="button"

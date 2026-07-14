@@ -4,6 +4,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import StudySidebar from './StudySidebar';
 import StudyBoardViewer from './StudyBoardViewer';
 import PositionEditorModal from './PositionEditorModal';
+import StudyMetaModal from './StudyMetaModal';
 import { useStudyStore } from '../../store/studyStore';
 import { GameState } from '../../game/types';
 import { useAuthStore } from '../../store/authStore';
@@ -18,10 +19,11 @@ export default function StudiesScreen() {
   const { setScreen } = useUIStore();
   const {
     current, currentLoading, error, publicStudies,
-    loadTree, openStudy, loadPublic, cloneStudy, setPublic, changeSlug, renameStudy, createStudyFromState, saveStudyTree,
+    loadTree, openStudy, loadPublic, cloneStudy, setPublic, changeSlug, renameStudy, createStudyFromState, saveStudyTree, setMeta,
   } = useStudyStore();
   const [mobileSidebar, setMobileSidebar] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
+  const [showMeta, setShowMeta] = useState(false);
 
   const handleCreateFromPosition = async (title: string, state: GameState) => {
     const r = await createStudyFromState(title, state);
@@ -115,6 +117,9 @@ export default function StudiesScreen() {
                     <button onClick={() => setPublic(current.id, !current.isPublic)} className={`px-2.5 py-1 rounded-md text-xs font-medium ${current.isPublic ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200'}`}>
                       {current.isPublic ? t.studyMakePrivate : t.studyMakePublic}
                     </button>
+                    <button onClick={() => setShowMeta(true)} className="px-2.5 py-1 rounded-md text-xs font-medium bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600">
+                      🏷 {t.studyMeta}
+                    </button>
                   </div>
                 )}
 
@@ -192,6 +197,13 @@ export default function StudiesScreen() {
 
       {showEditor && (
         <PositionEditorModal onClose={() => setShowEditor(false)} onCreate={handleCreateFromPosition} />
+      )}
+      {showMeta && current && (
+        <StudyMetaModal
+          initial={current.meta}
+          onClose={() => setShowMeta(false)}
+          onSave={(meta) => setMeta(current.id, meta)}
+        />
       )}
     </div>
   );

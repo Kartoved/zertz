@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import {
-  StudyTreeNode, StudyNode, PublicStudy,
+  StudyTreeNode, StudyNode, PublicStudy, StudyMeta,
   getStudyTree, getStudy, getPublicStudies,
   createStudy as apiCreate, updateStudy, moveStudy as apiMove,
   deleteStudy as apiDelete, cloneStudy as apiClone,
@@ -23,11 +23,12 @@ interface StudyStore {
   expand: (id: number) => void;
   openStudy: (owner: string, slug: string) => Promise<StudyNode | null>;
   createStudy: (parentId: number | null, title: string) => Promise<{ id: number; slug: string; ownerName: string } | null>;
-  createStudyFromState: (title: string, state: GameState) => Promise<{ id: number; slug: string; ownerName: string } | null>;
+  createStudyFromState: (title: string, state: GameState, parentId?: number | null) => Promise<{ id: number; slug: string; ownerName: string } | null>;
   saveStudyTree: (id: number, treeJson: string) => Promise<void>;
   renameStudy: (id: number, title: string) => Promise<void>;
   changeSlug: (id: number, slug: string) => Promise<string | null>;
   setPublic: (id: number, isPublic: boolean) => Promise<void>;
+  setMeta: (id: number, meta: StudyMeta) => Promise<void>;
   moveStudy: (id: number, newParentId: number | null) => Promise<void>;
   deleteStudy: (id: number) => Promise<void>;
   cloneStudy: (id: number) => Promise<{ id: number; slug: string; ownerName: string } | null>;
@@ -95,11 +96,12 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
     return r;
   },
 
-  createStudyFromState: async (title, state) => {
+  createStudyFromState: async (title, state, parentId = null) => {
     const setupJson = serializeState(state);
     const treeJson = serializeTree(createRootNode());
-    const r = await apiCreate({ parentId: null, title, boardSize: state.boardSize, setupJson, treeJson });
+    const r = await apiCreate({ parentId, title, boardSize: state.boardSize, setupJson, treeJson });
     await get().loadTree();
+    if (parentId != null) get().expand(parentId);
     return r;
   },
 
@@ -125,6 +127,11 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
     await updateStudy(id, { isPublic });
     await get().loadTree();
     set(s => (s.current && s.current.id === id ? { current: { ...s.current, isPublic } } : s));
+  },
+
+  setMeta: async (id, meta) => {
+    await updateStudy(id, { meta });
+    set(s => (s.current && s.current.id === id ? { current: { ...s.current, meta } } : s));
   },
 
   moveStudy: async (id, newParentId) => {
