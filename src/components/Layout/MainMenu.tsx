@@ -90,7 +90,7 @@ export default function MainMenu() {
   const selectedBoardSize: 37 | 48 | 61 = 37;
   const [selectedPreset, setSelectedPreset] = useState<TimePresetId>('5+5');
   const selectedTimeControl: 'blitz' | 'rapid' | 'long' | 'correspondence' = 'blitz';
-  const [mobileMainTab, setMobileMainTab] = useState<'play' | 'chat'>('play');
+  const [mobileMainTab, setMobileMainTab] = useState<'play' | 'tv' | 'chat'>('play');
 
   const { user, fetchMe, incomingChallengesCount } = useAuthStore();
   const boardLabels: Record<number, string> = { 37: t.board37, 48: t.board48, 61: t.board61 };
@@ -518,7 +518,7 @@ export default function MainMenu() {
       )}
 
       <div className="lg:hidden px-3 pt-3">
-        <div className="grid grid-cols-2 bg-white dark:bg-gray-800 rounded-xl p-1 shadow-sm border border-gray-200 dark:border-gray-700">
+        <div className="grid grid-cols-3 bg-white dark:bg-gray-800 rounded-xl p-1 shadow-sm border border-gray-200 dark:border-gray-700">
           <button
             type="button"
             onClick={() => setMobileMainTab('play')}
@@ -529,6 +529,17 @@ export default function MainMenu() {
             }`}
           >
             {t.tabPlay}
+          </button>
+          <button
+            type="button"
+            onClick={() => setMobileMainTab('tv')}
+            className={`py-2 text-sm font-semibold rounded-lg transition-colors ${
+              mobileMainTab === 'tv'
+                ? 'bg-indigo-500 text-white'
+                : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+            }`}
+          >
+            📺 TV
           </button>
           <button
             type="button"
@@ -631,6 +642,11 @@ export default function MainMenu() {
             </div>
             <div>{t.zertzByKrisBurm}</div>
           </div>
+        </section>
+
+        {/* MOBILE: ZERTZ TV tab (desktop shows it in the left column instead) */}
+        <section className={`lg:hidden flex-col min-h-0 order-2 ${mobileMainTab === 'tv' ? 'flex flex-1' : 'hidden'}`}>
+          <LiveGamesTV />
         </section>
 
         {/* RIGHT: Online players strip + global chat */}

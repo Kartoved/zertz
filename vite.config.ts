@@ -14,7 +14,7 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
       },
       manifest: {
-        name: 'ZERTZ — абстрактная стратегическая игра',
+        name: 'ZERTZ — abstract strategy game',
         short_name: 'ZERTZ',
         description: 'Browser implementation of the ZERTZ board game',
         theme_color: '#4f46e5',
