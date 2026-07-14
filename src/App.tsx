@@ -8,6 +8,7 @@ import { RoomScreen } from './components/Online/RoomScreen';
 import MagicLinkPage from './components/Auth/MagicLinkPage';
 import BlogList from './components/Blog/BlogList';
 import BlogPostPage from './components/Blog/BlogPostPage';
+import StudiesScreen from './components/Studies/StudiesScreen';
 import ErrorBoundary from './components/UI/ErrorBoundary';
 
 function LocalApp() {
@@ -36,6 +37,8 @@ function App() {
           <Route path="/magic" element={<MagicLinkPage />} />
           <Route path="/news" element={<BlogList />} />
           <Route path="/news/:slug" element={<BlogPostPage />} />
+          <Route path="/studies" element={<StudiesScreen />} />
+          <Route path="/studies/:owner/:slug" element={<StudiesScreen />} />
         </Routes>
       </BrowserRouter>
     </ErrorBoundary>
