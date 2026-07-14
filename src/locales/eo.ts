@@ -367,6 +367,8 @@ export const eo = {
   studyTabEdit: 'Redakti',
   studyTabRead: 'Legi',
   studyNoComment: 'Neniu komento por ĉi tiu pozicio',
+  studyDrawHint: 'Dekstra klako — sagoj kaj markiloj (Shift/Alt/Ctrl por koloro)',
+  studyClearShapes: 'Forviŝi markojn',
   saveToStudy: 'Al studio',
   saveToStudyParent: 'Konservi sub',
   saveToStudyRoot: 'Nova studio (radiko)',

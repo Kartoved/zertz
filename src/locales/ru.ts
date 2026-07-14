@@ -367,6 +367,8 @@ export const ru = {
   studyTabEdit: 'Редактор',
   studyTabRead: 'Чтение',
   studyNoComment: 'Нет комментария к этой позиции',
+  studyDrawHint: 'ПКМ — стрелки и маркеры (Shift/Alt/Ctrl — цвет)',
+  studyClearShapes: 'Очистить пометки',
   saveToStudy: 'В студию',
   saveToStudyParent: 'Куда сохранить',
   saveToStudyRoot: 'Новая студия (корень)',

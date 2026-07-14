@@ -14,7 +14,7 @@ import {
   applyAnalysisCapture,
 } from '../../store/analysisActions';
 import { studyStateAtNode, findNodeById } from './studyState';
-import { GameNode, GameState, MarbleColor, CaptureMove, Captures, WIN_CONDITIONS } from '../../game/types';
+import { GameNode, GameState, MarbleColor, CaptureMove, Captures, WIN_CONDITIONS, Shape } from '../../game/types';
 import { useI18n } from '../../i18n';
 
 const MARBLE_BG: Record<MarbleColor, string> = {
@@ -162,6 +162,27 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
     markEdited();
   };
 
+  // Toggle a drawn shape on the current node: same orig+dest with same colour
+  // removes it, a different colour recolours it, otherwise it's added.
+  const handleDrawShape = (shape: Shape) => {
+    const list = currentNode.shapes ? [...currentNode.shapes] : [];
+    const idx = list.findIndex(s => s.orig === shape.orig && s.dest === shape.dest);
+    if (idx >= 0) {
+      if (list[idx].brush === shape.brush) list.splice(idx, 1);
+      else list[idx] = shape;
+    } else {
+      list.push(shape);
+    }
+    currentNode.shapes = list.length ? list : undefined;
+    markEdited();
+  };
+
+  const clearShapes = () => {
+    if (!currentNode.shapes?.length) return;
+    currentNode.shapes = undefined;
+    markEdited();
+  };
+
   const selectRing = (ringId: string) => {
     const slice = computeAnalysisRingSelection(boardState, ringId);
     if (!slice) return;
@@ -270,6 +291,9 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
             highlightedCaptures={highlightedCaptures}
             validRemovableRings={validRemovableRings}
             onRingClick={handleRingClick}
+            shapes={currentNode.shapes}
+            drawable
+            onShapeDraw={handleDrawShape}
             preview
           />
         </div>
@@ -278,6 +302,18 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
           <NavBtn onClick={() => currentNode.parent && navigateTo(currentNode.parent)} disabled={!currentNode.parent}>◀</NavBtn>
           <NavBtn onClick={() => currentNode.children[0] && navigateTo(currentNode.children[0])} disabled={!currentNode.children[0]}>▶</NavBtn>
           <NavBtn onClick={() => navigateTo(findDeepestMainLine(rootRef.current))}>⏭</NavBtn>
+        </div>
+        <div className="hidden sm:flex items-center justify-center gap-3 mt-2">
+          <span className="text-[11px] text-gray-400 dark:text-gray-500">{t.studyDrawHint}</span>
+          {currentNode.shapes?.length ? (
+            <button
+              type="button"
+              onClick={clearShapes}
+              className="text-[11px] px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+            >
+              🗑 {t.studyClearShapes}
+            </button>
+          ) : null}
         </div>
 
         {/* Marble picker (placement phase) */}

@@ -367,6 +367,8 @@ export const en = {
   studyTabEdit: 'Edit',
   studyTabRead: 'Read',
   studyNoComment: 'No comment for this position',
+  studyDrawHint: 'Right-click — arrows & markers (Shift/Alt/Ctrl for colour)',
+  studyClearShapes: 'Clear annotations',
   saveToStudy: 'To study',
   saveToStudyParent: 'Save under',
   saveToStudyRoot: 'New study (root)',

@@ -33,6 +33,16 @@ export type Move =
   | { type: 'placement'; data: PlacementMove }
   | { type: 'capture'; data: CaptureMove };
 
+export type ShapeBrush = 'green' | 'red' | 'blue' | 'yellow';
+
+/** A board annotation: a circle on `orig` when `dest` is absent, otherwise an
+ *  arrow `orig`→`dest`. Used by Studies (drawn with the right mouse button). */
+export interface Shape {
+  orig: string;
+  dest?: string;
+  brush: ShapeBrush;
+}
+
 export interface GameNode {
   id: string;
   moveNumber: number;
@@ -45,6 +55,9 @@ export interface GameNode {
   /** Optional markdown annotation on this node — used by Studies for lessons.
    *  Carried transparently by serializeTree/deserializeTree (they spread the node). */
   comment?: string;
+  /** Board annotation shapes (arrows/circles) for this position — Studies only.
+   *  Also carried transparently by tree serialization. */
+  shapes?: Shape[];
 }
 
 export interface Captures {

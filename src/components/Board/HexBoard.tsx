@@ -1,10 +1,10 @@
-import { useState, useMemo, useRef, useId, type WheelEvent } from 'react';
+import { useState, useMemo, useRef, useId, type WheelEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { hexToPixel } from '../../game/Board';
 import { getValidRemovableRings } from '../../game/Board';
 import { hasAvailableCaptures, getAvailableCaptures } from '../../game/GameEngine';
 import HexRing from './HexRing';
-import { GameState, CaptureMove } from '../../game/types';
+import { GameState, CaptureMove, Shape, ShapeBrush } from '../../game/types';
 
 const HEX_SIZE = 28;
 const BOARD_PADDING = 60;
@@ -12,6 +12,60 @@ const RING_SPACING = 35; // Increased spacing between rings
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 2;
 const ZOOM_STEP = 0.1;
+
+const BRUSH_COLORS: Record<ShapeBrush, string> = {
+  green: '#22c55e', red: '#ef4444', blue: '#3b82f6', yellow: '#eab308',
+};
+
+function brushFromEvent(e: { shiftKey: boolean; altKey: boolean; ctrlKey: boolean; metaKey: boolean }): ShapeBrush {
+  if (e.shiftKey) return 'red';
+  if (e.altKey) return 'blue';
+  if (e.ctrlKey || e.metaKey) return 'yellow';
+  return 'green';
+}
+
+type Pt = { x: number; y: number };
+
+function Arrow({ x1, y1, x2, y2, color, opacity = 0.85 }: { x1: number; y1: number; x2: number; y2: number; color: string; opacity?: number }) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.hypot(dx, dy) || 1;
+  const ux = dx / len, uy = dy / len;
+  const sx = x1 + ux * HEX_SIZE * 0.55, sy = y1 + uy * HEX_SIZE * 0.55; // start off the origin ring
+  const tx = x2 - ux * HEX_SIZE * 0.75, ty = y2 - uy * HEX_SIZE * 0.75; // tip just short of dest center
+  const headLen = HEX_SIZE * 0.6, headW = HEX_SIZE * 0.42;
+  const bx = tx - ux * headLen, by = ty - uy * headLen; // head base
+  const px = -uy, py = ux;
+  return (
+    <g opacity={opacity}>
+      <line x1={sx} y1={sy} x2={bx} y2={by} stroke={color} strokeWidth={HEX_SIZE * 0.2} strokeLinecap="round" />
+      <polygon points={`${tx},${ty} ${bx + px * headW},${by + py * headW} ${bx - px * headW},${by - py * headW}`} fill={color} />
+    </g>
+  );
+}
+
+function ShapeMark({ shape, positions }: { shape: Shape; positions: Map<string, Pt> }) {
+  const o = positions.get(shape.orig);
+  if (!o) return null;
+  const color = BRUSH_COLORS[shape.brush];
+  if (!shape.dest) {
+    return <circle cx={o.x} cy={o.y} r={HEX_SIZE * 0.92} fill="none" stroke={color} strokeWidth={HEX_SIZE * 0.14} opacity={0.85} />;
+  }
+  const d = positions.get(shape.dest);
+  if (!d) return null;
+  return <Arrow x1={o.x} y1={o.y} x2={d.x} y2={d.y} color={color} />;
+}
+
+function ShapePreview({ draw, positions }: { draw: { orig: string; x: number; y: number; brush: ShapeBrush }; positions: Map<string, Pt> }) {
+  const o = positions.get(draw.orig);
+  if (!o) return null;
+  const color = BRUSH_COLORS[draw.brush];
+  const dx = draw.x - o.x, dy = draw.y - o.y;
+  const nearOrigin = dx * dx + dy * dy < (HEX_SIZE * 0.6) * (HEX_SIZE * 0.6);
+  if (nearOrigin) {
+    return <circle cx={o.x} cy={o.y} r={HEX_SIZE * 0.92} fill="none" stroke={color} strokeWidth={HEX_SIZE * 0.14} opacity={0.55} />;
+  }
+  return <Arrow x1={o.x} y1={o.y} x2={draw.x} y2={draw.y} color={color} opacity={0.55} />;
+}
 
 interface HexBoardProps {
   state?: GameState;
@@ -24,6 +78,12 @@ interface HexBoardProps {
   /** Position-editor mode: keep removed rings as clickable ghost slots so they
    *  can be restored, and keep full-board bounds. */
   editable?: boolean;
+  /** Annotation shapes (arrows/circles) to render over the board. */
+  shapes?: Shape[];
+  /** Enable right-click drawing of shapes (desktop). Emits completed shapes. */
+  drawable?: boolean;
+  /** Called when a shape is drawn (right-drag = arrow, right-click = circle). */
+  onShapeDraw?: (shape: Shape) => void;
 }
 
 export default function HexBoard(props: HexBoardProps = {}) {
@@ -131,12 +191,68 @@ export default function HexBoard(props: HexBoardProps = {}) {
     setZoom(newZoom);
   };
 
+  // ── Right-click annotation drawing (desktop; Studies) ──
+  const svgRef = useRef<SVGSVGElement>(null);
+  const drawOriginRef = useRef<string | null>(null);
+  const [drawState, setDrawState] = useState<{ orig: string; x: number; y: number; brush: ShapeBrush } | null>(null);
+
+  const toLocal = (clientX: number, clientY: number): Pt | null => {
+    const svg = svgRef.current;
+    const ctm = svg?.getScreenCTM();
+    if (!svg || !ctm) return null;
+    const p = svg.createSVGPoint();
+    p.x = clientX; p.y = clientY;
+    const u = p.matrixTransform(ctm.inverse());
+    return { x: u.x - offsetX, y: u.y - offsetY };
+  };
+
+  const ringAtLocal = (x: number, y: number): string | null => {
+    let best: string | null = null;
+    let bestD = HEX_SIZE * HEX_SIZE;
+    for (const [id, p] of positions) {
+      const d = (p.x - x) ** 2 + (p.y - y) ** 2;
+      if (d < bestD) { bestD = d; best = id; }
+    }
+    return best;
+  };
+
+  const handleDrawDown = (e: ReactMouseEvent<SVGSVGElement>) => {
+    if (e.button !== 2) return;
+    const loc = toLocal(e.clientX, e.clientY);
+    const ring = loc && ringAtLocal(loc.x, loc.y);
+    if (!ring) return;
+    e.preventDefault();
+    drawOriginRef.current = ring;
+    const p = positions.get(ring)!;
+    setDrawState({ orig: ring, x: p.x, y: p.y, brush: brushFromEvent(e) });
+  };
+
+  const handleDrawMove = (e: ReactMouseEvent<SVGSVGElement>) => {
+    if (!drawOriginRef.current) return;
+    const loc = toLocal(e.clientX, e.clientY);
+    if (loc) setDrawState(s => (s ? { ...s, x: loc.x, y: loc.y, brush: brushFromEvent(e) } : s));
+  };
+
+  const handleDrawUp = (e: ReactMouseEvent<SVGSVGElement>) => {
+    const orig = drawOriginRef.current;
+    if (!orig || e.button !== 2) return;
+    drawOriginRef.current = null;
+    setDrawState(null);
+    const loc = toLocal(e.clientX, e.clientY);
+    const dest = loc ? ringAtLocal(loc.x, loc.y) : null;
+    const brush = brushFromEvent(e);
+    props.onShapeDraw?.(dest && dest !== orig ? { orig, dest, brush } : { orig, brush });
+  };
+
+  const cancelDraw = () => { drawOriginRef.current = null; setDrawState(null); };
+
   const { preview } = props;
 
   return (
     <div className={preview ? 'flex items-center justify-center w-full h-full' : 'flex items-center justify-center p-2 sm:p-3 md:p-4 w-full'}>
       <div className={`relative rounded-2xl bg-[radial-gradient(circle_at_center,_#8A9AAB_0%,_#5A6978_100%)] shadow-lg overflow-hidden ${preview ? 'w-full h-full p-0' : 'w-full max-w-[1100px] p-3 sm:p-4'}`}>
         <svg
+          ref={svgRef}
           // Camera zoom: change viewBox, keep geometry (spacing) intact
           viewBox={`${viewX} ${viewY} ${viewWidth} ${viewHeight}`}
           preserveAspectRatio="xMidYMid meet"
@@ -146,6 +262,11 @@ export default function HexBoard(props: HexBoardProps = {}) {
           onTouchStart={preview ? undefined : handleTouchStart}
           onTouchMove={preview ? undefined : handleTouchMove}
           onTouchEnd={preview ? undefined : handleTouchEnd}
+          onContextMenu={props.drawable ? (e) => e.preventDefault() : undefined}
+          onMouseDown={props.drawable ? handleDrawDown : undefined}
+          onMouseMove={props.drawable ? handleDrawMove : undefined}
+          onMouseUp={props.drawable ? handleDrawUp : undefined}
+          onMouseLeave={props.drawable ? cancelDraw : undefined}
         >
           <g transform={`translate(${offsetX}, ${offsetY})`}>
             {rings.map(ring => {
@@ -176,6 +297,14 @@ export default function HexBoard(props: HexBoardProps = {}) {
                 />
               );
             })}
+
+            {/* Annotation shapes (arrows/circles) + live drawing preview */}
+            {(props.shapes?.length || drawState) && (
+              <g style={{ pointerEvents: 'none' }}>
+                {props.shapes?.map((s, i) => <ShapeMark key={`sh-${i}-${s.orig}-${s.dest ?? ''}`} shape={s} positions={positions} />)}
+                {drawState && <ShapePreview draw={drawState} positions={positions} />}
+              </g>
+            )}
           </g>
         </svg>
         {!preview && (
