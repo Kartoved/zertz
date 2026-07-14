@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { useNavigate, useParams } from 'react-router-dom';
 import StudySidebar from './StudySidebar';
 import StudyBoardViewer from './StudyBoardViewer';
@@ -128,7 +129,9 @@ export default function StudiesScreen() {
                 )}
 
                 {current.rootComment && (
-                  <p className="mt-4 text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{current.rootComment}</p>
+                  <div className="mt-4 prose prose-sm md:prose-base dark:prose-invert max-w-none">
+                    <ReactMarkdown>{current.rootComment}</ReactMarkdown>
+                  </div>
                 )}
 
                 {/* Board viewer — interactive; author can save moves */}

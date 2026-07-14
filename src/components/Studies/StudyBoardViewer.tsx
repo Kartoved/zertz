@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 import HexBoard from '../Board/HexBoard';
 import MarbleSelector from '../UI/MarbleSelector';
 import StudyMoveTree from './StudyMoveTree';
@@ -68,9 +69,14 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
   const [availableChains, setAvailableChains] = useState<CaptureMove[][]>([]);
   const [selectedMarble, setSelectedMarble] = useState<MarbleColor | null>(null);
   const [dirty, setDirty] = useState(false);
-  const [, force] = useState(0); // bump to reflect in-place tree mutations
+  const [commentMode, setCommentMode] = useState<'edit' | 'read'>('edit');
+  const [, setChangeSeq] = useState(0); // rerender on in-place tree mutations
+  const changeSeqRef = useRef(0);       // latest edit id, for save-race detection
 
   const clearSelection = () => { setSelectedRingId(null); setHighlightedCaptures([]); setAvailableChains([]); };
+
+  // Marks an in-place tree edit: rerender + flag dirty (drives autosave).
+  const markEdited = () => { changeSeqRef.current++; setChangeSeq(changeSeqRef.current); setDirty(true); };
 
   const reinit = (treeJson: string) => {
     const fresh = deserializeTree(treeJson);
@@ -94,24 +100,36 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
   const handleSave = async () => {
     if (saving) return;
     setSaving(true);
+    const seqAtStart = changeSeqRef.current;
     try {
       const treeJson = serializeTree(rootRef.current);
       lastTreeJsonRef.current = treeJson; // pre-empt the reinit from our own write
       await onSaveTree(treeJson);
-      setDirty(false);
+      // Keep dirty if the author edited again while the save was in flight.
+      if (changeSeqRef.current === seqAtStart) setDirty(false);
     } finally {
       setSaving(false);
     }
   };
 
+  // Autosave (owner only): debounced, and never mid-move (a placement still
+  // owing a ring removal would persist a half-finished node).
+  useEffect(() => {
+    if (!canEdit || !dirty || saving) return;
+    if (boardState.phase === 'ringRemoval') return;
+    const id = setTimeout(() => { handleSave(); }, 1200);
+    return () => clearTimeout(id);
+    /* eslint-disable-next-line */
+  }, [changeSeqRef.current, dirty, saving, canEdit, boardState.phase]);
+
   const handleDeleteBranch = (node: GameNode) => {
     const parent = node.parent;
     if (!parent) return;
+    if (!window.confirm(t.studyDeleteVariantConfirm)) return;
     // If the viewed node lives inside the pruned subtree, retreat to the parent.
     if (findNodeById(node, currentNode.id)) navigateTo(parent);
     parent.children = parent.children.filter(c => c !== node);
-    setDirty(true);
-    force(v => v + 1);
+    markEdited();
   };
 
   const navigateTo = (node: GameNode) => {
@@ -119,6 +137,29 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
     setBoardState(studyStateAtNode(study.setupJson, node));
     setSelectedMarble(null);
     clearSelection();
+  };
+
+  // Keyboard navigation: ←/→ step through the line, Home/End jump to the ends.
+  // Ignored while typing in the comment editor.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT')) return;
+      if (e.key === 'ArrowLeft') { if (currentNode.parent) navigateTo(currentNode.parent); }
+      else if (e.key === 'ArrowRight') { if (currentNode.children[0]) navigateTo(currentNode.children[0]); }
+      else if (e.key === 'Home') navigateTo(rootRef.current);
+      else if (e.key === 'End') navigateTo(findDeepestMainLine(rootRef.current));
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    /* eslint-disable-next-line */
+  }, [currentNode]);
+
+  const updateComment = (value: string) => {
+    currentNode.comment = value || undefined;
+    markEdited();
   };
 
   const selectRing = (ringId: string) => {
@@ -144,8 +185,7 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
       if (!res) return;
       setBoardState(res.analysisState);
       clearSelection();
-      setDirty(true);
-      force(v => v + 1);
+      markEdited();
     } else if (boardState.phase === 'capture') {
       if (selectedRingId) {
         const chain = availableChains.find(c => c[c.length - 1].to === ringId);
@@ -154,7 +194,7 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
           setBoardState(res.analysisState);
           if (res.analysisCurrentNode) setCurrentNode(res.analysisCurrentNode);
           clearSelection();
-          setDirty(true);
+          markEdited();
           return;
         }
       }
@@ -167,7 +207,7 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
         if (res.analysisCurrentNode) setCurrentNode(res.analysisCurrentNode);
         setSelectedMarble(null);
         clearSelection();
-        setDirty(true);
+        markEdited();
       } else if (!ring.marble) {
         selectRing(ringId);
       }
@@ -197,27 +237,19 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-2 max-w-[520px] mx-auto">
           <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{phaseLabel}</span>
-          {dirty && (
-            <div className="flex items-center gap-2">
-              {canEdit && (
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="text-xs font-semibold px-2 py-1 rounded-md bg-green-500 hover:bg-green-600 text-white disabled:opacity-50"
-                >
-                  💾 {t.studySave}
-                </button>
-              )}
-              <button
-                type="button"
-                onClick={() => reinit(study.treeJson)}
-                className="text-xs font-medium px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/60"
-              >
-                ↩ {canEdit ? t.studyDiscardChanges : t.studyResetLine}
-              </button>
-            </div>
-          )}
+          {canEdit ? (
+            <span className="text-[11px] text-gray-400 dark:text-gray-500">
+              {saving || dirty ? `💾 ${t.studySaving}` : `✓ ${t.studySaved}`}
+            </span>
+          ) : dirty ? (
+            <button
+              type="button"
+              onClick={() => reinit(study.treeJson)}
+              className="text-xs font-medium px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/60"
+            >
+              ↩ {t.studyResetLine}
+            </button>
+          ) : null}
         </div>
         <div className="flex items-stretch gap-2 mb-2 max-w-[520px] mx-auto">
           <CapturesCard
@@ -269,11 +301,40 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
         <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-2 max-h-[360px] overflow-y-auto">
           <StudyMoveTree root={rootRef.current} currentId={currentNode.id} onSelect={navigateTo} onDelete={canEdit ? handleDeleteBranch : undefined} />
         </div>
-        {currentNode.comment && (
-          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">
-            {currentNode.comment}
+        {canEdit ? (
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-2">
+            <div className="flex justify-end mb-1.5">
+              <div className="flex text-[11px] font-medium rounded-md overflow-hidden border border-gray-200 dark:border-gray-600">
+                <button type="button" onClick={() => setCommentMode('edit')}
+                  className={`px-2 py-0.5 ${commentMode === 'edit' ? 'bg-indigo-500 text-white' : 'bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}>
+                  ✎ {t.studyTabEdit}
+                </button>
+                <button type="button" onClick={() => setCommentMode('read')}
+                  className={`px-2 py-0.5 ${commentMode === 'read' ? 'bg-indigo-500 text-white' : 'bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}>
+                  👁 {t.studyTabRead}
+                </button>
+              </div>
+            </div>
+            {commentMode === 'edit' ? (
+              <textarea
+                value={currentNode.comment ?? ''}
+                onChange={e => updateComment(e.target.value)}
+                placeholder={t.studyCommentPlaceholder}
+                className="w-full min-h-[90px] text-sm bg-transparent text-gray-800 dark:text-gray-100 resize-y outline-none placeholder:text-gray-400"
+              />
+            ) : currentNode.comment ? (
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                <ReactMarkdown>{currentNode.comment}</ReactMarkdown>
+              </div>
+            ) : (
+              <p className="text-xs text-gray-400 dark:text-gray-500 py-2">{t.studyNoComment}</p>
+            )}
           </div>
-        )}
+        ) : currentNode.comment ? (
+          <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 prose prose-sm dark:prose-invert max-w-none">
+            <ReactMarkdown>{currentNode.comment}</ReactMarkdown>
+          </div>
+        ) : null}
         <p className="text-[11px] text-gray-400 dark:text-gray-500 px-1">{canEdit ? t.studyEditHint : t.studyExploreHint}</p>
       </div>
     </div>

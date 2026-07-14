@@ -1,5 +1,6 @@
 import type { ReactElement } from 'react';
 import { GameNode } from '../../game/types';
+import { useI18n } from '../../i18n';
 
 interface StudyMoveTreeProps {
   root: GameNode;
@@ -20,6 +21,7 @@ function MoveChip({ node, currentId, onSelect }: { node: GameNode; currentId: st
           : 'text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-700'
       }`}
     >
+      <span className={isCurrent ? 'text-indigo-200' : 'text-gray-400 dark:text-gray-500'}>{node.moveNumber}.</span>
       {node.notation}
       {node.comment && <span className="text-[10px] opacity-70" title={node.comment}>💬</span>}
     </span>
@@ -68,18 +70,33 @@ function renderLine(
 // Navigable variation tree. Root has no move; its children are the first moves
 // (children[0] = main line, rest = first-move alternatives).
 export default function StudyMoveTree({ root, currentId, onSelect, onDelete }: StudyMoveTreeProps) {
+  const { t } = useI18n();
   const first = root.children.filter(k => k.move);
-  if (first.length === 0) {
-    return <p className="text-xs text-gray-400 dark:text-gray-500 px-1 py-2">—</p>;
-  }
+  const startCurrent = currentId === root.id;
   return (
     <div className="flex flex-col gap-0.5">
-      {renderLine(first[0], 0, currentId, onSelect, onDelete)}
-      {first.slice(1).map(alt => (
-        <div key={`${alt.id}-rootvar`} className="border-l border-gray-200 dark:border-gray-700">
-          {renderLine(alt, 1, currentId, onSelect, onDelete)}
-        </div>
-      ))}
+      {/* Zero move — the starting position; clickable, can hold a comment. */}
+      <div>
+        <span
+          onClick={() => onSelect(root)}
+          className={`inline-flex items-center gap-1 text-[12px] leading-snug cursor-pointer rounded px-1.5 py-0.5 ${
+            startCurrent ? 'bg-indigo-500 text-white' : 'text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700'
+          }`}
+        >
+          ⏮ {t.studyStart}
+          {root.comment && <span className="text-[10px] opacity-70" title={root.comment}>💬</span>}
+        </span>
+      </div>
+      {first.length === 0 ? null : (
+        <>
+          {renderLine(first[0], 0, currentId, onSelect, onDelete)}
+          {first.slice(1).map(alt => (
+            <div key={`${alt.id}-rootvar`} className="border-l border-gray-200 dark:border-gray-700">
+              {renderLine(alt, 1, currentId, onSelect, onDelete)}
+            </div>
+          ))}
+        </>
+      )}
     </div>
   );
 }
