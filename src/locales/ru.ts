@@ -363,7 +363,6 @@ export const ru = {
   studySaved: 'Сохранено',
   studyDeleteVariantConfirm: 'Удалить эту ветку?',
   studySave: 'Сохранить',
-  studyDiscardChanges: 'Отменить изменения',
   studyCommentPlaceholder: 'Комментарий к позиции (markdown)…',
   studyTabEdit: 'Редактор',
   studyTabRead: 'Чтение',

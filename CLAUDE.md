@@ -112,6 +112,7 @@ Express app with JWT auth middleware. All routes under `/api`, static `dist/` se
 | `/api/push` | `routes/push.js` | Web Push subscriptions (VAPID) |
 | `/api/lobby` | `routes/lobby.js` | Public lobby slots (create/join/cancel, 10-min TTL) |
 | `/api/explorer` | `routes/explorer.js` | Opening-explorer position lookup (aggregates + per-game refs) |
+| `/api/studies` | `routes/studies.js` | Studies (Lichess-style lessons): Notion-like hierarchy CRUD, public list, per-`:owner/:slug` fetch, move/reorder, deep clone |
 
 `server/db.js` owns the PostgreSQL pool and creates all tables on startup (idempotent). Tables include `position_moves` (per-position move aggregates) and `position_games` (per-game references); see `shared/explorer/` for the indexing pipeline.
 
@@ -141,6 +142,8 @@ Express app with JWT auth middleware. All routes under `/api`, static `dist/` se
 **Top-level `ErrorBoundary` (`src/components/UI/ErrorBoundary.tsx`).** Wraps the router in `App.tsx` so a render-time throw shows a recoverable fallback (with the stack in a `<details>`) instead of a blank white screen. Note it only catches render/lifecycle errors, not event-handler errors.
 
 **Board previews reuse `HexBoard` in `preview` mode.** `MiniGamePreview` renders `<HexBoard state=… preview />` — a static, non-interactive fit-to-container variant (no zoom/pan, tighter padding). Gradient ids in `HexRing` are prefixed with a per-`HexBoard` `useId()` so multiple boards on one page (e.g. the menu's current-games grid) don't collide on duplicate `url(#…)` refs and render transparent. The desktop main-menu center shows current games as a wrapping grid of these previews (your-turn games first, green border), inside the same card as the Rooms/Ladder panel.
+
+**Studies (Lichess-style lessons) live under `src/components/Studies/` + `src/store/studyStore.ts`.** Route `/studies` and `/studies/:owner/:slug` (`App.tsx`), reached from the **Learning** menu. Data model is one `studies` table (`server/db.js`) where **every row is both content AND a Notion-like nestable node** (`parent_id`, fractional `sort`); `setup_json` is the starting `GameState`, `tree_json` is a `GameNode` tree (with an optional `comment` on nodes), plus `root_comment`/`meta_json`/`is_public`. `slug` is a user-editable, per-owner-unique, transliterated handle (`server/utils/slug.js`). The board interaction **reuses the pure `analysisActions` helpers** (placement/ring-removal/capture) — reader moves branch into a LOCAL working tree and are never persisted; the author's edits **autosave** (debounced, owner-only, skipped mid-`ringRemoval`) via `studyStore.saveStudyTree` → `PUT /:id`. Position reconstruction uses `studyStateAtNode` (replays from `setup_json`, NOT `createInitialState`, then `normalizePhase`) — so a study may start from a custom position. The arbitrary-position editor (`PositionEditorModal`) conserves the marble supply (6/8/10) by construction and uses `HexBoard editable` (removed rings render as clickable ghost slots). `SaveToStudy` (mounted in `RoomScreen`) turns any live/analysis position into a new study. If you touch the interaction, note it is the SAME code path as online analysis. Full build history: `docs/STUDIES_PLAN.md`.
 
 ### Game rules summary (for engine work)
 

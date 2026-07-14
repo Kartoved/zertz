@@ -363,7 +363,6 @@ export const eo = {
   studySaved: 'Konservita',
   studyDeleteVariantConfirm: 'Ĉu forigi ĉi tiun branĉon?',
   studySave: 'Konservi',
-  studyDiscardChanges: 'Nuligi ŝanĝojn',
   studyCommentPlaceholder: 'Komento pri ĉi tiu pozicio (markdown)…',
   studyTabEdit: 'Redakti',
   studyTabRead: 'Legi',

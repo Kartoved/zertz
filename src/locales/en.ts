@@ -363,7 +363,6 @@ export const en = {
   studySaved: 'Saved',
   studyDeleteVariantConfirm: 'Delete this branch?',
   studySave: 'Save',
-  studyDiscardChanges: 'Discard changes',
   studyCommentPlaceholder: 'Comment on this position (markdown)…',
   studyTabEdit: 'Edit',
   studyTabRead: 'Read',

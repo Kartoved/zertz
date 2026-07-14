@@ -23,6 +23,45 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.15.0',
+    date: '2026-07-15',
+    changes: {
+      ru: [
+        '🎓 Студии — новый раздел в «Обучение»: интерактивные учебники с ветками ходов, markdown-комментариями и произвольными позициями. Notion-подобная бесконечная вложенность, публичные студии, клонирование к себе одной кнопкой',
+        'Студии: редактор произвольной позиции с контролем баланса шариков (6/8/10), простановкой уже взятых, выбором стороны хода и размера доски',
+        'Студии: автосохранение авторских ходов и комментариев (без кнопки «Сохранить»); читатели свободно изучают ветки, но их правки не сохраняются',
+        'Студии: из любой партии текущую позицию можно сохранить в студию одной кнопкой «📚 В студию»',
+        '📺 ZERTZ TV — на главном экране крупная живая доска с идущими партиями (слайдер + автолистание); если живых партий нет — реплей последней завершённой',
+        'Международность: превью ссылок и имя приложения теперь на английском',
+        'В правилах единый термин «резерв» вместо смеси «резерв/запас»',
+        'В начале партии показывается только «Аннулировать» — кнопка «Сдаться» больше не дублируется',
+        'Версия обновлена до v0.15.0',
+      ],
+      en: [
+        '🎓 Studies — a new section under “Learning”: interactive lessons with move branches, markdown comments and arbitrary positions. Notion-like infinite nesting, public studies, one-click clone to yourself',
+        'Studies: arbitrary position editor with marble-supply balance control (6/8/10), preset captured marbles, side to move and board size',
+        'Studies: autosave of the author’s moves and comments (no “Save” button); readers freely explore branches but their edits are not saved',
+        'Studies: save the current position from any game into a study with one “📚 To study” button',
+        '📺 ZERTZ TV — a large live board on the main screen broadcasting ongoing games (slider + auto-advance); when nothing is live, it replays the last finished game',
+        'Going international: link previews and the app name are now in English',
+        'Rules now use one term for the shared pool',
+        'At the start of a game only “Cancel” is shown — the “Resign” button is no longer duplicated',
+        'Version updated to v0.15.0',
+      ],
+      eo: [
+        '🎓 Studioj — nova sekcio sub «Lernado»: interagaj lecionoj kun movbranĉoj, markdown-komentoj kaj arbitraj pozicioj. Notion-simila senfina ingado, publikaj studioj, unuklaka kopiado al vi',
+        'Studioj: redaktilo de arbitra pozicio kun kontrolo de globa provizo (6/8/10), antaŭagorditaj kaptitaj globoj, vicanto kaj tabulgrandeco',
+        'Studioj: aŭtomata konservado de movoj kaj komentoj de la aŭtoro (sen butono «Konservi»); legantoj libere esploras branĉojn, sed iliaj ŝanĝoj ne konserviĝas',
+        'Studioj: konservu la aktualan pozicion el iu ajn ludo en studion per unu butono «📚 Al studio»',
+        '📺 ZERTZ TV — granda viva tabulo sur la ĉefekrano kun daŭrantaj ludoj (ŝovilo + aŭtomata paĝumado); kiam nenio vivas — ripeto de la lasta finita ludo',
+        'Internacieco: ligilaj antaŭrigardoj kaj la nomo de la aplikaĵo nun en la angla',
+        'La reguloj nun uzas unu terminon por la komuna provizo',
+        'Komence de ludo montriĝas nur «Nuligi» — la butono «Kapitulaci» ne plu duobliĝas',
+        'Versio ĝisdatigita al v0.15.0',
+      ],
+    },
+  },
+  {
     version: '0.14.0',
     date: '2026-05-14',
     changes: {
