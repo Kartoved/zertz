@@ -300,6 +300,33 @@ async function ensureSchema() {
       matched_at  TIMESTAMP NOT NULL DEFAULT NOW()
     );
   `);
+
+  // Studies: Lichess-style interactive lessons. Every row is a Notion-like node
+  // that both holds content (a starting position + a move tree with markdown
+  // comments) AND can nest under another node (parent_id). `slug` is a
+  // user-editable, per-owner-unique handle used in the URL /studies/:owner/:slug.
+  // `sort` is a fractional index so drag-reorder rewrites only the moved node.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS studies (
+      id            SERIAL PRIMARY KEY,
+      owner_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      parent_id     INTEGER REFERENCES studies(id) ON DELETE CASCADE,
+      slug          TEXT NOT NULL,
+      title         TEXT NOT NULL,
+      board_size    SMALLINT NOT NULL DEFAULT 37,
+      setup_json    TEXT NOT NULL,
+      tree_json     TEXT NOT NULL,
+      root_comment  TEXT,
+      meta_json     JSONB,
+      is_public     BOOLEAN NOT NULL DEFAULT false,
+      sort          DOUBLE PRECISION NOT NULL DEFAULT 0,
+      created_at    TIMESTAMP NOT NULL DEFAULT NOW(),
+      updated_at    TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+  `);
+  await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS studies_owner_slug ON studies(owner_id, slug);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS studies_owner_parent ON studies(owner_id, parent_id, sort);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS studies_public_idx ON studies(is_public) WHERE is_public;`);
 }
 
 export { pool, ensureSchema };

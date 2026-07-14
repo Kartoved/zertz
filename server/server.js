@@ -15,6 +15,7 @@ import gamesRouter from './routes/games.js';
 import pushRouter from './routes/push.js';
 import lobbyRouter from './routes/lobby.js';
 import explorerRouter from './routes/explorer.js';
+import studiesRouter from './routes/studies.js';
 import {
   authLimiter,
   chatLimiter,
@@ -47,6 +48,7 @@ app.use('/api/games', gamesRouter);
 app.use('/api/push', pushRouter);
 app.use('/api/lobby', createRoomLimiter, lobbyRouter);
 app.use('/api/explorer', explorerRouter);
+app.use('/api/studies', studiesRouter);
 
 // Serve static files
 const __filename = fileURLToPath(import.meta.url);

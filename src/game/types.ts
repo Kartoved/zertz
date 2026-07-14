@@ -42,6 +42,9 @@ export interface GameNode {
   children: GameNode[];
   parent: GameNode | null;
   isMainLine: boolean;
+  /** Optional markdown annotation on this node — used by Studies for lessons.
+   *  Carried transparently by serializeTree/deserializeTree (they spread the node). */
+  comment?: string;
 }
 
 export interface Captures {
