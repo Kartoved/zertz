@@ -340,6 +340,9 @@ export const en = {
   statusOffline: 'Offline',
   onlinePlayers: 'Online players',
   noOneOnline: 'No one online right now',
+  zertzTv: 'ZERTZ TV',
+  tvLastGame: 'Last game',
+  tvNoGames: 'No games yet',
   playersTotal: 'Total',
   playersOnline: 'Online',
 };

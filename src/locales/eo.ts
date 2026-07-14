@@ -340,6 +340,9 @@ export const eo = {
   statusOffline: 'Nekonektita',
   onlinePlayers: 'Konektitaj ludantoj',
   noOneOnline: 'Neniu nun konektita',
+  zertzTv: 'ZERTZ TV',
+  tvLastGame: 'Lasta partio',
+  tvNoGames: 'Ankoraŭ neniuj partioj',
   playersTotal: 'Entute',
   playersOnline: 'Konektitaj',
 };

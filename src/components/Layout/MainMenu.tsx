@@ -23,7 +23,8 @@ import { useMainMenuModals, NavTab } from './useMainMenuModals';
 import { useMatchmaking } from './useMatchmaking';
 import MiniGamePreview from '../UI/MiniGamePreview';
 import RoomsPanel from '../Lobby/RoomsPanel';
-import OnlinePlayersPanel from '../Lobby/OnlinePlayersPanel';
+import LiveGamesTV from '../Lobby/LiveGamesTV';
+import OnlinePlayersStrip from '../Lobby/OnlinePlayersStrip';
 import IncomingChallengesBanner from './IncomingChallengesBanner';
 
 export type TimePresetId = '5+5' | '15+0' | '30+0' | '7d';
@@ -552,11 +553,9 @@ export default function MainMenu() {
               onLoginClick={() => modals.setShowAuthModal(true)}
             />
           </div>
-          {user && (
-            <div className="w-full">
-              <OnlinePlayersPanel />
-            </div>
-          )}
+          <div className="w-full">
+            <LiveGamesTV />
+          </div>
         </aside>
 
         {/* CENTER: Time control modes */}
@@ -634,9 +633,12 @@ export default function MainMenu() {
           </div>
         </section>
 
-        {/* RIGHT: Global chat */}
+        {/* RIGHT: Online players strip + global chat */}
         <aside className={`w-full lg:w-80 lg:flex-shrink-0 flex-col min-h-0 order-3 ${mobileMainTab === 'chat' ? 'flex flex-1' : 'hidden lg:flex'}`}>
-          <GlobalChat />
+          {user && <OnlinePlayersStrip />}
+          <div className="flex-1 min-h-0">
+            <GlobalChat />
+          </div>
         </aside>
       </main>
       

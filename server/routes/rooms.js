@@ -298,6 +298,87 @@ router.get('/active/:username', async (req, res) => {
   }
 });
 
+// ZERTZ TV: live games to broadcast on the main menu. Returns in-progress
+// games (both seats filled, no winner) ordered so real-time games lead and
+// correspondence games trail, most-recently-moved first within each group.
+// When nothing is live, `fallback` carries the most recent finished game
+// (with its tree) so the client can auto-replay it. `optionalAuth` lets us
+// rank the viewer's own games last (others are more interesting to discover)
+// while still including them — at low population your own game may be the only
+// live one, and an empty TV is exactly what we're avoiding.
+// Must be defined before /:id so Express doesn't match "tv" as an id.
+router.get('/tv', optionalAuth, async (req, res) => {
+  const viewerId = req.user ? req.user.id : null;
+  const mapCommon = (r) => ({
+    id: String(r.id),
+    boardSize: r.board_size,
+    playerNames: { player1: r.player1_name, player2: r.player2_name },
+    ratings: {
+      player1: r.r1 != null ? Math.round(r.r1) : null,
+      player2: r.r2 != null ? Math.round(r.r2) : null,
+    },
+    countries: { player1: r.c1 || null, player2: r.c2 || null },
+    stateJson: r.state_json,
+  });
+  try {
+    const params = [];
+    // realtime first, correspondence last; then (if signed in) others' games
+    // before the viewer's own; then most-recently-moved first.
+    const orderParts = [
+      `(CASE WHEN r.time_control_increment_ms = -1 OR r.time_control_base_ms IS NULL THEN 1 ELSE 0 END) ASC`,
+    ];
+    if (viewerId) {
+      params.push(viewerId);
+      orderParts.push(`(CASE WHEN r.user1_id = $1 OR r.user2_id = $1 THEN 1 ELSE 0 END) ASC`);
+    }
+    orderParts.push('r.updated_at DESC');
+    const liveResult = await pool.query(
+      `SELECT r.id, r.board_size, r.player1_name, r.player2_name, r.state_json,
+              r.time_control_base_ms, r.time_control_increment_ms, r.updated_at,
+              u1.rating AS r1, u1.country AS c1,
+              u2.rating AS r2, u2.country AS c2
+         FROM rooms r
+         LEFT JOIN users u1 ON u1.id = r.user1_id
+         LEFT JOIN users u2 ON u2.id = r.user2_id
+        WHERE r.winner IS NULL AND r.user2_id IS NOT NULL
+        ORDER BY ${orderParts.join(', ')}
+        LIMIT 12`,
+      params
+    );
+
+    const live = liveResult.rows.map(r => ({
+      ...mapCommon(r),
+      timeControl: { baseMs: r.time_control_base_ms, incMs: r.time_control_increment_ms },
+      isCorrespondence: r.time_control_increment_ms === -1 || r.time_control_base_ms == null,
+      updatedAt: r.updated_at.getTime(),
+    }));
+
+    let fallback = null;
+    if (live.length === 0) {
+      const fbResult = await pool.query(
+        `SELECT r.id, r.board_size, r.player1_name, r.player2_name, r.state_json, r.tree_json,
+                u1.rating AS r1, u1.country AS c1,
+                u2.rating AS r2, u2.country AS c2
+           FROM rooms r
+           LEFT JOIN users u1 ON u1.id = r.user1_id
+           LEFT JOIN users u2 ON u2.id = r.user2_id
+          WHERE r.winner IS NOT NULL
+          ORDER BY r.updated_at DESC
+          LIMIT 1`
+      );
+      if (fbResult.rows.length > 0) {
+        const r = fbResult.rows[0];
+        fallback = { ...mapCommon(r), treeJson: r.tree_json };
+      }
+    }
+
+    res.json({ live, fallback });
+  } catch (err) {
+    console.error('Get TV games error:', err);
+    res.status(500).json({ error: 'Failed to get TV games' });
+  }
+});
+
 // Lightweight "did anything change?" check used by pollRoom to skip a full
 // fetch when the room is unchanged. Returns { updatedAt, winner } only.
 // Must be defined before /:id so Express doesn't match "head" as an id.

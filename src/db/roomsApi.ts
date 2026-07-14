@@ -323,6 +323,47 @@ export async function getActiveRooms(username?: string): Promise<Array<{
   return response.json();
 }
 
+// ── ZERTZ TV ──────────────────────────────────────────────────────────────
+export interface TvPlayerMeta {
+  player1: string | null;
+  player2: string | null;
+}
+
+export interface TvLiveGame {
+  id: string;
+  boardSize: 37 | 48 | 61;
+  playerNames: { player1: string; player2: string };
+  ratings: { player1: number | null; player2: number | null };
+  countries: TvPlayerMeta;
+  stateJson: string;
+  timeControl: { baseMs: number | null; incMs: number | null };
+  isCorrespondence: boolean;
+  updatedAt: number;
+}
+
+export interface TvFallbackGame {
+  id: string;
+  boardSize: 37 | 48 | 61;
+  playerNames: { player1: string; player2: string };
+  ratings: { player1: number | null; player2: number | null };
+  countries: TvPlayerMeta;
+  stateJson: string;
+  treeJson: string;
+}
+
+export interface TvResponse {
+  live: TvLiveGame[];
+  fallback: TvFallbackGame | null;
+}
+
+// Live games to broadcast on the main menu (ZERTZ TV). `fallback` is the most
+// recent finished game, present only when nothing is currently live.
+export async function getTvGames(): Promise<TvResponse> {
+  const response = await fetch(`${API_BASE}/api/rooms/tv`, { headers: authHeaders(false) });
+  if (!response.ok) return { live: [], fallback: null };
+  return response.json();
+}
+
 export async function cancelGame(id: number | string): Promise<void> {
   const response = await fetch(`${API_BASE}/api/rooms/${id}/cancel`, {
     method: 'POST',
