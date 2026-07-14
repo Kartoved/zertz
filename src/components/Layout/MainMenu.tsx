@@ -24,6 +24,7 @@ import { useMatchmaking } from './useMatchmaking';
 import MiniGamePreview from '../UI/MiniGamePreview';
 import RoomsPanel from '../Lobby/RoomsPanel';
 import LiveGamesTV from '../Lobby/LiveGamesTV';
+import { useTvGames } from '../Lobby/useTvGames';
 import OnlinePlayersStrip from '../Lobby/OnlinePlayersStrip';
 import IncomingChallengesBanner from './IncomingChallengesBanner';
 
@@ -91,6 +92,7 @@ export default function MainMenu() {
   const [selectedPreset, setSelectedPreset] = useState<TimePresetId>('5+5');
   const selectedTimeControl: 'blitz' | 'rapid' | 'long' | 'correspondence' = 'blitz';
   const [mobileMainTab, setMobileMainTab] = useState<'play' | 'tv' | 'chat'>('play');
+  const { live: tvLive, fallback: tvFallback } = useTvGames();
 
   const { user, fetchMe, incomingChallengesCount } = useAuthStore();
   const boardLabels: Record<number, string> = { 37: t.board37, 48: t.board48, 61: t.board61 };
@@ -533,13 +535,19 @@ export default function MainMenu() {
           <button
             type="button"
             onClick={() => setMobileMainTab('tv')}
-            className={`py-2 text-sm font-semibold rounded-lg transition-colors ${
+            className={`relative py-2 text-sm font-semibold rounded-lg transition-colors ${
               mobileMainTab === 'tv'
                 ? 'bg-indigo-500 text-white'
                 : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
             }`}
           >
             📺 TV
+            {tvLive.length > 0 && (
+              <span className="absolute top-1.5 right-1.5 flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75 animate-ping" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+              </span>
+            )}
           </button>
           <button
             type="button"
@@ -565,7 +573,7 @@ export default function MainMenu() {
             />
           </div>
           <div className="w-full">
-            <LiveGamesTV />
+            <LiveGamesTV live={tvLive} fallback={tvFallback} />
           </div>
         </aside>
 
@@ -646,7 +654,7 @@ export default function MainMenu() {
 
         {/* MOBILE: ZERTZ TV tab (desktop shows it in the left column instead) */}
         <section className={`lg:hidden flex-col min-h-0 order-2 ${mobileMainTab === 'tv' ? 'flex flex-1' : 'hidden'}`}>
-          <LiveGamesTV />
+          <LiveGamesTV live={tvLive} fallback={tvFallback} />
         </section>
 
         {/* RIGHT: Online players strip + global chat */}

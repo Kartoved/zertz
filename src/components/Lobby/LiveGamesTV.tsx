@@ -1,13 +1,12 @@
 import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import HexBoard from '../Board/HexBoard';
-import { getTvGames, TvLiveGame, TvFallbackGame } from '../../db/roomsApi';
+import { TvLiveGame, TvFallbackGame } from '../../db/roomsApi';
 import { deserializeState, deserializeTree } from '../../db/apiClient';
 import { rebuildStateFromNode } from '../../utils/gameTreeUtils';
 import { GameState } from '../../game/types';
 import { useI18n } from '../../i18n';
 
-const POLL_MS = 4500;
 const AUTO_ADVANCE_MS = 18000;
 const REPLAY_STEP_MS = 1200;
 
@@ -60,33 +59,26 @@ function PlayersRow({
   );
 }
 
-// Left-column "ZERTZ TV": one large auto-updating board broadcasting live games,
-// with a slider to page through them. Real-time games lead, correspondence
-// trails (server-ordered). When nothing is live, auto-replays the last finished
-// game. The board refreshes on its own because each poll returns fresh state.
-export default function LiveGamesTV() {
+interface LiveGamesTVProps {
+  live: TvLiveGame[];
+  fallback: TvFallbackGame | null;
+}
+
+// "ZERTZ TV": one large auto-updating board broadcasting live games, with a
+// slider to page through them. Real-time games lead, correspondence trails
+// (server-ordered). When nothing is live, auto-replays the last finished game.
+// Data is polled once by the parent (useTvGames) and passed in; the board
+// refreshes on its own because each poll returns fresh state.
+export default function LiveGamesTV({ live, fallback }: LiveGamesTVProps) {
   const { t } = useI18n();
   const navigate = useNavigate();
-  const [live, setLive] = useState<TvLiveGame[]>([]);
-  const [fallback, setFallback] = useState<TvFallbackGame | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const hoveredRef = useRef(false);
 
-  const refresh = useCallback(async () => {
-    try {
-      const { live: l, fallback: fb } = await getTvGames();
-      setLive(l);
-      setFallback(l.length === 0 ? fb : null);
-    } catch {
-      /* keep last list on transient errors */
-    }
-  }, []);
-
-  useEffect(() => {
-    refresh();
-    const iv = setInterval(refresh, POLL_MS);
-    return () => clearInterval(iv);
-  }, [refresh]);
+  // Latest live list behind a ref so `go` can stay stable — otherwise the
+  // auto-advance interval below would reset on every poll and never fire.
+  const liveRef = useRef(live);
+  liveRef.current = live;
 
   // Keep the shown game valid as the live list changes (index tracked by id,
   // so a reordered poll doesn't jump the view).
@@ -102,13 +94,11 @@ export default function LiveGamesTV() {
   const current = live[activeIndex] ?? null;
 
   const go = useCallback((dir: 1 | -1) => {
-    setLive(prev => {
-      if (prev.length <= 1) return prev;
-      setActiveId(id => {
-        const i = Math.max(0, prev.findIndex(g => g.id === id));
-        return prev[(i + dir + prev.length) % prev.length].id;
-      });
-      return prev;
+    const l = liveRef.current;
+    if (l.length <= 1) return;
+    setActiveId(id => {
+      const i = Math.max(0, l.findIndex(g => g.id === id));
+      return l[(i + dir + l.length) % l.length].id;
     });
   }, []);
 
