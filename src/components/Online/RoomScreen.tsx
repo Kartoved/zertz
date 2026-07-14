@@ -946,7 +946,7 @@ export function RoomScreen() {
                   >
                     ↶ {t.undoMove}
                   </button>
-                  {canCancel && (
+                  {canCancel ? (
                     <button
                       type="button"
                       onClick={() => cancelGame()}
@@ -954,14 +954,15 @@ export function RoomScreen() {
                     >
                       ✕ {t.cancelGame}
                     </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowSurrenderConfirm(true)}
+                      className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-black hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                    >
+                      🏳️ {t.surrender}
+                    </button>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => setShowSurrenderConfirm(true)}
-                    className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100 border border-black hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-                  >
-                    🏳️ {t.surrender}
-                  </button>
                 </div>
                 {isAuthed && (
                   <button
@@ -1175,7 +1176,7 @@ export function RoomScreen() {
                     ✕ {t.cancelGame}
                   </button>
                 )}
-                {!isSpectator && !state.winner && (
+                {!isSpectator && !state.winner && !canCancel && (
                   <button
                     type="button"
                     onClick={() => { setShowMobileActions(false); setShowSurrenderConfirm(true); }}
