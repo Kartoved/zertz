@@ -6,12 +6,13 @@ import { useI18n } from '../../i18n';
 interface StudySidebarProps {
   currentId: number | null;
   onOpen: (slug: string) => void;
+  onNewFromPosition: () => void;
 }
 
 // Notion-like hierarchy of the author's own studies. Create child, rename,
 // delete, and drag a node onto another to re-parent (drop on the header →
 // top level). Content-free — bodies load on open.
-export default function StudySidebar({ currentId, onOpen }: StudySidebarProps) {
+export default function StudySidebar({ currentId, onOpen, onNewFromPosition }: StudySidebarProps) {
   const { t } = useI18n();
   const { tree, expanded, toggleExpand, createStudy, renameStudy, deleteStudy, moveStudy } = useStudyStore();
   const [dragId, setDragId] = useState<number | null>(null);
@@ -120,13 +121,23 @@ export default function StudySidebar({ currentId, onOpen }: StudySidebarProps) {
         onDrop={(e) => { e.preventDefault(); handleDrop(null); }}
       >
         <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t.myStudies}</span>
-        <button
-          type="button"
-          onClick={() => handleCreate(null)}
-          className="px-2 py-1 rounded-md text-sm font-semibold bg-indigo-500 hover:bg-indigo-600 text-white"
-        >
-          + {t.studyNew}
-        </button>
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={onNewFromPosition}
+            title={t.studyNewFromPosition}
+            className="px-2 py-1 rounded-md text-sm font-semibold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"
+          >
+            ⊞
+          </button>
+          <button
+            type="button"
+            onClick={() => handleCreate(null)}
+            className="px-2 py-1 rounded-md text-sm font-semibold bg-indigo-500 hover:bg-indigo-600 text-white"
+          >
+            + {t.studyNew}
+          </button>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto py-1 px-1">

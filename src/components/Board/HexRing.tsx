@@ -13,6 +13,8 @@ interface HexRingProps {
   isCaptureSource: boolean;
   isCaptureTarget: boolean;
   isValidPlacement: boolean;
+  /** Position-editor ghost slot for a removed ring — faint, clickable to restore. */
+  ghost?: boolean;
   onClick?: (ringId: string) => void;
 }
 
@@ -27,6 +29,7 @@ export default function HexRing({
   isCaptureSource,
   isCaptureTarget,
   isValidPlacement,
+  ghost,
   onClick,
 }: HexRingProps) {
   const { selectRing, handleCapture, selectedRingId, availableCaptureChains } = useGameStore();
@@ -84,6 +87,23 @@ export default function HexRing({
   const outerRadius = size * 0.85;
   const innerRadius = size * (0.55 / 1.5);
   const marbleRadius = size * 0.58;
+
+  // Removed ring in the position editor: a faint dashed slot that stays
+  // clickable (transparent hit circle) so the author can restore it.
+  if (ghost) {
+    return (
+      <g transform={`translate(${x}, ${y})`} onClick={handleClick} className="cursor-pointer hover:opacity-80">
+        <circle cx={0} cy={0} r={outerRadius} fill="transparent" pointerEvents="all" />
+        <circle
+          cx={0} cy={0} r={size * 0.5}
+          fill="rgba(255,255,255,0.03)"
+          stroke="rgba(255,255,255,0.28)"
+          strokeWidth={2}
+          strokeDasharray="4 4"
+        />
+      </g>
+    );
+  }
 
   // Compound path (outer circle - inner circle) to create a true hole.
   const ringPath = `

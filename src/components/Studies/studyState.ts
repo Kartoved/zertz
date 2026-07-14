@@ -1,5 +1,6 @@
 import { GameNode, GameState } from '../../game/types';
 import { placeMarble, removeRing, skipRingRemoval, executeCapture } from '../../game/GameEngine';
+import { normalizePhase } from '../../utils/moveActions';
 import { deserializeState } from '../../db/apiClient';
 
 // Reconstructs the board state at `node` by replaying moves root→node onto the
@@ -24,6 +25,10 @@ export function studyStateAtNode(setupJson: string, node: GameNode): GameState {
       executeCapture(state, captures);
     }
   }
+  // Reflect mandatory captures in the phase — matters for custom setups (Etap D)
+  // where the starting position may already have a forced capture. No-op for
+  // gameOver/ringRemoval. Mirrors what the analysis flow does after each move.
+  normalizePhase(state);
   return state;
 }
 

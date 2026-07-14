@@ -8,6 +8,7 @@ import {
 import { serializeState, serializeTree } from '../db/apiClient';
 import { createInitialState } from '../game/GameEngine';
 import { createRootNode } from '../utils/gameTreeUtils';
+import { GameState } from '../game/types';
 
 interface StudyStore {
   tree: StudyTreeNode[];        // the signed-in user's hierarchy (content-free)
@@ -22,6 +23,8 @@ interface StudyStore {
   expand: (id: number) => void;
   openStudy: (owner: string, slug: string) => Promise<StudyNode | null>;
   createStudy: (parentId: number | null, title: string) => Promise<{ id: number; slug: string; ownerName: string } | null>;
+  createStudyFromState: (title: string, state: GameState) => Promise<{ id: number; slug: string; ownerName: string } | null>;
+  saveStudyTree: (id: number, treeJson: string) => Promise<void>;
   renameStudy: (id: number, title: string) => Promise<void>;
   changeSlug: (id: number, slug: string) => Promise<string | null>;
   setPublic: (id: number, isPublic: boolean) => Promise<void>;
@@ -90,6 +93,19 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
     await get().loadTree();
     if (parentId != null) get().expand(parentId);
     return r;
+  },
+
+  createStudyFromState: async (title, state) => {
+    const setupJson = serializeState(state);
+    const treeJson = serializeTree(createRootNode());
+    const r = await apiCreate({ parentId: null, title, boardSize: state.boardSize, setupJson, treeJson });
+    await get().loadTree();
+    return r;
+  },
+
+  saveStudyTree: async (id, treeJson) => {
+    await updateStudy(id, { treeJson });
+    set(s => (s.current && s.current.id === id ? { current: { ...s.current, treeJson } } : s));
   },
 
   renameStudy: async (id, title) => {

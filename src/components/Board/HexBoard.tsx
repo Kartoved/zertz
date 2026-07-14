@@ -21,6 +21,9 @@ interface HexBoardProps {
   onRingClick?: (ringId: string) => void;
   /** Static thumbnail mode: fills its parent, no zoom/pan, no zoom badge. */
   preview?: boolean;
+  /** Position-editor mode: keep removed rings as clickable ghost slots so they
+   *  can be restored, and keep full-board bounds. */
+  editable?: boolean;
 }
 
 export default function HexBoard(props: HexBoardProps = {}) {
@@ -62,7 +65,8 @@ export default function HexBoard(props: HexBoardProps = {}) {
   };
   
   const { rings, positions, bounds } = useMemo(() => {
-    const ringsArray = Array.from(state.rings.values()).filter(r => !r.isRemoved);
+    const all = Array.from(state.rings.values());
+    const ringsArray = props.editable ? all : all.filter(r => !r.isRemoved);
     const positions = new Map<string, { x: number; y: number }>();
     
     let minX = Infinity, maxX = -Infinity;
@@ -82,7 +86,7 @@ export default function HexBoard(props: HexBoardProps = {}) {
       positions,
       bounds: { minX, maxX, minY, maxY },
     };
-  }, [state.rings]);
+  }, [state.rings, props.editable]);
   
   // In preview (thumbnail) mode the board should fill the square edge-to-edge,
   // so pad only by a ring radius instead of the full interactive breathing room.
@@ -167,6 +171,7 @@ export default function HexBoard(props: HexBoardProps = {}) {
                   isCaptureSource={isCaptureSource}
                   isCaptureTarget={isCaptureTarget}
                   isValidPlacement={isValidPlacement}
+                  ghost={ring.isRemoved}
                   onClick={props.onRingClick}
                 />
               );

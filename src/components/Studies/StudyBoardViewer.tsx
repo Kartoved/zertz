@@ -3,7 +3,7 @@ import HexBoard from '../Board/HexBoard';
 import MarbleSelector from '../UI/MarbleSelector';
 import StudyMoveTree from './StudyMoveTree';
 import { StudyNode } from '../../db/studiesApi';
-import { deserializeTree } from '../../db/apiClient';
+import { deserializeTree, serializeTree } from '../../db/apiClient';
 import { findDeepestMainLine } from '../../utils/gameTreeUtils';
 import { getValidRemovableRings } from '../../game/Board';
 import {
@@ -12,7 +12,7 @@ import {
   applyAnalysisRingRemoval,
   applyAnalysisCapture,
 } from '../../store/analysisActions';
-import { studyStateAtNode } from './studyState';
+import { studyStateAtNode, findNodeById } from './studyState';
 import { GameNode, GameState, MarbleColor, CaptureMove, Captures, WIN_CONDITIONS } from '../../game/types';
 import { useI18n } from '../../i18n';
 
@@ -47,13 +47,20 @@ function CapturesCard({ label, caps, active }: { label: string; caps: Captures; 
 // branch into a LOCAL working copy of the study tree (deserialized fresh, never
 // the study prop) and are NOT persisted. "Back to author's line" discards the
 // exploration. The same interaction will power author editing (Etap E, + save).
-export default function StudyBoardViewer({ study }: { study: StudyNode }) {
+export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNode; onSaveTree: (treeJson: string) => Promise<void> }) {
   const { t } = useI18n();
+  const canEdit = study.isOwner;
 
   // Working tree: private, mutable, discardable. Re-init on study change.
   const rootRef = useRef<GameNode>(deserializeTree(study.treeJson));
   const [currentNode, setCurrentNode] = useState<GameNode>(rootRef.current);
   const [boardState, setBoardState] = useState<GameState>(() => studyStateAtNode(study.setupJson, rootRef.current));
+  const [saving, setSaving] = useState(false);
+
+  // Guards the reinit effect: after our own save we bump these so the incoming
+  // treeJson prop change doesn't reset the board to root.
+  const lastStudyIdRef = useRef(study.id);
+  const lastTreeJsonRef = useRef(study.treeJson);
 
   // Selection / input state.
   const [selectedRingId, setSelectedRingId] = useState<string | null>(null);
@@ -75,7 +82,37 @@ export default function StudyBoardViewer({ study }: { study: StudyNode }) {
     setDirty(false);
   };
 
-  useEffect(() => { reinit(study.treeJson); /* eslint-disable-next-line */ }, [study.id, study.treeJson]);
+  useEffect(() => {
+    // Skip when the change is our own save (same study, treeJson we just wrote).
+    if (study.id === lastStudyIdRef.current && study.treeJson === lastTreeJsonRef.current) return;
+    lastStudyIdRef.current = study.id;
+    lastTreeJsonRef.current = study.treeJson;
+    reinit(study.treeJson);
+    /* eslint-disable-next-line */
+  }, [study.id, study.treeJson]);
+
+  const handleSave = async () => {
+    if (saving) return;
+    setSaving(true);
+    try {
+      const treeJson = serializeTree(rootRef.current);
+      lastTreeJsonRef.current = treeJson; // pre-empt the reinit from our own write
+      await onSaveTree(treeJson);
+      setDirty(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteBranch = (node: GameNode) => {
+    const parent = node.parent;
+    if (!parent) return;
+    // If the viewed node lives inside the pruned subtree, retreat to the parent.
+    if (findNodeById(node, currentNode.id)) navigateTo(parent);
+    parent.children = parent.children.filter(c => c !== node);
+    setDirty(true);
+    force(v => v + 1);
+  };
 
   const navigateTo = (node: GameNode) => {
     setCurrentNode(node);
@@ -161,13 +198,25 @@ export default function StudyBoardViewer({ study }: { study: StudyNode }) {
         <div className="flex items-center justify-between mb-2 max-w-[520px] mx-auto">
           <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{phaseLabel}</span>
           {dirty && (
-            <button
-              type="button"
-              onClick={() => reinit(study.treeJson)}
-              className="text-xs font-medium px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/60"
-            >
-              ↩ {t.studyResetLine}
-            </button>
+            <div className="flex items-center gap-2">
+              {canEdit && (
+                <button
+                  type="button"
+                  onClick={handleSave}
+                  disabled={saving}
+                  className="text-xs font-semibold px-2 py-1 rounded-md bg-green-500 hover:bg-green-600 text-white disabled:opacity-50"
+                >
+                  💾 {t.studySave}
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => reinit(study.treeJson)}
+                className="text-xs font-medium px-2 py-1 rounded-md bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-900/60"
+              >
+                ↩ {canEdit ? t.studyDiscardChanges : t.studyResetLine}
+              </button>
+            </div>
           )}
         </div>
         <div className="flex items-stretch gap-2 mb-2 max-w-[520px] mx-auto">
@@ -218,14 +267,14 @@ export default function StudyBoardViewer({ study }: { study: StudyNode }) {
       {/* Notation panel + node comment */}
       <div className="lg:w-72 flex-shrink-0 flex flex-col gap-3">
         <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-2 max-h-[360px] overflow-y-auto">
-          <StudyMoveTree root={rootRef.current} currentId={currentNode.id} onSelect={navigateTo} />
+          <StudyMoveTree root={rootRef.current} currentId={currentNode.id} onSelect={navigateTo} onDelete={canEdit ? handleDeleteBranch : undefined} />
         </div>
         {currentNode.comment && (
           <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-3 text-sm text-gray-700 dark:text-gray-200 whitespace-pre-wrap">
             {currentNode.comment}
           </div>
         )}
-        <p className="text-[11px] text-gray-400 dark:text-gray-500 px-1">{t.studyExploreHint}</p>
+        <p className="text-[11px] text-gray-400 dark:text-gray-500 px-1">{canEdit ? t.studyEditHint : t.studyExploreHint}</p>
       </div>
     </div>
   );

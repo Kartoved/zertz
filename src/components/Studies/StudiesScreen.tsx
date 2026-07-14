@@ -2,7 +2,9 @@ import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import StudySidebar from './StudySidebar';
 import StudyBoardViewer from './StudyBoardViewer';
+import PositionEditorModal from './PositionEditorModal';
 import { useStudyStore } from '../../store/studyStore';
+import { GameState } from '../../game/types';
 import { useAuthStore } from '../../store/authStore';
 import { useUIStore } from '../../store/uiStore';
 import { useI18n } from '../../i18n';
@@ -15,9 +17,16 @@ export default function StudiesScreen() {
   const { setScreen } = useUIStore();
   const {
     current, currentLoading, error, publicStudies,
-    loadTree, openStudy, loadPublic, cloneStudy, setPublic, changeSlug, renameStudy,
+    loadTree, openStudy, loadPublic, cloneStudy, setPublic, changeSlug, renameStudy, createStudyFromState, saveStudyTree,
   } = useStudyStore();
   const [mobileSidebar, setMobileSidebar] = useState(false);
+  const [showEditor, setShowEditor] = useState(false);
+
+  const handleCreateFromPosition = async (title: string, state: GameState) => {
+    const r = await createStudyFromState(title, state);
+    setShowEditor(false);
+    if (r) navigate(`/studies/${encodeURIComponent(r.ownerName)}/${encodeURIComponent(r.slug)}`);
+  };
 
   useEffect(() => { if (user) loadTree(); loadPublic(); }, [user, loadTree, loadPublic]);
 
@@ -69,7 +78,7 @@ export default function StudiesScreen() {
         {/* Sidebar (author's hierarchy) */}
         {user && (
           <aside className={`${mobileSidebar ? 'flex' : 'hidden'} lg:flex w-full lg:w-72 flex-shrink-0 flex-col bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700`}>
-            <StudySidebar currentId={current?.id ?? null} onOpen={open} />
+            <StudySidebar currentId={current?.id ?? null} onOpen={open} onNewFromPosition={() => setShowEditor(true)} />
           </aside>
         )}
 
@@ -122,8 +131,8 @@ export default function StudiesScreen() {
                   <p className="mt-4 text-gray-700 dark:text-gray-200 whitespace-pre-wrap">{current.rootComment}</p>
                 )}
 
-                {/* Board viewer (Etap C1: read-only) */}
-                <StudyBoardViewer study={current} />
+                {/* Board viewer — interactive; author can save moves */}
+                <StudyBoardViewer study={current} onSaveTree={(treeJson) => saveStudyTree(current.id, treeJson)} />
 
                 {/* Sub-studies */}
                 {current.children.length > 0 && (
@@ -147,6 +156,14 @@ export default function StudiesScreen() {
               <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t.studies}</h1>
               <p className="text-gray-500 dark:text-gray-400 mt-1">{t.studyWelcome}</p>
               {!user && <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">🔒 {t.loginToCreateStudies}</p>}
+              {user && (
+                <button
+                  onClick={() => setShowEditor(true)}
+                  className="mt-3 px-3 py-1.5 rounded-lg text-sm font-semibold bg-indigo-500 hover:bg-indigo-600 text-white"
+                >
+                  ⊞ {t.studyNewFromPosition}
+                </button>
+              )}
 
               <h2 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mt-6 mb-2">{t.publicStudies}</h2>
               {publicStudies.length === 0 ? (
@@ -169,6 +186,10 @@ export default function StudiesScreen() {
           )}
         </main>
       </div>
+
+      {showEditor && (
+        <PositionEditorModal onClose={() => setShowEditor(false)} onCreate={handleCreateFromPosition} />
+      )}
     </div>
   );
 }
