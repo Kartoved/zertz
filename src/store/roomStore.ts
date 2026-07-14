@@ -37,7 +37,7 @@ import {
   applyAnalysisCapture,
   mergeLiveTreeIntoAnalysis,
 } from './analysisActions';
-import { removeBranch, analysisSubtreeToTree, SavePremoveResult } from './premovesActions';
+import { analysisSubtreeToTree, SavePremoveResult } from './premovesActions';
 import { serializeState } from '../db/apiClient';
 import { loadAnalysis, saveAnalysis } from './analysisStorage';
 
@@ -141,7 +141,6 @@ interface RoomStore {
   // Pre-moves actions
   loadPremoves: () => Promise<void>;
   armAnalysisSubtree: (playOwnMove?: boolean) => Promise<SavePremoveResult & { droppedMyAlternatives?: boolean }>;
-  deletePremoveBranch: (nodeId: string) => Promise<void>;
   clearPremoves: () => Promise<void>;
 
   reset: () => void;
@@ -1145,20 +1144,6 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     if (hasIncompleteMove) return { ok: false as const, reason: 'incompleteMove' as const };
     if (!tree) return { ok: false as const, reason: 'empty' as const };
     return persist(tree, droppedMyAlternatives);
-  },
-
-  deletePremoveBranch: async (nodeId) => {
-    const { roomId, premoves } = get();
-    if (!roomId || !premoves) return;
-    const updated = removeBranch(premoves, nodeId);
-    if (updated === premoves) return;
-    const prev = premoves;
-    set({ premoves: updated });
-    try {
-      await premovesApi.setPremoves(roomId, updated);
-    } catch {
-      set({ premoves: prev });
-    }
   },
 
   clearPremoves: async () => {
