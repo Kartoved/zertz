@@ -3,6 +3,7 @@ import HexBoard from '../Board/HexBoard';
 import { GameState } from '../../game/types';
 import { loadGame } from '../../db/gamesStorage';
 import { useI18n } from '../../i18n';
+import { usePressToActivate } from '../../utils/pressToActivate';
 
 interface MiniGamePreviewProps {
   gameId: string;
@@ -19,6 +20,7 @@ interface MiniGamePreviewProps {
 export default function MiniGamePreview({ gameId, playerNames, moveCount, isOnline, onClick, size = 148, isMyTurn }: MiniGamePreviewProps) {
   const { t } = useI18n();
   const [gameState, setGameState] = useState<GameState | null>(null);
+  const press = usePressToActivate(onClick);
 
   useEffect(() => {
     loadGame(gameId).then(data => {
@@ -28,13 +30,13 @@ export default function MiniGamePreview({ gameId, playerNames, moveCount, isOnli
 
   return (
     <div
-      onClick={onClick}
-      className={`snap-start flex-shrink-0 flex flex-col cursor-pointer rounded-xl overflow-hidden border-2 bg-white dark:bg-gray-800 shadow-sm active:scale-95 transition-transform ${
+      {...press}
+      className={`snap-start flex-shrink-0 flex flex-col cursor-pointer rounded-xl overflow-hidden border-2 bg-white dark:bg-gray-800 shadow-sm transition-colors ${
         isMyTurn
           ? 'border-green-400 dark:border-green-500 hover:border-green-500 dark:hover:border-green-400'
           : 'border-gray-200 dark:border-gray-700 hover:border-indigo-400 dark:hover:border-indigo-500'
       }`}
-      style={{ width: size + 4 }}
+      style={{ width: size + 4, touchAction: 'manipulation' }}
     >
       {/* Mini board */}
       <div

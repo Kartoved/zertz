@@ -6,6 +6,7 @@ import { deserializeState, deserializeTree } from '../../db/apiClient';
 import { rebuildStateFromNode } from '../../utils/gameTreeUtils';
 import { GameState } from '../../game/types';
 import { useI18n } from '../../i18n';
+import { usePressToActivate } from '../../utils/pressToActivate';
 
 const AUTO_ADVANCE_MS = 18000;
 const REPLAY_STEP_MS = 1200;
@@ -131,6 +132,14 @@ export default function LiveGamesTV({ live, fallback }: LiveGamesTVProps) {
   const showFallback = !showLive && !!fallback && replayStates.length > 0;
   const boardState = showLive ? liveState : showFallback ? replayStates[replayIdx] : null;
 
+  // Robust open-on-press (see usePressToActivate): the board re-renders every
+  // poll, so a plain onClick can get dropped when the element updates between
+  // press and release.
+  const openBoard = usePressToActivate(() => {
+    if (showLive && current) navigate(`/room/${current.id}`);
+    else if (fallback) navigate(`/room/${fallback.id}`);
+  });
+
   return (
     <div className="w-full bg-white dark:bg-gray-800 rounded-2xl shadow-md p-3">
       <div className="flex items-center justify-between mb-2">
@@ -158,8 +167,9 @@ export default function LiveGamesTV({ live, fallback }: LiveGamesTVProps) {
           <div className="relative">
             <button
               type="button"
-              onClick={() => (showLive ? navigate(`/room/${current!.id}`) : navigate(`/room/${fallback!.id}`))}
+              {...openBoard}
               className="block w-full aspect-square rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-900 border-2 border-gray-200 dark:border-gray-700 hover:border-indigo-400 dark:hover:border-indigo-500 transition-colors"
+              style={{ touchAction: 'manipulation' }}
               title={t.watchGame}
             >
               <div className="w-full h-full" style={{ pointerEvents: 'none' }}>

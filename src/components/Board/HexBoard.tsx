@@ -1,6 +1,7 @@
 import { useState, useMemo, useRef, useId, type WheelEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { hexToPixel } from '../../game/Board';
+import { useUIStore } from '../../store/uiStore';
+import { hexToPixel, idToAlgebraic } from '../../game/Board';
 import { getValidRemovableRings } from '../../game/Board';
 import { hasAvailableCaptures, getAvailableCaptures } from '../../game/GameEngine';
 import HexRing from './HexRing';
@@ -97,6 +98,10 @@ export default function HexBoard(props: HexBoardProps = {}) {
   // fails to resolve, leaving ring fills transparent. Strip colons so the id is
   // safe inside url(#...).
   const gradPrefix = `hb${useId().replace(/:/g, '')}`;
+  // Coordinate labels are a shared, persisted UI preference (see uiStore). Never
+  // shown in tiny thumbnail (preview) boards.
+  const showCoordinates = useUIStore(s => s.showCoordinates) && !props.preview;
+  const toggleCoordinates = useUIStore(s => s.toggleCoordinates);
   const [zoom, setZoom] = useState(1);
   const pinchRef = useRef<{ dist: number; zoom: number } | null>(null);
 
@@ -182,6 +187,38 @@ export default function HexBoard(props: HexBoardProps = {}) {
   const highlightedRings = useMemo(() => {
     return new Set(highlightedCaptures.map(c => c.to));
   }, [highlightedCaptures]);
+
+  // Per-column coordinate labels: for each vertical (same q), tag the bottom-most
+  // visible ring below it (a1, b1, …) and the top-most visible ring above it
+  // (a4, b5, …). Attaches to actual rings so the labels track the board's real
+  // outline even after rings are removed.
+  const coordLabels = useMemo(() => {
+    if (!showCoordinates) return [];
+    const byCol = new Map<number, { x: number; topId: string; topY: number; botId: string; botY: number }>();
+    for (const ring of rings) {
+      if (ring.isRemoved) continue;
+      const pos = positions.get(ring.id);
+      if (!pos) continue;
+      const c = byCol.get(ring.q);
+      if (!c) {
+        byCol.set(ring.q, { x: pos.x, topId: ring.id, topY: pos.y, botId: ring.id, botY: pos.y });
+      } else {
+        c.x = pos.x;
+        if (pos.y < c.topY) { c.topY = pos.y; c.topId = ring.id; }
+        if (pos.y > c.botY) { c.botY = pos.y; c.botId = ring.id; }
+      }
+    }
+    const gap = HEX_SIZE + 6;
+    const labels: { key: string; x: number; y: number; text: string }[] = [];
+    for (const c of byCol.values()) {
+      labels.push({ key: `b-${c.botId}`, x: c.x, y: c.botY + gap, text: idToAlgebraic(c.botId, state.boardSize) });
+      // Single-ring column: bottom and top are the same ring — one label only.
+      if (c.topId !== c.botId) {
+        labels.push({ key: `t-${c.topId}`, x: c.x, y: c.topY - gap, text: idToAlgebraic(c.topId, state.boardSize) });
+      }
+    }
+    return labels;
+  }, [showCoordinates, rings, positions, state.boardSize]);
   
   const handleWheel = (e: WheelEvent<SVGSVGElement>) => {
     e.preventDefault();
@@ -298,6 +335,28 @@ export default function HexBoard(props: HexBoardProps = {}) {
               );
             })}
 
+            {/* Coordinate labels above/below each column */}
+            {coordLabels.length > 0 && (
+              <g style={{ pointerEvents: 'none' }}>
+                {coordLabels.map(l => (
+                  <text
+                    key={l.key}
+                    x={l.x}
+                    y={l.y}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fontSize={HEX_SIZE * 0.62}
+                    fontWeight={700}
+                    fill="#ffffff"
+                    opacity={0.85}
+                    style={{ userSelect: 'none' }}
+                  >
+                    {l.text}
+                  </text>
+                ))}
+              </g>
+            )}
+
             {/* Annotation shapes (arrows/circles) + live drawing preview */}
             {(props.shapes?.length || drawState) && (
               <g style={{ pointerEvents: 'none' }}>
@@ -311,6 +370,21 @@ export default function HexBoard(props: HexBoardProps = {}) {
           <div className="absolute bottom-2 right-2 bg-black/50 text-white px-2 py-1 rounded text-xs">
             Zoom: {Math.round(zoom * 100)}%
           </div>
+        )}
+        {!preview && (
+          <button
+            type="button"
+            onClick={toggleCoordinates}
+            title="Coordinates"
+            aria-pressed={showCoordinates}
+            className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-mono font-bold transition-colors ${
+              showCoordinates
+                ? 'bg-blue-500 text-white'
+                : 'bg-black/50 text-white/80 hover:bg-black/60'
+            }`}
+          >
+            a1
+          </button>
         )}
       </div>
     </div>

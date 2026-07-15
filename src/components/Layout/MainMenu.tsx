@@ -125,12 +125,14 @@ export default function MainMenu() {
       return;
     }
 
-    await loadSavedGame(gameId);
     modals.setShowLoadDialog(false);
 
     if (game.isOnline) {
+      // RoomScreen re-fetches authoritative state via joinRoom, so don't gate the
+      // open on the local IndexedDB read — navigate immediately.
       navigate(`/room/${gameId}`);
     } else {
+      await loadSavedGame(gameId);
       setScreen('game');
     }
   };
