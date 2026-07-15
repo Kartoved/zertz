@@ -399,7 +399,9 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         clockRunningSince: room.clockRunningSince,
       });
 
-      await persistOnlineGame(numericRoomId, syncedState, room.tree, names, room.winType);
+      // Only the user's own games belong in local storage (the "Current" list);
+      // spectated games must not pollute it.
+      if (myPlayer) await persistOnlineGame(numericRoomId, syncedState, room.tree, names, room.winType);
 
       // Load chat messages
       const messages = await roomsApi.getChatMessages(roomId);
@@ -492,7 +494,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
           clockRunningSince: room.clockRunningSince,
           ...(mergedAnalysisTree ? { analysisGameTree: mergedAnalysisTree, lastLiveMergeAt: Date.now() } : {}),
         });
-        await persistOnlineGame(roomId, syncedState, room.tree, room.playerNames, room.winType);
+        if (myP) await persistOnlineGame(roomId, syncedState, room.tree, room.playerNames, room.winType);
         if (mergedAnalysisTree) persistAnalysisLocal(get());
       }
     } catch {

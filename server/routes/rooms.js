@@ -299,8 +299,9 @@ router.get('/active/:username', async (req, res) => {
 });
 
 // ZERTZ TV: live games to broadcast on the main menu. Returns in-progress
-// games (both seats filled, no winner) ordered so real-time games lead and
-// correspondence games trail, most-recently-moved first within each group.
+// games with at least 2 moves played (moveNumber >= 3) — this filters out open
+// challenge rooms and just-joined games with no play yet. Ordered so real-time
+// games lead and correspondence games trail, most-recently-moved first.
 // When nothing is live, `fallback` carries the most recent finished game
 // (with its tree) so the client can auto-replay it. `optionalAuth` lets us
 // rank the viewer's own games last (others are more interesting to discover)
@@ -340,7 +341,7 @@ router.get('/tv', optionalAuth, async (req, res) => {
          FROM rooms r
          LEFT JOIN users u1 ON u1.id = r.user1_id
          LEFT JOIN users u2 ON u2.id = r.user2_id
-        WHERE r.winner IS NULL AND r.user2_id IS NOT NULL
+        WHERE r.winner IS NULL AND (r.state_json::jsonb->>'moveNumber')::int >= 3
         ORDER BY ${orderParts.join(', ')}
         LIMIT 12`,
       params
@@ -362,7 +363,7 @@ router.get('/tv', optionalAuth, async (req, res) => {
            FROM rooms r
            LEFT JOIN users u1 ON u1.id = r.user1_id
            LEFT JOIN users u2 ON u2.id = r.user2_id
-          WHERE r.winner IS NOT NULL
+          WHERE r.winner IS NOT NULL AND (r.state_json::jsonb->>'moveNumber')::int >= 3
           ORDER BY r.updated_at DESC
           LIMIT 1`
       );
