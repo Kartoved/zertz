@@ -53,6 +53,8 @@ export const ru = {
   gameLink: 'Ссылка на игру:',
   copyLink: 'Копировать ссылку',
   copied: '✓ Скопировано!',
+  copyPosition: 'Копировать позицию',
+  exportGame: 'Экспорт партии',
   goToGame: 'Перейти к игре',
   login: 'Войти',
   register: 'Зарегистрироваться',

@@ -14,6 +14,7 @@ async function getVapidPublicKey(): Promise<string> {
 }
 
 export function getPushPref(): boolean {
+  if (typeof localStorage === 'undefined') return true; // test/SSR-safe default
   const val = localStorage.getItem(PUSH_PREF_KEY);
   if (val === null) return true; // default: enabled for new users
   return val === 'true';

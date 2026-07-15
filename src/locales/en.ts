@@ -53,6 +53,8 @@ export const en = {
   gameLink: 'Game link:',
   copyLink: 'Copy link',
   copied: '✓ Copied!',
+  copyPosition: 'Copy position',
+  exportGame: 'Export game',
   goToGame: 'Go to game',
   login: 'Login',
   register: 'Register',

@@ -53,6 +53,8 @@ export const eo = {
   gameLink: 'Luda ligilo:',
   copyLink: 'Kopii ligilon',
   copied: '✓ Kopiite!',
+  copyPosition: 'Kopii pozicion',
+  exportGame: 'Eksporti ludon',
   goToGame: 'Iri al ludo',
   login: 'Ensaluti',
   register: 'Registriĝi',

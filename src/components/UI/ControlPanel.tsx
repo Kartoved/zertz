@@ -1,6 +1,10 @@
 import { useGameStore } from '../../store/gameStore';
 import { useUIStore } from '../../store/uiStore';
 import { useI18n } from '../../i18n';
+import { createInitialState } from '../../game/GameEngine';
+import { stateToZip } from '../../game/zip';
+import { treeToZen } from '../../game/zen';
+import NotationButtons from './NotationButtons';
 
 interface ControlPanelProps {
   onSurrender?: () => void;
@@ -9,10 +13,21 @@ interface ControlPanelProps {
 
 export default function ControlPanel({ onSurrender, onCancel }: ControlPanelProps) {
   const { t } = useI18n();
-  const { undo, currentNode, state } = useGameStore();
+  const { undo, currentNode, state, gameTree, playerNames } = useGameStore();
   const { setScreen } = useUIStore();
 
   const canCancel = !state.winner && (state.moveNumber ?? 0) <= 2 && currentNode.children.length === 0;
+
+  const getZip = () => stateToZip(state);
+  const getZen = () => {
+    const start = createInitialState(state.boardSize);
+    const result = state.winner === 'player1' ? '1-0' : state.winner === 'player2' ? '0-1' : '*';
+    return treeToZen(start, gameTree, {
+      Player1: playerNames.player1,
+      Player2: playerNames.player2,
+      Result: result,
+    });
+  };
 
   const handleSurrender = () => {
     if (onSurrender) {
@@ -49,6 +64,8 @@ export default function ControlPanel({ onSurrender, onCancel }: ControlPanelProp
       >
         🏳️ {t.surrender}
       </button>
+
+      <NotationButtons getZip={getZip} getZen={getZen} className="contents" />
     </div>
   );
 }

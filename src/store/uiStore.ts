@@ -7,15 +7,18 @@ export type Language = 'ru' | 'en' | 'eo';
 const LANGUAGE_KEY = 'zertz_language';
 const COORDS_KEY = 'zertz_show_coords';
 
+// Test/SSR-safe localStorage access (undefined outside the browser).
+const ls: Storage | null = typeof localStorage !== 'undefined' ? localStorage : null;
+
 function getInitialLanguage(): Language {
-  const saved = localStorage.getItem(LANGUAGE_KEY);
+  const saved = ls?.getItem(LANGUAGE_KEY);
   if (saved === 'en' || saved === 'eo' || saved === 'ru') return saved;
   return 'en';
 }
 
 function getInitialShowCoordinates(): boolean {
   // Default on — coordinates help reading move notation. Persisted per browser.
-  return localStorage.getItem(COORDS_KEY) !== '0';
+  return ls?.getItem(COORDS_KEY) !== '0';
 }
 
 interface UIStore {
@@ -67,12 +70,12 @@ export const useUIStore = create<UIStore>((set) => ({
 
   toggleCoordinates: () => set((state) => {
     const next = !state.showCoordinates;
-    localStorage.setItem(COORDS_KEY, next ? '1' : '0');
+    ls?.setItem(COORDS_KEY, next ? '1' : '0');
     return { showCoordinates: next };
   }),
 
   setLanguage: (language) => {
-    localStorage.setItem(LANGUAGE_KEY, language);
+    ls?.setItem(LANGUAGE_KEY, language);
     set({ language });
   },
 
@@ -80,7 +83,7 @@ export const useUIStore = create<UIStore>((set) => ({
     const order: Language[] = ['ru', 'en', 'eo'];
     const idx = order.indexOf(state.language);
     const next = order[(idx + 1) % order.length];
-    localStorage.setItem(LANGUAGE_KEY, next);
+    ls?.setItem(LANGUAGE_KEY, next);
     return { language: next };
   }),
 

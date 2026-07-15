@@ -8,7 +8,10 @@ import { ChatPanel } from './ChatPanel';
 import MarbleSelector from '../UI/MarbleSelector';
 import SaveToStudy from '../Studies/SaveToStudy';
 import { getValidRemovableRings } from '../../game/Board';
-import { getWinType } from '../../game/GameEngine';
+import { getWinType, createInitialState } from '../../game/GameEngine';
+import { stateToZip } from '../../game/zip';
+import { treeToZen } from '../../game/zen';
+import NotationButtons from '../UI/NotationButtons';
 import { GameNode } from '../../game/types';
 import { nodeDepth, mainLineNodeAtDepth } from '../../utils/gameTreeUtils';
 import PlayerProfileModal from '../Auth/PlayerProfileModal';
@@ -51,6 +54,7 @@ export function RoomScreen() {
 
   const {
     state,
+    gameTree,
     playerNames,
     myPlayer,
     pendingPlayerChoice,
@@ -185,6 +189,17 @@ export function RoomScreen() {
     navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const getZip = () => stateToZip(state);
+  const getZen = () => {
+    const start = createInitialState(state.boardSize);
+    const result = state.winner === 'player1' ? '1-0' : state.winner === 'player2' ? '0-1' : '*';
+    return treeToZen(start, gameTree, {
+      Player1: playerNames.player1,
+      Player2: playerNames.player2,
+      Result: result,
+    });
   };
 
   const canUndoOwnLastMove = () => {
@@ -649,6 +664,12 @@ export function RoomScreen() {
             >
               {copied ? t.copied : `🔗 ${t.copyRoomLink}`}
             </button>
+            <NotationButtons
+              getZip={getZip}
+              getZen={getZen}
+              className="contents"
+              buttonClassName="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+            />
             <button
               onClick={toggleDarkMode}
               className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
