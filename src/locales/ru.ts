@@ -328,6 +328,8 @@ export const ru = {
   premoveFiredToast: 'Ваш предход сыгран автоматически: {move}',
   premovePrunedToast: 'Предходы сброшены: партия отклонилась от плана',
   premoveArmed: 'Предход заряжен',
+  confirmSendMove: 'Отправить ход {move}?',
+  sendMove: 'Отправить',
   armFromAnalysis: 'Зарядить план из анализа',
   playAndArm: 'Сыграть и зарядить',
   planBuildHint: 'Постройте варианты на доске — они появятся здесь как дерево. Клик по ходу — перейти к позиции, ✕ — удалить ветку.',

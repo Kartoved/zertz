@@ -18,6 +18,12 @@ body {
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.2));
 }
 
+/* Entrance for the correspondence "send move?" confirmation card. */
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
 .marble-white {
   background: radial-gradient(circle at 30% 30%, #ffffff, #e0e0e0);
 }

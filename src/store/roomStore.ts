@@ -46,6 +46,14 @@ interface RoomStore {
   // pollRoom checks this and skips the fetch while > 0.
   pendingMoveCount: number;
 
+  // Correspondence-only "confirm before sending" gate. When a full turn is
+  // completed in a correspondence game, the move is applied LOCALLY (board shows
+  // it as a preview) but NOT sent to the server yet — instead `pendingMove` holds
+  // the deferred submit closure and the UI shows an "Send move?" bar. Confirming
+  // runs `submit`; cancelling reverts the local preview. `pendingMoveCount` is
+  // held > 0 the whole time so polling can't clobber the preview.
+  pendingMove: { submit: () => Promise<void>; revert: () => void; notation: string } | null;
+
   // Room info
   roomId: number | null;
   myPlayer: 1 | 2 | null;
@@ -117,9 +125,11 @@ interface RoomStore {
   
   selectMarbleColor: (color: MarbleColor | null) => void;
   selectRing: (ringId: string | null) => void;
-  handlePlacement: (ringId: string) => Promise<void>;
-  handleRingRemoval: (ringId: string) => Promise<void>;
-  handleCapture: (captures: CaptureMove[]) => Promise<void>;
+  handlePlacement: (ringId: string, opts?: { skipConfirm?: boolean }) => Promise<void>;
+  handleRingRemoval: (ringId: string, opts?: { skipConfirm?: boolean }) => Promise<void>;
+  handleCapture: (captures: CaptureMove[], opts?: { skipConfirm?: boolean }) => Promise<void>;
+  confirmPendingMove: () => Promise<void>;
+  cancelPendingMove: () => void;
   undoLastMove: (overrideCheck?: boolean) => Promise<void>;
   navigateToNode: (targetNode: GameNode) => void;
   setPlayerName: (player: 1 | 2, name: string) => Promise<void>;
@@ -147,6 +157,54 @@ interface RoomStore {
 }
 
 // pendingMoveCount is now a store field — see RoomStore interface below.
+
+// Correspondence games are flagged by increment_ms === -1 (per-turn clock). They
+// get the "confirm before sending" gate to prevent accidental taps in async play.
+// (BIGINT columns come back as strings from node-postgres, so coerce.)
+function isCorrespondenceInc(incrementMs: number | null): boolean {
+  return incrementMs != null && Number(incrementMs) === -1;
+}
+
+// Defers a completed correspondence turn: applies it locally (preview) and stashes
+// the server-sync closure for confirm/cancel. The extra pendingMoveCount bump keeps
+// it elevated after the calling handler's `finally` decrement, so pollRoom won't
+// overwrite the preview until the player confirms or cancels.
+function stashPendingMove(
+  set: (partial: Partial<RoomStore> | ((s: RoomStore) => Partial<RoomStore>)) => void,
+  submit: () => Promise<void>,
+  revert: () => void,
+  notation: string
+): void {
+  set(s => ({ pendingMoveCount: s.pendingMoveCount + 1, pendingMove: { submit, revert, notation } }));
+}
+
+// Builds the local-only "undo my just-made turn" closure: splice the turn's start
+// node out of its parent and rebuild the state from the parent. Used to revert a
+// correspondence preview when the player cancels instead of sending.
+function makeRevert(
+  set: (partial: Partial<RoomStore> | ((s: RoomStore) => Partial<RoomStore>)) => void,
+  parentNode: GameNode,
+  startNode: GameNode,
+  boardSize: 37 | 48 | 61
+): () => void {
+  return () => {
+    const idx = parentNode.children.indexOf(startNode);
+    if (idx >= 0) {
+      parentNode.children.splice(idx, 1);
+      syncMainLineFlags(parentNode);
+    }
+    const revState = rebuildStateFromNode(parentNode, boardSize);
+    set({
+      state: revState,
+      currentNode: parentNode,
+      selectedMarbleColor: null,
+      selectedRingId: null,
+      highlightedCaptures: [],
+      availableCaptureChains: [],
+      winType: null,
+    });
+  };
+}
 
 function syncWinnerFromRoom(state: GameState, winnerNum: number | null): GameState {
   if (winnerNum == null || winnerNum === 0) return state; // 0 = cancelled, keep state_json winner
@@ -235,6 +293,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     return { playerNames: defaults };
   })(),
   pendingMoveCount: 0,
+  pendingMove: null,
   roomId: null,
   myPlayer: null,
   creatorPlayer: null,
@@ -584,12 +643,13 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     }
   },
 
-  handlePlacement: async (ringId) => {
-    const { state, selectedMarbleColor, roomId, currentNode, gameTree, playerNames, myPlayer } = get();
+  handlePlacement: async (ringId, opts) => {
+    const { state, selectedMarbleColor, roomId, currentNode, gameTree, playerNames, myPlayer, timeControlIncrementMs } = get();
     if (!selectedMarbleColor || !roomId || !myPlayer) return;
     // Turn enforcement
     const myPlayerStr = myPlayer === 1 ? 'player1' : 'player2';
     if (state.currentPlayer !== myPlayerStr) return;
+    const confirmGate = !opts?.skipConfirm && isCorrespondenceInc(timeControlIncrementMs);
 
     set(s => ({ pendingMoveCount: s.pendingMoveCount + 1 }));
     try {
@@ -606,15 +666,29 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       set({ state: newState, currentNode: newNode, selectedMarbleColor: null, selectedRingId: null, highlightedCaptures: [], availableCaptureChains: [], winType: winType ?? null });
 
       if (!needsRingRemoval) {
-        const winnerNum = winner === 'player1' ? 1 : winner === 'player2' ? 2 : null;
-        const currentPlayerNum = newState.currentPlayer === 'player1' ? 1 : 2;
-        const res = await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, winnerNum, winType, myPlayer || undefined);
-        if (res.ratingDelta) set({ ratingDelta: res.ratingDelta });
-        if (winner && get().rated) useAuthStore.getState().fetchMe();
-        await persistOnlineGame(roomId, newState, gameTree, playerNames, winType);
+        // Turn completes here — gate the send behind a confirmation in
+        // correspondence games (otherwise submit immediately).
+        const submit = async () => {
+          const winnerNum = winner === 'player1' ? 1 : winner === 'player2' ? 2 : null;
+          const currentPlayerNum = newState.currentPlayer === 'player1' ? 1 : 2;
+          const res = await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, winnerNum, winType, myPlayer || undefined);
+          if (res.ratingDelta) set({ ratingDelta: res.ratingDelta });
+          if (winner && get().rated) useAuthStore.getState().fetchMe();
+          await persistOnlineGame(roomId, newState, gameTree, playerNames, winType);
+        };
+        if (confirmGate) {
+          stashPendingMove(set, submit, makeRevert(set, currentNode, newNode, state.boardSize), newNode.notation);
+          return;
+        }
+        await submit();
       } else {
-        const currentPlayerNum = state.currentPlayer === 'player1' ? 1 : 2;
-        await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, null, null, myPlayer || undefined);
+        // Intermediate placement (ring removal still owed, turn stays mine). In
+        // a confirm-gated game, hold it locally — nothing is sent until the whole
+        // turn is completed and confirmed after the ring removal step.
+        if (!confirmGate) {
+          const currentPlayerNum = state.currentPlayer === 'player1' ? 1 : 2;
+          await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, null, null, myPlayer || undefined);
+        }
         await persistOnlineGame(roomId, newState, gameTree, playerNames, null);
       }
     } catch (err) {
@@ -624,8 +698,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     }
   },
 
-  handleRingRemoval: async (ringId) => {
-    const { state, roomId, currentNode, gameTree, playerNames, myPlayer } = get();
+  handleRingRemoval: async (ringId, opts) => {
+    const { state, roomId, currentNode, gameTree, playerNames, myPlayer, timeControlIncrementMs } = get();
     if (!roomId || !myPlayer) return;
     // Turn enforcement (ring removal is still current player's turn)
     const myPlayerStrRR = myPlayer === 1 ? 'player1' : 'player2';
@@ -633,6 +707,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
     const validRings = getValidRemovableRings(state.rings);
     if (!validRings.includes(ringId)) return;
+    const confirmGate = !opts?.skipConfirm && isCorrespondenceInc(timeControlIncrementMs);
 
     set(s => ({ pendingMoveCount: s.pendingMoveCount + 1 }));
     try {
@@ -647,12 +722,22 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
       set({ state: newState, selectedRingId: null, highlightedCaptures: [], availableCaptureChains: [], winType: winType ?? null });
 
-      const winnerNum = winner === 'player1' ? 1 : winner === 'player2' ? 2 : null;
-      const currentPlayerNum = newState.currentPlayer === 'player1' ? 1 : 2;
-      const res = await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, winnerNum, winType, myPlayer || undefined);
-      if (res.ratingDelta) set({ ratingDelta: res.ratingDelta });
-      if (winner && get().rated) useAuthStore.getState().fetchMe();
-      await persistOnlineGame(roomId, newState, gameTree, playerNames, winType);
+      // Ring removal completes the placement turn — gate the send in correspondence.
+      const submit = async () => {
+        const winnerNum = winner === 'player1' ? 1 : winner === 'player2' ? 2 : null;
+        const currentPlayerNum = newState.currentPlayer === 'player1' ? 1 : 2;
+        const res = await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, winnerNum, winType, myPlayer || undefined);
+        if (res.ratingDelta) set({ ratingDelta: res.ratingDelta });
+        if (winner && get().rated) useAuthStore.getState().fetchMe();
+        await persistOnlineGame(roomId, newState, gameTree, playerNames, winType);
+      };
+      // currentNode is the placement node (turn start); its parent is the
+      // pre-turn position. Reverting splices the whole placement+removal turn.
+      if (confirmGate && currentNode.parent) {
+        stashPendingMove(set, submit, makeRevert(set, currentNode.parent, currentNode, state.boardSize), currentNode.notation);
+        return;
+      }
+      await submit();
     } catch (err) {
       console.error('[roomStore.handleRingRemoval] ERROR:', err);
     } finally {
@@ -660,12 +745,13 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     }
   },
 
-  handleCapture: async (captures) => {
-    const { state, roomId, currentNode, gameTree, playerNames, myPlayer } = get();
+  handleCapture: async (captures, opts) => {
+    const { state, roomId, currentNode, gameTree, playerNames, myPlayer, timeControlIncrementMs } = get();
     if (!roomId || !myPlayer) return;
     // Turn enforcement
     const myPlayerStrC = myPlayer === 1 ? 'player1' : 'player2';
     if (state.currentPlayer !== myPlayerStrC) return;
+    const confirmGate = !opts?.skipConfirm && isCorrespondenceInc(timeControlIncrementMs);
 
     set(s => ({ pendingMoveCount: s.pendingMoveCount + 1 }));
     try {
@@ -679,17 +765,50 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
       set({ state: newState, currentNode: newNode, selectedRingId: null, highlightedCaptures: [], availableCaptureChains: [], winType: winType ?? null });
 
-      const winnerNum = winner === 'player1' ? 1 : winner === 'player2' ? 2 : null;
-      const currentPlayerNum = newState.currentPlayer === 'player1' ? 1 : 2;
-      const res = await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, winnerNum, winType, myPlayer || undefined);
-      if (res.ratingDelta) set({ ratingDelta: res.ratingDelta });
-      if (winner && get().rated) useAuthStore.getState().fetchMe();
-      await persistOnlineGame(roomId, newState, gameTree, playerNames, winType);
+      // A capture chain completes the turn only when no further capture is
+      // mandated (phase advanced away from 'capture'). Gate the send in
+      // correspondence; otherwise (mid-chain continuation) submit as before.
+      const submit = async () => {
+        const winnerNum = winner === 'player1' ? 1 : winner === 'player2' ? 2 : null;
+        const currentPlayerNum = newState.currentPlayer === 'player1' ? 1 : 2;
+        const res = await roomsApi.updateRoomState(roomId, newState, gameTree, currentPlayerNum as 1 | 2, winnerNum, winType, myPlayer || undefined);
+        if (res.ratingDelta) set({ ratingDelta: res.ratingDelta });
+        if (winner && get().rated) useAuthStore.getState().fetchMe();
+        await persistOnlineGame(roomId, newState, gameTree, playerNames, winType);
+      };
+      const turnCompleted = newState.currentPlayer !== state.currentPlayer || !!winner;
+      if (confirmGate && turnCompleted) {
+        stashPendingMove(set, submit, makeRevert(set, currentNode, newNode, state.boardSize), newNode.notation);
+        return;
+      }
+      await submit();
     } catch (err) {
       console.error('[roomStore.handleCapture] ERROR:', err);
     } finally {
       set(s => ({ pendingMoveCount: s.pendingMoveCount - 1 }));
     }
+  },
+
+  confirmPendingMove: async () => {
+    const pm = get().pendingMove;
+    if (!pm) return;
+    try {
+      await pm.submit();
+    } catch (err) {
+      console.error('[roomStore.confirmPendingMove] ERROR:', err);
+    } finally {
+      // Release the hold placed by stashPendingMove (which kept pendingMoveCount
+      // elevated so polling couldn't clobber the preview).
+      set(s => ({ pendingMoveCount: Math.max(0, s.pendingMoveCount - 1), pendingMove: null }));
+    }
+  },
+
+  cancelPendingMove: () => {
+    const pm = get().pendingMove;
+    if (!pm) return;
+    // Local-only revert of my just-made (but unsent) turn — no server sync ran.
+    pm.revert();
+    set(s => ({ pendingMoveCount: Math.max(0, s.pendingMoveCount - 1), pendingMove: null }));
   },
 
   undoLastMove: async (overrideCheck = false) => {
@@ -1123,11 +1242,13 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
           return { ok: false as const, reason: 'incompleteMove' as const };
         }
         set({ selectedMarbleColor: move.data.marbleColor });
-        await get().handlePlacement(move.data.ringId);
-        if (move.data.removedRingId) await get().handleRingRemoval(move.data.removedRingId);
+        // Arming has its own confirmation and checks the turn passed synchronously,
+        // so bypass the correspondence "send move?" gate here.
+        await get().handlePlacement(move.data.ringId, { skipConfirm: true });
+        if (move.data.removedRingId) await get().handleRingRemoval(move.data.removedRingId, { skipConfirm: true });
       } else if (move.type === 'capture') {
         const { chain, ...firstCapture } = move.data;
-        await get().handleCapture([firstCapture as CaptureMove, ...((chain as CaptureMove[]) || [])]);
+        await get().handleCapture([firstCapture as CaptureMove, ...((chain as CaptureMove[]) || [])], { skipConfirm: true });
       } else {
         return { ok: false as const, reason: 'error' as const };
       }
@@ -1164,6 +1285,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     const rootNode = createRootNode();
     set({
       pendingMoveCount: 0,
+      pendingMove: null,
       roomId: null,
       myPlayer: null,
       creatorPlayer: null,

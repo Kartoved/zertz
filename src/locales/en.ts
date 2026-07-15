@@ -328,6 +328,8 @@ export const en = {
   premoveFiredToast: 'Your pre-move was played automatically: {move}',
   premovePrunedToast: 'Pre-moves cleared: the game diverged from your plan',
   premoveArmed: 'Pre-move armed',
+  confirmSendMove: 'Send move {move}?',
+  sendMove: 'Send',
   armFromAnalysis: 'Arm plan from analysis',
   playAndArm: 'Play and arm',
   planBuildHint: 'Build variations on the board — they appear here as a tree. Click a move to jump to it, ✕ to delete a branch.',

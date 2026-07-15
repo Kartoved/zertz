@@ -328,6 +328,8 @@ export const eo = {
   premoveFiredToast: 'Via antaŭmovo estis aŭtomate ludita: {move}',
   premovePrunedToast: 'Antaŭmovoj forigitaj: la partio deflankiĝis de via plano',
   premoveArmed: 'Antaŭmovo ŝargita',
+  confirmSendMove: 'Ĉu sendi movon {move}?',
+  sendMove: 'Sendi',
   armFromAnalysis: 'Ŝargi planon el analizo',
   playAndArm: 'Ludi kaj ŝargi',
   planBuildHint: 'Konstruu variantojn sur la tabulo — ili aperas ĉi tie kiel arbo. Klaku movon por salti al ĝi, ✕ por forigi branĉon.',

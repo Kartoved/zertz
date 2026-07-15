@@ -108,6 +108,9 @@ export function RoomScreen() {
     premoveNotice,
     armAnalysisSubtree,
     clearPremoves,
+    pendingMove,
+    confirmPendingMove,
+    cancelPendingMove,
   } = useRoomStore();
   const { user } = useAuthStore();
   const isAuthed = !!user;
@@ -224,13 +227,22 @@ export function RoomScreen() {
     return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
   };
 
+  // While a correspondence move is awaiting confirmation it hasn't been sent, so
+  // for clock purposes it's still the mover's turn — the board `state` has already
+  // flipped currentPlayer to the opponent (local preview), so revert that here.
+  // This keeps the opponent's clock frozen until the move is actually confirmed.
+  const clockTurnPlayer: 'player1' | 'player2' =
+    pendingMove && myPlayer != null
+      ? (myPlayer === 1 ? 'player1' : 'player2')
+      : state.currentPlayer;
+
   const getDisplayClockMs = (player: 'player1' | 'player2'): number | null => {
     if (!isTimedGame || timeControlBaseMs == null) return null;
     const base = player === 'player1'
       ? (clockP1Ms ?? timeControlBaseMs)
       : (clockP2Ms ?? timeControlBaseMs);
 
-    if (state.winner || !clockRunningSince || state.currentPlayer !== player) {
+    if (state.winner || !clockRunningSince || clockTurnPlayer !== player) {
       return Math.max(0, base);
     }
 
@@ -246,6 +258,17 @@ export function RoomScreen() {
   // Correspondence games are marked with incrementMs === -1 (clock resets each turn).
   // BIGINT columns come back as strings from node-postgres, so coerce.
   const isCorrespondence = timeControlIncrementMs != null && Number(timeControlIncrementMs) === -1;
+
+  // While a move awaits confirmation the turn isn't finished, so the highlight and
+  // "whose turn" label stay on the mover (me) even though the board preview has
+  // already flipped currentPlayer to the opponent. NOTE: this is display-only — it
+  // must NOT feed `isMyTurn`, which gates board interaction (a second move is
+  // correctly blocked while pending).
+  const displayTurnPlayer: 'player1' | 'player2' =
+    pendingMove && myPlayer != null
+      ? (myPlayer === 1 ? 'player1' : 'player2')
+      : boardState.currentPlayer;
+  const turnSubText = pendingMove ? pendingMove.notation : getPhaseText();
 
   // "Give opponent more time": only in an ongoing timed game, only as a seated
   // player, and only ever applied to the opponent's clock (never your own).
@@ -420,7 +443,7 @@ export function RoomScreen() {
     userId: number | null | undefined,
     isBottom: boolean
   ) => {
-    const isActive = !boardState.winner && boardState.currentPlayer === slot;
+    const isActive = !boardState.winner && displayTurnPlayer === slot;
     const caps = safeCaptures[slot];
     const name = safePlayerNames[slot];
     const isMine = !isSpectator && myPlayer != null && ((myPlayer === 1 ? 'player1' : 'player2') === slot);
@@ -455,7 +478,7 @@ export function RoomScreen() {
           </div>
           {isActive && (
             <div className="text-[10px] text-blue-700 dark:text-blue-200 truncate">
-              {isMine ? t.yourTurn : t.opponentTurn} · {getPhaseText()}
+              {isMine ? t.yourTurn : t.opponentTurn} · {turnSubText}
             </div>
           )}
         </div>
@@ -702,7 +725,7 @@ export function RoomScreen() {
         <div className="hidden lg:flex lg:w-64 lg:flex-col gap-2 lg:gap-4 min-w-0">
           {/* Player 1 */}
           <div className={`p-2 lg:p-3 rounded-lg ${
-            boardState.currentPlayer === 'player1' && !boardState.winner
+            displayTurnPlayer === 'player1' && !boardState.winner
               ? 'bg-blue-100 dark:bg-blue-900 ring-2 ring-blue-500'
               : 'bg-white dark:bg-gray-800'
           }`}>
@@ -766,17 +789,17 @@ export function RoomScreen() {
               <span>🔘 {safeCaptures.player1.gray}</span>
               <span>⚫ {safeCaptures.player1.black}</span>
             </div>
-            {boardState.currentPlayer === 'player1' && !boardState.winner && (
+            {displayTurnPlayer === 'player1' && !boardState.winner && (
               <div className="mt-2 text-sm font-medium text-blue-700 dark:text-blue-200">
                 <div>{myPlayer === 1 ? t.yourTurn : t.opponentTurn}</div>
-                <div className="text-xs text-blue-600/90 dark:text-blue-300/90">{getPhaseText()}</div>
+                <div className="text-xs text-blue-600/90 dark:text-blue-300/90">{turnSubText}</div>
               </div>
             )}
           </div>
 
           {/* Player 2 */}
           <div className={`p-2 lg:p-3 rounded-lg ${
-            boardState.currentPlayer === 'player2' && !boardState.winner
+            displayTurnPlayer === 'player2' && !boardState.winner
               ? 'bg-blue-100 dark:bg-blue-900 ring-2 ring-blue-500'
               : 'bg-white dark:bg-gray-800'
           }`}>
@@ -840,10 +863,10 @@ export function RoomScreen() {
               <span>🔘 {safeCaptures.player2.gray}</span>
               <span>⚫ {safeCaptures.player2.black}</span>
             </div>
-            {boardState.currentPlayer === 'player2' && !boardState.winner && (
+            {displayTurnPlayer === 'player2' && !boardState.winner && (
               <div className="mt-2 text-sm font-medium text-blue-700 dark:text-blue-200">
                 <div>{myPlayer === 2 ? t.yourTurn : t.opponentTurn}</div>
-                <div className="text-xs text-blue-600/90 dark:text-blue-300/90">{getPhaseText()}</div>
+                <div className="text-xs text-blue-600/90 dark:text-blue-300/90">{turnSubText}</div>
               </div>
             )}
           </div>
@@ -1350,6 +1373,35 @@ export function RoomScreen() {
                   OK
                 </button>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Correspondence-only "Send move?" confirmation — the move is shown on the
+          board as a preview and only sent once confirmed, so accidental taps in
+          async games don't fire a real move. */}
+      {pendingMove && !isAnalyzing && (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center px-4 pointer-events-none">
+          <div className="pointer-events-auto flex flex-col items-center gap-3 bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm border-2 border-green-500 rounded-2xl shadow-2xl px-6 py-5 animate-[fadeInScale_150ms_ease-out]">
+            <span className="text-base lg:text-lg font-semibold text-gray-900 dark:text-gray-50 text-center">
+              {t.confirmSendMove.replace('{move}', pendingMove.notation)}
+            </span>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => cancelPendingMove()}
+                className="px-5 py-2 rounded-full text-sm font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                {t.cancel}
+              </button>
+              <button
+                type="button"
+                onClick={() => confirmPendingMove()}
+                className="px-6 py-2 rounded-full text-sm font-bold text-white bg-green-500 hover:bg-green-600 shadow-lg shadow-green-500/30"
+              >
+                {t.sendMove}
+              </button>
             </div>
           </div>
         </div>
