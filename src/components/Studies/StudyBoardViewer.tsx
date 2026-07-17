@@ -15,6 +15,7 @@ import {
   applyAnalysisPlacement,
   applyAnalysisRingRemoval,
   applyAnalysisCapture,
+  pickCaptureChain,
 } from '../../store/analysisActions';
 import { studyStateAtNode, findNodeById } from './studyState';
 import { GameNode, GameState, MarbleColor, CaptureMove, Captures, WIN_CONDITIONS, Shape } from '../../game/types';
@@ -212,7 +213,7 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
       markEdited();
     } else if (boardState.phase === 'capture') {
       if (selectedRingId) {
-        const chain = availableChains.find(c => c[c.length - 1].to === ringId);
+        const chain = pickCaptureChain(availableChains, ringId, currentNode);
         if (chain) {
           const res = applyAnalysisCapture(boardState, currentNode, chain);
           setBoardState(res.analysisState);

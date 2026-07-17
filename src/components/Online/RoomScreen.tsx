@@ -12,6 +12,7 @@ import { getWinType, createInitialState } from '../../game/GameEngine';
 import { stateToZip } from '../../game/zip';
 import { treeToZen } from '../../game/zen';
 import NotationButtons from '../UI/NotationButtons';
+import { pickCaptureChain } from '../../store/analysisActions';
 import { GameNode } from '../../game/types';
 import { nodeDepth, mainLineNodeAtDepth } from '../../utils/gameTreeUtils';
 import PlayerProfileModal from '../Auth/PlayerProfileModal';
@@ -567,7 +568,9 @@ export function RoomScreen() {
       // Chains share an intermediate `to` when they branch — only the terminal
       // is unique per chain, so matching there disambiguates the user's intent.
       if (selectedRingId) {
-        const chain = availableCaptureChains.find(c => c[c.length - 1].to === ringId);
+        // In analysis, disambiguate same-terminal chains so a second capture
+        // branch can be built (see pickCaptureChain).
+        const chain = pickCaptureChain(availableCaptureChains, ringId, isAnalyzing ? analysisCurrentNode : null);
         if (chain) {
           effectiveHandleCapture(chain);
           return;

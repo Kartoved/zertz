@@ -44,6 +44,37 @@ export function injectPremovesIntoTree(startNode: GameNode, premoves: PreMoveTre
   walk(startNode, premoves.children);
 }
 
+// Picks which capture chain the user meant when they clicked a terminal landing.
+// Chains are disambiguated by their terminal `to`, BUT two distinct maximal chains
+// from the same marble can share a terminal (different intermediate jumps that
+// reconverge). When building variations (analysis/premoves), that ambiguity makes
+// a second same-terminal branch unaddable — `.find` always returns the first.
+//
+// So when several chains end on the clicked ring, prefer one that isn't already a
+// child of `currentNode` (i.e. a NOT-yet-built branch); fall back to the first.
+// Pass `currentNode` only where branching matters (analysis); omit for live play.
+function captureKey(from: string, landings: string[]): string {
+  return `${from}:${landings.join('>')}`;
+}
+
+export function pickCaptureChain(
+  chains: CaptureMove[][],
+  terminalRingId: string,
+  currentNode?: GameNode | null
+): CaptureMove[] | undefined {
+  const matches = chains.filter(c => c[c.length - 1].to === terminalRingId);
+  if (matches.length <= 1 || !currentNode) return matches[0];
+
+  const existing = new Set<string>();
+  for (const n of currentNode.children) {
+    if (n.move?.type === 'capture') {
+      const d = n.move.data;
+      existing.add(captureKey(d.from, [d.to, ...(d.chain || []).map(c => c.to)]));
+    }
+  }
+  return matches.find(c => !existing.has(captureKey(c[0].from, c.map(x => x.to)))) ?? matches[0];
+}
+
 // Returns the selection slice to apply, or null when the input is invalid and
 // no state change should occur. When `ringId` is null the slice clears the
 // selection.

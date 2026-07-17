@@ -1,5 +1,6 @@
 import { Ring } from '../../game/types';
 import { useGameStore } from '../../store/gameStore';
+import { pickCaptureChain } from '../../store/analysisActions';
 
 interface HexRingProps {
   ring: Ring;
@@ -32,7 +33,7 @@ export default function HexRing({
   ghost,
   onClick,
 }: HexRingProps) {
-  const { selectRing, handleCapture, selectedRingId, availableCaptureChains } = useGameStore();
+  const { selectRing, handleCapture, selectedRingId, availableCaptureChains, currentNode } = useGameStore();
   
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -46,7 +47,7 @@ export default function HexRing({
     
     // Local mode — use pre-computed chains from the store (set by selectRing).
     if (isCaptureTarget && selectedRingId) {
-      const fullChain = availableCaptureChains.find(c => c[c.length - 1].to === ring.id);
+      const fullChain = pickCaptureChain(availableCaptureChains, ring.id, currentNode);
       if (fullChain) {
         handleCapture(fullChain);
       }

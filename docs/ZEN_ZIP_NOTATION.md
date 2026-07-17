@@ -229,3 +229,14 @@ Structurally like PGN: **tag pairs + movetext**.
 - ZEN: whitespace-free ASCII move tokens; capture separator `x` (accept `×`);
   `+colors` suffix optional/derivable; PGN-style numbering with `1...` support;
   comments/variations/annotations yes, NAGs later.
+
+## Future ideas (not started)
+
+- **Export from the online room on mobile** — currently the copy/export buttons
+  live in the desktop `RoomScreen` header; add them to the mobile actions sheet.
+- **Share a position by link** — `?zip=…` URL param that opens the position (like
+  `?watch=1` does for rooms).
+- **Port the codec to `shared/`** — move `zip.ts`/`zen.ts` into `shared/` (plain
+  JS ESM, like `shared/explorer/`) so the server can use them too: server-side
+  validation of imported games, and possibly ZIP/ZEN as human-readable keys
+  alongside the explorer hash.
