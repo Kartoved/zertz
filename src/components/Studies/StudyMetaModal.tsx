@@ -19,6 +19,7 @@ export default function StudyMetaModal({ initial, onClose, onSave }: StudyMetaMo
   const [timeControl, setTimeControl] = useState(initial?.timeControl ?? '');
   const [date, setDate] = useState(initial?.date ?? '');
   const [result, setResult] = useState(initial?.result ?? '');
+  const [training, setTraining] = useState(initial?.training ?? false);
   const [busy, setBusy] = useState(false);
 
   const handleSave = async () => {
@@ -35,6 +36,7 @@ export default function StudyMetaModal({ initial, onClose, onSave }: StudyMetaMo
     if (timeControl.trim()) meta.timeControl = timeControl.trim();
     if (date.trim()) meta.date = date.trim();
     if (result.trim()) meta.result = result.trim();
+    if (training) meta.training = true;
     try {
       await onSave(meta);
       onClose();
@@ -71,6 +73,10 @@ export default function StudyMetaModal({ initial, onClose, onSave }: StudyMetaMo
           {field(t.metaDate, date, setDate, '2026-07-15')}
         </div>
         <div className="mt-3">{field(t.metaResult, result, setResult, '1–0 / ½–½ / 0–1')}</div>
+        <label className="flex items-center gap-2 mt-3 cursor-pointer">
+          <input type="checkbox" checked={training} onChange={e => setTraining(e.target.checked)} className="w-4 h-4 accent-indigo-500" />
+          <span className="text-sm text-gray-700 dark:text-gray-200">🎯 {t.metaTraining}</span>
+        </label>
         <div className="flex gap-2 mt-4">
           <button onClick={onClose} className="flex-1 px-3 py-2 rounded-lg text-sm font-semibold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600">
             {t.cancel}

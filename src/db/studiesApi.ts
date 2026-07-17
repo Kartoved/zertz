@@ -7,6 +7,8 @@ export interface StudyMeta {
   timeControl?: string;
   date?: string;
   result?: string;
+  /** Author default: open the study in training mode (solution hidden). */
+  training?: boolean;
 }
 
 // Content-free node for the sidebar hierarchy.

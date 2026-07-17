@@ -52,6 +52,17 @@ function CapturesCard({ label, caps, active }: { label: string; caps: Captures; 
 // branch into a LOCAL working copy of the study tree (deserialized fresh, never
 // the study prop) and are NOT persisted. "Back to author's line" discards the
 // exploration. The same interaction will power author editing (Etap E, + save).
+const TRAINING_KEY = 'zertz_study_training:';
+
+// Effective training state for a study: the reader's per-study localStorage
+// override wins; otherwise the author default from meta.training.
+function readTraining(study: StudyNode): boolean {
+  const ls = typeof localStorage !== 'undefined' ? localStorage.getItem(`${TRAINING_KEY}${study.id}`) : null;
+  if (ls === '1') return true;
+  if (ls === '0') return false;
+  return study.meta?.training ?? false;
+}
+
 export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNode; onSaveTree: (treeJson: string) => Promise<void> }) {
   const { t } = useI18n();
   const canEdit = study.isOwner;
@@ -61,6 +72,20 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
   const [currentNode, setCurrentNode] = useState<GameNode>(rootRef.current);
   const [boardState, setBoardState] = useState<GameState>(() => studyStateAtNode(study.setupJson, rootRef.current));
   const [saving, setSaving] = useState(false);
+
+  // Training mode: hide the whole solution (move tree, comments, arrows, forward
+  // nav) so the learner explores freely without spoilers. Effective value =
+  // per-study localStorage override, else the author default (meta.training).
+  // Computed synchronously so training applies on the first render (no flash).
+  const [training, setTraining] = useState<boolean>(() => readTraining(study));
+  useEffect(() => { setTraining(readTraining(study)); }, [study.id, study.meta?.training]);
+  const toggleTraining = () => {
+    setTraining(v => {
+      const next = !v;
+      try { localStorage.setItem(`${TRAINING_KEY}${study.id}`, next ? '1' : '0'); } catch { /* ignore */ }
+      return next;
+    });
+  };
 
   // Guards the reinit effect: after our own save we bump these so the incoming
   // treeJson prop change doesn't reset the board to root.
@@ -150,16 +175,17 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
       const el = e.target as HTMLElement | null;
       if (el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT')) return;
       if (e.key === 'ArrowLeft') { if (currentNode.parent) navigateTo(currentNode.parent); }
-      else if (e.key === 'ArrowRight') { if (currentNode.children[0]) navigateTo(currentNode.children[0]); }
+      // Forward navigation is disabled in training — it would reveal the solution.
+      else if (e.key === 'ArrowRight') { if (!training && currentNode.children[0]) navigateTo(currentNode.children[0]); }
       else if (e.key === 'Home') navigateTo(rootRef.current);
-      else if (e.key === 'End') navigateTo(findDeepestMainLine(rootRef.current));
+      else if (e.key === 'End') { if (!training) navigateTo(findDeepestMainLine(rootRef.current)); }
       else return;
       e.preventDefault();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
     /* eslint-disable-next-line */
-  }, [currentNode]);
+  }, [currentNode, training]);
 
   const updateComment = (value: string) => {
     currentNode.comment = value || undefined;
@@ -272,7 +298,21 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
       {/* Board */}
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-2 max-w-[520px] mx-auto">
-          <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{phaseLabel}</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{phaseLabel}</span>
+            <button
+              type="button"
+              onClick={toggleTraining}
+              title={t.studyTraining}
+              className={`text-[11px] font-medium px-2 py-0.5 rounded-md ${
+                training
+                  ? 'bg-amber-500 text-white'
+                  : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              }`}
+            >
+              {training ? `🙈 ${t.studyTrainingHidden}` : `🎯 ${t.studyTraining}`}
+            </button>
+          </div>
           {canEdit ? (
             <span className="text-[11px] text-gray-400 dark:text-gray-500">
               {saving || dirty ? `💾 ${t.studySaving}` : `✓ ${t.studySaved}`}
@@ -306,8 +346,8 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
             highlightedCaptures={highlightedCaptures}
             validRemovableRings={validRemovableRings}
             onRingClick={handleRingClick}
-            shapes={currentNode.shapes}
-            drawable
+            shapes={training ? undefined : currentNode.shapes}
+            drawable={!training}
             onShapeDraw={handleDrawShape}
             preview
           />
@@ -315,10 +355,11 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
         <div className="flex items-center justify-center gap-2 mt-3">
           <NavBtn onClick={() => navigateTo(rootRef.current)} disabled={currentNode === rootRef.current}>⏮</NavBtn>
           <NavBtn onClick={() => currentNode.parent && navigateTo(currentNode.parent)} disabled={!currentNode.parent}>◀</NavBtn>
-          <NavBtn onClick={() => currentNode.children[0] && navigateTo(currentNode.children[0])} disabled={!currentNode.children[0]}>▶</NavBtn>
-          <NavBtn onClick={() => navigateTo(findDeepestMainLine(rootRef.current))}>⏭</NavBtn>
+          {/* Forward navigation hidden in training — it would reveal the solution. */}
+          <NavBtn onClick={() => !training && currentNode.children[0] && navigateTo(currentNode.children[0])} disabled={training || !currentNode.children[0]}>▶</NavBtn>
+          <NavBtn onClick={() => !training && navigateTo(findDeepestMainLine(rootRef.current))} disabled={training}>⏭</NavBtn>
         </div>
-        <div className="hidden sm:flex items-center justify-center gap-3 mt-2">
+        <div className={`${training ? 'hidden' : 'hidden sm:flex'} items-center justify-center gap-3 mt-2`}>
           <span className="text-[11px] text-gray-400 dark:text-gray-500">{t.studyDrawHint}</span>
           {currentNode.shapes?.length ? (
             <button
@@ -350,7 +391,11 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
       {/* Notation panel + node comment */}
       <div className="lg:w-72 flex-shrink-0 flex flex-col gap-3">
         <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-2 max-h-[360px] overflow-y-auto">
-          <StudyMoveTree root={rootRef.current} currentId={currentNode.id} onSelect={navigateTo} onDelete={canEdit ? handleDeleteBranch : undefined} />
+          {training ? (
+            <p className="text-xs text-gray-400 dark:text-gray-500 py-6 text-center">🙈 {t.studyTrainingHidden}</p>
+          ) : (
+            <StudyMoveTree root={rootRef.current} currentId={currentNode.id} onSelect={navigateTo} onDelete={canEdit ? handleDeleteBranch : undefined} />
+          )}
         </div>
         <NotationButtons
           getZip={getZip}
@@ -358,7 +403,7 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
           className="flex flex-wrap gap-2"
           buttonClassName="flex-1 px-3 py-1.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"
         />
-        {canEdit ? (
+        {training ? null : canEdit ? (
           <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-2">
             <div className="flex justify-end mb-1.5">
               <div className="flex text-[11px] font-medium rounded-md overflow-hidden border border-gray-200 dark:border-gray-600">
