@@ -103,7 +103,7 @@ function ringsMatch(serverRings, clientRings) {
  * @param {1|2} args.playerIndex  Submitting player (derived from auth).
  * @returns {{ok: true} | {ok: false, reason: string}}
  */
-export function verifySubmittedState({ stateJson, treeJson, boardSize, winType, playerIndex }) {
+export function verifySubmittedState({ stateJson, treeJson, boardSize, winType, playerIndex, setupJson }) {
   let tree, clientState;
   try { tree = JSON.parse(treeJson); }
   catch { return { ok: false, reason: 'bad-tree-json' }; }
@@ -127,7 +127,9 @@ export function verifySubmittedState({ stateJson, treeJson, boardSize, winType, 
   // Replay the tree on the server.
   let serverState;
   try {
-    serverState = createInitialState(boardSize);
+    // Custom-start games (imported ZIP) replay from the stored setup; standard
+    // games (setup_json null) from the standard board.
+    serverState = setupJson ? deserializeStateJson(setupJson) : createInitialState(boardSize);
     for (const move of mainLineMoves(tree)) {
       applyMove(serverState, move);
     }
@@ -245,14 +247,14 @@ function moveApplicable(state, move) {
  * @returns {{ok:true, stateJson:string, currentPlayer:1|2, winner:number|null, winType:string|null}
  *          | {ok:false, reason:string}}
  */
-export function computePremoveResponse({ treeJson, boardSize, expectedPreStateJson, responseMove }) {
+export function computePremoveResponse({ treeJson, boardSize, expectedPreStateJson, responseMove, setupJson }) {
   let tree, expected;
   try { tree = JSON.parse(treeJson); } catch { return { ok: false, reason: 'bad-tree-json' }; }
   try { expected = deserializeStateJson(expectedPreStateJson); } catch { return { ok: false, reason: 'bad-expected-json' }; }
 
   let state;
   try {
-    state = createInitialState(boardSize);
+    state = setupJson ? deserializeStateJson(setupJson) : createInitialState(boardSize);
     for (const move of mainLineMoves(tree)) applyMove(state, move);
     normalizePhase(state);
   } catch (err) {

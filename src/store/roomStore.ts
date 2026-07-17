@@ -22,6 +22,7 @@ import {
   createRootNode,
   addMoveToTree,
   rebuildStateFromNode,
+  rebuildStateFromNodeWithStart,
   findDeepestMainLine,
   findNodeAndParent,
   syncMainLineFlags,
@@ -38,7 +39,7 @@ import {
   mergeLiveTreeIntoAnalysis,
 } from './analysisActions';
 import { analysisSubtreeToTree, SavePremoveResult } from './premovesActions';
-import { serializeState } from '../db/apiClient';
+import { serializeState, deserializeState } from '../db/apiClient';
 import { loadAnalysis, saveAnalysis } from './analysisStorage';
 
 interface RoomStore {
@@ -107,13 +108,17 @@ interface RoomStore {
   premoves: PreMoveTree | null;
   // Latest server notice about my pre-move tree (fired / pruned) — drives a toast.
   premoveNotice: PreMoveNotice | null;
+  // Custom starting position (imported ZIP). When set, board state for a node is
+  // replayed from here instead of the standard board. null for ordinary games.
+  roomSetup: GameState | null;
 
   // Actions
   createRoom: (
     boardSize: 37 | 48 | 61,
     creatorPlayer?: 1 | 2,
     rated?: boolean,
-    timeControl?: FischerTimeControl | null
+    timeControl?: FischerTimeControl | null,
+    startState?: GameState | null
   ) => Promise<number>;
   pendingPlayerChoice: 1 | 2 | null;
   joinRoom: (roomId: number | string, options?: { watchOnly?: boolean }) => Promise<boolean>;
@@ -178,6 +183,12 @@ function stashPendingMove(
   set(s => ({ pendingMoveCount: s.pendingMoveCount + 1, pendingMove: { submit, revert, notation } }));
 }
 
+// Rebuilds board state at a node, replaying from a custom start (imported ZIP)
+// when the room has one, else from the standard board.
+function rebuildRoomState(node: GameNode, boardSize: 37 | 48 | 61, roomSetup: GameState | null): GameState {
+  return roomSetup ? rebuildStateFromNodeWithStart(roomSetup, node) : rebuildStateFromNode(node, boardSize);
+}
+
 // Builds the local-only "undo my just-made turn" closure: splice the turn's start
 // node out of its parent and rebuild the state from the parent. Used to revert a
 // correspondence preview when the player cancels instead of sending.
@@ -185,7 +196,8 @@ function makeRevert(
   set: (partial: Partial<RoomStore> | ((s: RoomStore) => Partial<RoomStore>)) => void,
   parentNode: GameNode,
   startNode: GameNode,
-  boardSize: 37 | 48 | 61
+  boardSize: 37 | 48 | 61,
+  roomSetup: GameState | null
 ): () => void {
   return () => {
     const idx = parentNode.children.indexOf(startNode);
@@ -193,7 +205,7 @@ function makeRevert(
       parentNode.children.splice(idx, 1);
       syncMainLineFlags(parentNode);
     }
-    const revState = rebuildStateFromNode(parentNode, boardSize);
+    const revState = rebuildRoomState(parentNode, boardSize, roomSetup);
     set({
       state: revState,
       currentNode: parentNode,
@@ -335,14 +347,18 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   lastLiveMergeAt: 0,
   premoves: null,
   premoveNotice: null,
+  roomSetup: null,
 
-  createRoom: async (boardSize, creatorPlayer = 1, rated = true, timeControl = null) => {
+  createRoom: async (boardSize, creatorPlayer = 1, rated = true, timeControl = null, startState = null) => {
     set({ isLoading: true, error: null });
     try {
-      const initialState = createInitialState(boardSize);
+      // startState (imported ZIP) overrides the standard board; its size wins.
+      const initialState = startState ?? createInitialState(boardSize);
+      const size = initialState.boardSize;
+      const setupJson = startState ? serializeState(startState) : null;
       const rootNode = createRootNode();
 
-      const roomId = await roomsApi.createRoom(boardSize, initialState, rootNode, creatorPlayer, rated, timeControl);
+      const roomId = await roomsApi.createRoom(size, initialState, rootNode, creatorPlayer, rated, timeControl, setupJson);
       
       const authUser = useAuthStore.getState().user;
       const names = { ...getDefaultPlayerNames() };
@@ -361,6 +377,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         state: initialState,
         gameTree: rootNode,
         currentNode: rootNode,
+        roomSetup: startState ?? null,
         playerNames: names,
         isLoading: false,
         lastUpdated: Date.now(),
@@ -443,6 +460,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         state: syncedState,
         gameTree: room.tree,
         currentNode: findDeepestMainLine(room.tree),
+        roomSetup: room.setupJson ? deserializeState(room.setupJson) : null,
         playerNames: names,
         isLoading: false,
         lastUpdated: room.updatedAt,
@@ -677,7 +695,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
           await persistOnlineGame(roomId, newState, gameTree, playerNames, winType);
         };
         if (confirmGate) {
-          stashPendingMove(set, submit, makeRevert(set, currentNode, newNode, state.boardSize), newNode.notation);
+          stashPendingMove(set, submit, makeRevert(set, currentNode, newNode, state.boardSize, get().roomSetup), newNode.notation);
           return;
         }
         await submit();
@@ -734,7 +752,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       // currentNode is the placement node (turn start); its parent is the
       // pre-turn position. Reverting splices the whole placement+removal turn.
       if (confirmGate && currentNode.parent) {
-        stashPendingMove(set, submit, makeRevert(set, currentNode.parent, currentNode, state.boardSize), currentNode.notation);
+        stashPendingMove(set, submit, makeRevert(set, currentNode.parent, currentNode, state.boardSize, get().roomSetup), currentNode.notation);
         return;
       }
       await submit();
@@ -778,7 +796,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       };
       const turnCompleted = newState.currentPlayer !== state.currentPlayer || !!winner;
       if (confirmGate && turnCompleted) {
-        stashPendingMove(set, submit, makeRevert(set, currentNode, newNode, state.boardSize), newNode.notation);
+        stashPendingMove(set, submit, makeRevert(set, currentNode, newNode, state.boardSize, get().roomSetup), newNode.notation);
         return;
       }
       await submit();
@@ -837,7 +855,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         syncMainLineFlags(parentNode);
       }
 
-      const newState = rebuildStateFromNode(parentNode, state.boardSize);
+      const newState = rebuildRoomState(parentNode, state.boardSize, get().roomSetup);
       const winner = newState.winner;
       const winType = winner && winner !== 'cancelled' ? getWinType(newState, winner) : null;
 
@@ -865,7 +883,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
 
   navigateToNode: (targetNode) => {
     const { state } = get();
-    const newState = rebuildStateFromNode(targetNode, state.boardSize);
+    const newState = rebuildRoomState(targetNode, state.boardSize, get().roomSetup);
 
     set({
       state: newState,
@@ -1016,7 +1034,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       injectPremovesIntoTree(startNode, premoves);
 
       // Replay state at the user's last-viewed position.
-      analysisStateValue = rebuildStateFromNode(analysisCurrent, state.boardSize);
+      analysisStateValue = rebuildRoomState(analysisCurrent, state.boardSize, get().roomSetup);
       normalizePhase(analysisStateValue);
     } else {
       // Fresh start — clone the live tree at the current position.
@@ -1123,7 +1141,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   analysisNavigateToNode: (targetNode) => {
     const { analysisState } = get();
     if (!analysisState) return;
-    const newState = rebuildStateFromNode(targetNode, analysisState.boardSize);
+    const newState = rebuildRoomState(targetNode, analysisState.boardSize, get().roomSetup);
     // rebuildStateFromNode replays moves but doesn't recompute phase after
     // captures — without this the navigated position can sit in 'placement'
     // when a capture is actually mandatory, which breaks capture selection
@@ -1156,7 +1174,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     if (analysisCurrentNode && isDescendant(node, analysisCurrentNode.id)) {
       newCurrent = parent;
     }
-    const newState = newCurrent ? rebuildStateFromNode(newCurrent, state.boardSize) : null;
+    const newState = newCurrent ? rebuildRoomState(newCurrent, state.boardSize, get().roomSetup) : null;
     if (newState) normalizePhase(newState);
 
     set({
@@ -1224,7 +1242,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       if (state.currentPlayer !== owner || state.winner) return { ok: false as const, reason: 'error' as const };
 
       // Build the tree from the position AFTER my move, before mutating the game.
-      const afterState = rebuildStateFromNode(mainFirst, state.boardSize);
+      const afterState = rebuildRoomState(mainFirst, state.boardSize, get().roomSetup);
       normalizePhase(afterState);
       const built = analysisSubtreeToTree(mainFirst, owner, state.boardSize, serializeState(afterState));
       if (built.hasIncompleteMove) return { ok: false as const, reason: 'incompleteMove' as const };
@@ -1234,7 +1252,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       if (move.type === 'placement') {
         // Guard: a placement that needs a ring removal MUST carry it, or we'd
         // submit a half-move and hang the game. Reject before touching the board.
-        const beforeState = rebuildStateFromNode(anchor, state.boardSize);
+        const beforeState = rebuildRoomState(anchor, state.boardSize, get().roomSetup);
         normalizePhase(beforeState);
         const placed = applyPlacement(beforeState, move.data.ringId, move.data.marbleColor);
         if (!placed) return { ok: false as const, reason: 'error' as const };
@@ -1260,7 +1278,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
     }
 
     // Opponent to move: arm the anchor's subtree directly.
-    const anchorState = rebuildStateFromNode(anchor, state.boardSize);
+    const anchorState = rebuildRoomState(anchor, state.boardSize, get().roomSetup);
     normalizePhase(anchorState);
     const { tree, droppedMyAlternatives, hasIncompleteMove } =
       analysisSubtreeToTree(anchor, owner, state.boardSize, serializeState(anchorState));
@@ -1323,6 +1341,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       lastLiveMergeAt: 0,
       premoves: null,
       premoveNotice: null,
+      roomSetup: null,
     });
   },
 }));

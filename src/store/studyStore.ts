@@ -8,7 +8,7 @@ import {
 import { serializeState, serializeTree } from '../db/apiClient';
 import { createInitialState } from '../game/GameEngine';
 import { createRootNode } from '../utils/gameTreeUtils';
-import { GameState } from '../game/types';
+import { GameState, GameNode } from '../game/types';
 
 interface StudyStore {
   tree: StudyTreeNode[];        // the signed-in user's hierarchy (content-free)
@@ -24,6 +24,7 @@ interface StudyStore {
   openStudy: (owner: string, slug: string) => Promise<StudyNode | null>;
   createStudy: (parentId: number | null, title: string) => Promise<{ id: number; slug: string; ownerName: string } | null>;
   createStudyFromState: (title: string, state: GameState, parentId?: number | null) => Promise<{ id: number; slug: string; ownerName: string } | null>;
+  createStudyFromGame: (title: string, setupState: GameState, root: GameNode, parentId?: number | null) => Promise<{ id: number; slug: string; ownerName: string } | null>;
   saveStudyTree: (id: number, treeJson: string) => Promise<void>;
   renameStudy: (id: number, title: string) => Promise<void>;
   changeSlug: (id: number, slug: string) => Promise<string | null>;
@@ -100,6 +101,16 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
     const setupJson = serializeState(state);
     const treeJson = serializeTree(createRootNode());
     const r = await apiCreate({ parentId, title, boardSize: state.boardSize, setupJson, treeJson });
+    await get().loadTree();
+    if (parentId != null) get().expand(parentId);
+    return r;
+  },
+
+  // Create a study from an imported game (ZEN): its start position + full move tree.
+  createStudyFromGame: async (title, setupState, root, parentId = null) => {
+    const setupJson = serializeState(setupState);
+    const treeJson = serializeTree(root);
+    const r = await apiCreate({ parentId, title, boardSize: setupState.boardSize, setupJson, treeJson });
     await get().loadTree();
     if (parentId != null) get().expand(parentId);
     return r;

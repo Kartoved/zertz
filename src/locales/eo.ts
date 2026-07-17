@@ -389,6 +389,8 @@ export const eo = {
   studyPlayer1: 'Ludanto 1',
   studyPlayer2: 'Ludanto 2',
   studyNewFromPosition: 'El pozicio',
+  studyImport: 'Importi ZEN/ZIP',
+  studyImportTitle: 'Titolo (nedeviga)',
   editorTitle: 'Pozicia redaktilo',
   editorEraseMarble: 'Forigi globon',
   editorToggleRing: 'Forigi/restarigi ringon',

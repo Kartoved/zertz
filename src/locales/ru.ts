@@ -389,6 +389,8 @@ export const ru = {
   studyPlayer1: 'Игрок 1',
   studyPlayer2: 'Игрок 2',
   studyNewFromPosition: 'Из позиции',
+  studyImport: 'Импорт ZEN/ZIP',
+  studyImportTitle: 'Название (необязательно)',
   editorTitle: 'Редактор позиции',
   editorEraseMarble: 'Убрать шарик',
   editorToggleRing: 'Убрать/вернуть кольцо',

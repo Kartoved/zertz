@@ -23,6 +23,39 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.16.0',
+    date: '2026-07-17',
+    changes: {
+      ru: [
+        '📋 Нотация ZIP и ZEN — свои аналоги FEN/PGN для ZERTZ. Кнопки «Копировать позицию» и «Экспорт партии» в локальной игре, онлайн-комнате и студиях; импорт позиции или партии через «Играть → Импорт позиции» (вставь ZIP или ZEN)',
+        '✅ Асинхронные партии: отправка хода теперь по подтверждению — сходил, в центре доски появляется карточка «Отправить ход?». Часы соперника не идут, пока не подтвердишь, — случайные «протыки» больше не отправляют ход',
+        '🔤 Координаты на доске: тоггл «a1» в правом верхнем углу — подписи под нижними и над верхними кольцами каждой вертикали. Настройка запоминается',
+        'Фикс: партии в «Текущих» и Zertz TV теперь надёжно открываются по клику (раньше иногда не срабатывало с первого раза)',
+        'Фикс: при зарядке предходов теперь можно добавить вторую ветку взятия, даже если варианты соперника заканчиваются на одной клетке',
+        'Zertz TV показывает только партии с 2+ ходами; наблюдаемые партии больше не попадают в «Текущие»',
+        'Версия обновлена до v0.16.0',
+      ],
+      en: [
+        '📋 ZIP & ZEN notation — ZERTZ’s own take on FEN/PGN. “Copy position” and “Export game” buttons in the local game, online room and studies; import a position or a game via “Play → Import position” (paste ZIP or ZEN)',
+        '✅ Async games: moves are now sent on confirmation — after you move, a “Send move?” card appears in the center of the board. The opponent’s clock doesn’t start until you confirm, so accidental taps no longer fire a move',
+        '🔤 Board coordinates: an “a1” toggle in the top-right corner — labels under the bottom and above the top ring of each column. The setting is remembered',
+        'Fix: games in “Current” and Zertz TV now reliably open on click (previously they sometimes did nothing on the first try)',
+        'Fix: when arming pre-moves you can now add a second capture branch even when the opponent’s variations end on the same ring',
+        'Zertz TV only shows games with 2+ moves; spectated games no longer land in “Current”',
+        'Version updated to v0.16.0',
+      ],
+      eo: [
+        '📋 ZIP kaj ZEN notacio — propraj analogoj de FEN/PGN por ZERTZ. Butonoj «Kopii pozicion» kaj «Eksporti ludon» en la loka ludo, reta ĉambro kaj studioj; importu pozicion aŭ ludon per «Ludi → Importi pozicion» (algluu ZIP aŭ ZEN)',
+        '✅ Asinkronaj ludoj: movoj nun sendiĝas post konfirmo — post via movo aperas karto «Ĉu sendi movon?» en la centro de la tabulo. La horloĝo de la kontraŭulo ne ekas ĝis vi konfirmas, do hazardaj tuŝoj ne plu sendas movon',
+        '🔤 Koordinatoj sur la tabulo: baskulo «a1» en la supra dekstra angulo — etikedoj sub la malsupra kaj super la supra ringo de ĉiu kolumno. La agordo memoriĝas',
+        'Riparo: ludoj en «Aktualaj» kaj Zertz TV nun fidinde malfermiĝas per klako (antaŭe foje nenio okazis je la unua provo)',
+        'Riparo: dum ŝargo de antaŭmovoj vi nun povas aldoni duan kaptobranĉon eĉ kiam la variantoj de la kontraŭulo finiĝas sur la sama ringo',
+        'Zertz TV montras nur ludojn kun 2+ movoj; spektataj ludoj ne plu aperas en «Aktualaj»',
+        'Versio ĝisdatigita al v0.16.0',
+      ],
+    },
+  },
+  {
     version: '0.15.0',
     date: '2026-07-15',
     changes: {

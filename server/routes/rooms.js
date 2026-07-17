@@ -169,6 +169,7 @@ router.post('/', createRoomLimiter, optionalAuth, async (req, res) => {
     rated = true,
     timeControlBaseMs = null,
     timeControlIncrementMs = null,
+    setupJson = null, // custom start position (imported ZIP); null = standard board
   } = req.body;
 
   if (!stateJson || !treeJson) {
@@ -207,9 +208,10 @@ router.post('/', createRoomLimiter, optionalAuth, async (req, res) => {
          time_control_increment_ms,
          clock_p1_ms,
          clock_p2_ms,
-         clock_running_since
+         clock_running_since,
+         setup_json
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING id`,
       [
         boardSize,
@@ -223,6 +225,7 @@ router.post('/', createRoomLimiter, optionalAuth, async (req, res) => {
         clockBase,
         clockBase,
         now,
+        setupJson,
       ]
     );
 
@@ -525,6 +528,7 @@ router.get('/:id', async (req, res) => {
       clockP1Ms: row.clock_p1_ms,
       clockP2Ms: row.clock_p2_ms,
       clockRunningSince: row.clock_running_since ? row.clock_running_since.getTime() : null,
+      setupJson: row.setup_json || null,
     });
   } catch (err) {
     console.error('Error getting room:', err);
@@ -548,7 +552,8 @@ router.put('/:id/state', moveLimiter, authRequired, async (req, res) => {
       time_control_increment_ms,
       clock_p1_ms,
       clock_p2_ms,
-      clock_running_since
+      clock_running_since,
+      setup_json
      FROM rooms
      WHERE id = $1`,
     [id]
@@ -590,6 +595,7 @@ router.put('/:id/state', moveLimiter, authRequired, async (req, res) => {
     boardSize: room.board_size,
     winType,
     playerIndex,
+    setupJson: room.setup_json,
   });
   if (!verifyResult.ok) {
     console.warn(`[rooms] state verification failed for room ${id}, player ${playerIndex}: ${verifyResult.reason}`);
@@ -768,7 +774,7 @@ async function tryAutoExecutePremove(roomId, ownerPlayer, opponentPlayer) {
 
     const result = await client.query(
       `SELECT premoves_json, tree_json, board_size, time_control_increment_ms, time_control_base_ms,
-              clock_p1_ms, clock_p2_ms, user1_id, user2_id
+              clock_p1_ms, clock_p2_ms, user1_id, user2_id, setup_json
        FROM rooms WHERE id = $1
        FOR UPDATE`,
       [roomId]
@@ -832,6 +838,7 @@ async function tryAutoExecutePremove(roomId, ownerPlayer, opponentPlayer) {
       boardSize: room.board_size,
       expectedPreStateJson: selection.expectedPreStateJson,
       responseMove: response.move,
+      setupJson: room.setup_json,
     });
     if (!computed.ok) {
       // Position diverged (transposition / stale anchor) or move inapplicable —

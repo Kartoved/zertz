@@ -155,6 +155,7 @@ export default function MainMenu() {
   const navTabs: Array<{ id: NavTab; label: string; authOnly?: boolean }> = [
     { id: 'playLocal', label: t.playLocal },
     { id: 'loadGame', label: t.loadGame },
+    { id: 'import', label: t.importPosition },
     { id: 'rules', label: t.rules },
     { id: 'players', label: t.players },
     { id: 'challenges', label: t.challenges, authOnly: true },

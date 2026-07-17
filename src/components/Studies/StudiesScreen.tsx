@@ -4,8 +4,11 @@ import { useNavigate, useParams } from 'react-router-dom';
 import StudySidebar from './StudySidebar';
 import StudyBoardViewer from './StudyBoardViewer';
 import PositionEditorModal from './PositionEditorModal';
+import ImportStudyModal from './ImportStudyModal';
 import StudyMetaModal from './StudyMetaModal';
 import { useStudyStore } from '../../store/studyStore';
+import { zipToState } from '../../game/zip';
+import { zenToTree } from '../../game/zen';
 import { GameState } from '../../game/types';
 import { useAuthStore } from '../../store/authStore';
 import { useUIStore } from '../../store/uiStore';
@@ -19,16 +22,37 @@ export default function StudiesScreen() {
   const { setScreen } = useUIStore();
   const {
     current, currentLoading, error, publicStudies,
-    loadTree, openStudy, loadPublic, cloneStudy, setPublic, changeSlug, renameStudy, createStudyFromState, saveStudyTree, setMeta,
+    loadTree, openStudy, loadPublic, cloneStudy, setPublic, changeSlug, renameStudy, createStudyFromState, createStudyFromGame, saveStudyTree, setMeta,
   } = useStudyStore();
   const [mobileSidebar, setMobileSidebar] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
+  const [showImport, setShowImport] = useState(false);
   const [showMeta, setShowMeta] = useState(false);
 
   const handleCreateFromPosition = async (title: string, state: GameState) => {
     const r = await createStudyFromState(title, state);
     setShowEditor(false);
     if (r) navigate(`/studies/${encodeURIComponent(r.ownerName)}/${encodeURIComponent(r.slug)}`);
+  };
+
+  // Import a ZEN game or a ZIP position as a new study. Returns false on parse
+  // failure so the modal can show an error.
+  const handleImport = async (text: string, title: string): Promise<boolean> => {
+    try {
+      let r;
+      if (/\[\w+\s+"/.test(text)) {
+        const { startState, root, meta } = zenToTree(text);
+        r = await createStudyFromGame(title || meta.Event || 'Imported game', startState, root);
+      } else {
+        r = await createStudyFromState(title || 'Imported position', zipToState(text));
+      }
+      if (!r) return false;
+      setShowImport(false);
+      navigate(`/studies/${encodeURIComponent(r.ownerName)}/${encodeURIComponent(r.slug)}`);
+      return true;
+    } catch {
+      return false;
+    }
   };
 
   useEffect(() => { if (user) loadTree(); loadPublic(); }, [user, loadTree, loadPublic]);
@@ -165,12 +189,20 @@ export default function StudiesScreen() {
               <p className="text-gray-500 dark:text-gray-400 mt-1">{t.studyWelcome}</p>
               {!user && <p className="mt-2 text-sm text-amber-600 dark:text-amber-400">🔒 {t.loginToCreateStudies}</p>}
               {user && (
-                <button
-                  onClick={() => setShowEditor(true)}
-                  className="mt-3 px-3 py-1.5 rounded-lg text-sm font-semibold bg-indigo-500 hover:bg-indigo-600 text-white"
-                >
-                  ⊞ {t.studyNewFromPosition}
-                </button>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => setShowEditor(true)}
+                    className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-indigo-500 hover:bg-indigo-600 text-white"
+                  >
+                    ⊞ {t.studyNewFromPosition}
+                  </button>
+                  <button
+                    onClick={() => setShowImport(true)}
+                    className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600"
+                  >
+                    ⤓ {t.studyImport}
+                  </button>
+                </div>
               )}
 
               <h2 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mt-6 mb-2">{t.publicStudies}</h2>
@@ -197,6 +229,9 @@ export default function StudiesScreen() {
 
       {showEditor && (
         <PositionEditorModal onClose={() => setShowEditor(false)} onCreate={handleCreateFromPosition} />
+      )}
+      {showImport && (
+        <ImportStudyModal onClose={() => setShowImport(false)} onImport={handleImport} />
       )}
       {showMeta && current && (
         <StudyMetaModal

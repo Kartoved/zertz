@@ -4,6 +4,8 @@ import { useI18n } from '../../i18n';
 import { useRoomStore } from '../../store/roomStore';
 import { useAuthStore } from '../../store/authStore';
 import * as roomsApi from '../../db/roomsApi';
+import { zipToState } from '../../game/zip';
+import { GameState } from '../../game/types';
 import { TimePresetId, FISCHER_PRESETS, TIME_CONTROLS } from './MainMenu';
 
 interface OnlineChallengeModalProps {
@@ -32,6 +34,25 @@ export default function OnlineChallengeModal({
   const [createdRoomId, setCreatedRoomId] = useState<number | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
 
+  // Optional custom start position (imported ZIP). When set, board size is taken
+  // from it and the size selector is disabled.
+  const [importState, setImportState] = useState<GameState | null>(null);
+  const [showImport, setShowImport] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importErr, setImportErr] = useState(false);
+
+  const applyImport = () => {
+    try {
+      const s = zipToState(importText.trim());
+      setImportState(s);
+      setSelectedBoardSize(s.boardSize);
+      setShowImport(false);
+      setImportErr(false);
+    } catch {
+      setImportErr(true);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden">
@@ -56,8 +77,9 @@ export default function OnlineChallengeModal({
                   {([37, 48, 61] as const).map((size) => (
                     <button
                       key={size}
+                      disabled={!!importState}
                       onClick={() => setSelectedBoardSize(size)}
-                      className={`p-2 text-center rounded-lg border-2 transition-colors ${
+                      className={`p-2 text-center rounded-lg border-2 transition-colors disabled:opacity-40 disabled:cursor-not-allowed ${
                         selectedBoardSize === size
                           ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/40 text-gray-900 dark:text-white'
                           : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
@@ -66,6 +88,51 @@ export default function OnlineChallengeModal({
                       <div className="text-lg font-bold mb-0.5">{size}</div>
                     </button>
                   ))}
+                </div>
+
+                {/* Import a custom start position (ZIP) */}
+                <div className="mt-2">
+                  {importState ? (
+                    <div className="flex items-center gap-2 text-xs">
+                      <span className="px-2 py-1 rounded bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300 font-medium">
+                        ✓ {t.importPosition}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => { setImportState(null); setImportText(''); }}
+                        className="text-gray-500 hover:text-red-500"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ) : showImport ? (
+                    <div className="space-y-1.5">
+                      <textarea
+                        value={importText}
+                        onChange={(e) => { setImportText(e.target.value); setImportErr(false); }}
+                        placeholder="ZIP…"
+                        rows={2}
+                        className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 p-2 font-mono text-xs text-gray-800 dark:text-gray-100 focus:outline-none focus:border-indigo-500 resize-y"
+                      />
+                      {importErr && <p className="text-xs text-red-500">{t.importError}</p>}
+                      <button
+                        type="button"
+                        onClick={applyImport}
+                        disabled={!importText.trim()}
+                        className="px-3 py-1 rounded-lg text-xs font-semibold bg-indigo-500 hover:bg-indigo-600 text-white disabled:opacity-50"
+                      >
+                        {t.importLoad}
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowImport(true)}
+                      className="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+                    >
+                      ⤓ {t.importPosition}
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -160,7 +227,8 @@ export default function OnlineChallengeModal({
                       selectedBoardSize,
                       player,
                       user ? isRated : false,
-                      { baseMs: preset.baseMs, incrementMs: preset.incrementMs }
+                      { baseMs: preset.baseMs, incrementMs: preset.incrementMs },
+                      importState
                     );
                     setCreatedRoomId(roomId);
                     setOnlineStep('link');

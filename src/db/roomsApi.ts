@@ -34,6 +34,7 @@ export interface RoomData {
   clockP1Ms: number | null;
   clockP2Ms: number | null;
   clockRunningSince: number | null;
+  setupJson: string | null;
 }
 
 export interface ChatMessage {
@@ -50,7 +51,8 @@ export async function createRoom(
   tree: GameNode,
   creatorPlayer: 1 | 2 = 1,
   rated: boolean = true,
-  timeControl?: FischerTimeControl | null
+  timeControl?: FischerTimeControl | null,
+  setupJson?: string | null
 ): Promise<number> {
   const response = await fetch(`${API_BASE}/api/rooms`, {
     method: 'POST',
@@ -63,6 +65,7 @@ export async function createRoom(
       rated,
       timeControlBaseMs: timeControl?.baseMs ?? null,
       timeControlIncrementMs: timeControl?.incrementMs ?? null,
+      setupJson: setupJson ?? null,
     }),
   });
 
@@ -102,6 +105,7 @@ export async function getRoom(id: number | string): Promise<{
   clockP1Ms: number | null;
   clockP2Ms: number | null;
   clockRunningSince: number | null;
+  setupJson: string | null;
 } | null> {
   const response = await fetch(`${API_BASE}/api/rooms/${id}`);
   
@@ -135,6 +139,7 @@ export async function getRoom(id: number | string): Promise<{
     clockP1Ms: data.clockP1Ms,
     clockP2Ms: data.clockP2Ms,
     clockRunningSince: data.clockRunningSince,
+    setupJson: data.setupJson ?? null,
   };
 }
 

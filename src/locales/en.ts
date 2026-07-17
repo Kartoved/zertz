@@ -389,6 +389,8 @@ export const en = {
   studyPlayer1: 'Player 1',
   studyPlayer2: 'Player 2',
   studyNewFromPosition: 'From position',
+  studyImport: 'Import ZEN/ZIP',
+  studyImportTitle: 'Title (optional)',
   editorTitle: 'Position editor',
   editorEraseMarble: 'Erase marble',
   editorToggleRing: 'Remove/restore ring',
