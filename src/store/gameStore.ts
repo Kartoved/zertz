@@ -23,6 +23,7 @@ import {
   createRootNode,
   addMoveToTree,
   rebuildStateFromNode,
+  rebuildStateFromNodeWithStart,
   findNodeAndParent,
   isDescendant,
   formatGameId,
@@ -40,6 +41,10 @@ interface GameStore {
   availableCaptureChains: CaptureMove[][];
   playerNames: { player1: string; player2: string };
   gameId: string;
+  // Non-standard starting position (imported ZIP/ZEN). When set, board state is
+  // reconstructed by replaying from here instead of createInitialState. null for
+  // ordinary games that begin from the standard board.
+  customStart: GameState | null;
   savedGames: Array<{ id: string; playerNames: { player1: string; player2: string }; updatedAt: number; moveCount: number; winner: string | null; winType: string | null; boardSize: 37 | 48 | 61; isOnline: boolean }>;
   winType: string | null;
   isLoadedGame: boolean;
@@ -84,6 +89,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   selectedRingId: null,
   highlightedCaptures: [],
   availableCaptureChains: [],
+  customStart: null,
   gameId: formatGameId(Date.now()),
   savedGames: [],
   winType: null,
@@ -106,6 +112,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       selectedRingId: null,
       highlightedCaptures: [],
       availableCaptureChains: [],
+      customStart: null,
       playerNames: { player1: player1Name, player2: defaults.player2 },
       gameId: newGameId,
       winType: null,
@@ -115,7 +122,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
   },
 
-  // Start a fresh local game from an arbitrary position (e.g. imported ZIP).
+  // Start a fresh local game from an arbitrary position (e.g. imported ZIP). The
+  // position is a custom start, so record it for navigation back to the root.
   loadPosition: (state) => {
     const rootNode = createRootNode();
     const defaults = getDefaultPlayerNames();
@@ -128,6 +136,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       selectedRingId: null,
       highlightedCaptures: [],
       availableCaptureChains: [],
+      customStart: cloneState(state),
       playerNames: { player1: authUser ? authUser.username : defaults.player1, player2: defaults.player2 },
       gameId: formatGameId(Date.now()),
       winType: null,
@@ -137,9 +146,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
   },
 
-  // Load a whole imported game (ZEN) as a local game to navigate/analyze. Assumes
-  // a standard start position (the common case); navigation replays from
-  // createInitialState, so custom-start games aren't fully supported yet.
+  // Load a whole imported game (ZEN) as a local game to navigate/analyze. The
+  // start position (which may be a custom setup) is recorded so navigation
+  // replays from it rather than the standard board.
   loadTree: (startState, root, names) => {
     const defaults = getDefaultPlayerNames();
     set({
@@ -150,6 +159,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       selectedRingId: null,
       highlightedCaptures: [],
       availableCaptureChains: [],
+      customStart: cloneState(startState),
       playerNames: names ?? defaults,
       gameId: formatGameId(Date.now()),
       winType: null,
@@ -178,6 +188,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       selectedRingId: null,
       highlightedCaptures: [],
       availableCaptureChains: [],
+      customStart: null,
       playerNames: names,
       gameId: newGameId,
       winType: null,
@@ -361,7 +372,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     const shouldRewind = isDescendant(node, currentNode.id);
     const targetNode = shouldRewind ? parent : currentNode;
-    const newState = rebuildStateFromNode(targetNode, state.boardSize);
+    const customStart = get().customStart;
+    const newState = customStart
+      ? rebuildStateFromNodeWithStart(customStart, targetNode)
+      : rebuildStateFromNode(targetNode, state.boardSize);
 
     set({
       state: newState,
@@ -382,6 +396,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         state: saved.state,
         gameTree: saved.tree,
         currentNode: saved.tree,
+        customStart: null,
         playerNames: saved.playerNames,
         gameId: id,
         selectedMarbleColor: null,
@@ -405,7 +420,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
   
   navigateToNode: (targetNode: GameNode) => {
-    const newState = rebuildStateFromNode(targetNode, get().state.boardSize);
+    const { customStart, state } = get();
+    const newState = customStart
+      ? rebuildStateFromNodeWithStart(customStart, targetNode)
+      : rebuildStateFromNode(targetNode, state.boardSize);
 
     set({
       state: newState,

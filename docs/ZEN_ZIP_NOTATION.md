@@ -1,12 +1,18 @@
 # ZEN & ZIP — ZERTZ notation formats (design notes)
 
-> Status: **ZIP + ZEN implemented** (client-side TS). Design captured here.
+> Status: **ZIP + ZEN implemented and wired into the UI** (client-side TS).
 >
 > - **ZIP** ✅ `src/game/zip.ts` (+ tests). `stateToZip` / `zipToState`.
 > - **ZEN** ✅ `src/game/zen.ts` (+ tests). Move tokens (`moveToZen` / `zenToMove`),
 >   intrinsic labels (`buildLabels`), and whole-game movetext (`treeToZen` /
 >   `zenToTree`) — tags, numbering, `{comments}`, `(variations)`, `[%cal]/[%csl]`
 >   annotations ↔ `GameNode.shapes`. Start position rides in a `[ZIP]` tag.
+> - **UI** ✅ `NotationButtons` (copy ZIP / export ZEN) in the local game
+>   (`ControlPanel`), online room (`RoomScreen` header) and studies
+>   (`StudyBoardViewer`). Import via **Play → Import position** (`ImportPositionModal`,
+>   auto-detects ZIP vs ZEN) → `gameStore.loadPosition` / `loadTree`. Custom starts
+>   navigate correctly via `gameStore.customStart` + `rebuildStateFromNodeWithStart`
+>   (verified end-to-end for ZIP import with Playwright).
 >
 > **Labeling — DECIDED (was open #5):** ZEN uses **intrinsic** algebraic labels
 > (leftmost column = `a`, per-column bottom = row 1), from the position's own rings

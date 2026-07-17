@@ -4,9 +4,12 @@ import HexBoard from '../Board/HexBoard';
 import MarbleSelector from '../UI/MarbleSelector';
 import StudyMoveTree from './StudyMoveTree';
 import { StudyNode } from '../../db/studiesApi';
-import { deserializeTree, serializeTree } from '../../db/apiClient';
+import { deserializeTree, serializeTree, deserializeState } from '../../db/apiClient';
 import { findDeepestMainLine } from '../../utils/gameTreeUtils';
 import { getValidRemovableRings } from '../../game/Board';
+import { stateToZip } from '../../game/zip';
+import { treeToZen } from '../../game/zen';
+import NotationButtons from '../UI/NotationButtons';
 import {
   computeAnalysisRingSelection,
   applyAnalysisPlacement,
@@ -246,6 +249,17 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
     </button>
   );
 
+  const getZip = () => stateToZip(boardState);
+  const getZen = () => {
+    const players = study.meta?.players;
+    return treeToZen(deserializeState(study.setupJson), rootRef.current, {
+      Event: study.title || 'Study',
+      ...(players?.white ? { Player1: players.white } : {}),
+      ...(players?.black ? { Player2: players.black } : {}),
+      Result: '*',
+    });
+  };
+
   const phaseLabel = boardState.winner
     ? '🏆'
     : boardState.phase === 'placement' ? t.phasePlacement
@@ -337,6 +351,12 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
         <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-2 max-h-[360px] overflow-y-auto">
           <StudyMoveTree root={rootRef.current} currentId={currentNode.id} onSelect={navigateTo} onDelete={canEdit ? handleDeleteBranch : undefined} />
         </div>
+        <NotationButtons
+          getZip={getZip}
+          getZen={getZen}
+          className="flex flex-wrap gap-2"
+          buttonClassName="flex-1 px-3 py-1.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"
+        />
         {canEdit ? (
           <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-2">
             <div className="flex justify-end mb-1.5">

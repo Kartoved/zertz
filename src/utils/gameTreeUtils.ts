@@ -101,6 +101,29 @@ export function rebuildStateFromNode(targetNode: GameNode, boardSize: 37 | 48 | 
   return nextState;
 }
 
+// Like rebuildStateFromNode but replays from an arbitrary START state instead of
+// createInitialState(boardSize) — for games/positions that begin from a custom
+// setup (imported ZEN with a non-standard [ZIP] start, or an imported ZIP
+// position). Not cached (custom starts are rare).
+export function rebuildStateFromNodeWithStart(start: GameState, targetNode: GameNode): GameState {
+  const nextState = cloneState(start);
+  const moves: GameNode[] = [];
+  let node: GameNode | null = targetNode;
+  while (node && node.move) { moves.unshift(node); node = node.parent; }
+
+  for (const moveNode of moves) {
+    if (moveNode.move?.type === 'placement') {
+      const { marbleColor, ringId, removedRingId } = moveNode.move.data;
+      placeMarble(nextState, ringId, marbleColor);
+      if (removedRingId) removeRing(nextState, removedRingId);
+      else skipRingRemoval(nextState);
+    } else if (moveNode.move?.type === 'capture') {
+      executeCapture(nextState, [moveNode.move.data, ...(moveNode.move.data.chain || [])]);
+    }
+  }
+  return nextState;
+}
+
 // Depth of a node from the root (root === 0, first move === 1, …).
 export function nodeDepth(node: GameNode): number {
   let d = 0;

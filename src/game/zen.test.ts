@@ -4,7 +4,8 @@ import {
   createInitialState, executeCapture, cloneState, placeMarble, removeRing, skipRingRemoval,
 } from './GameEngine';
 import { getValidRemovableRings, idToAlgebraic, coordToId } from './Board';
-import { addMoveToTree, createRootNode } from '../utils/gameTreeUtils';
+import { addMoveToTree, createRootNode, rebuildStateFromNodeWithStart } from '../utils/gameTreeUtils';
+import { stateToZip } from './zip';
 import { normalizePhase } from '../utils/moveActions';
 import { GameNode, GameState, Move } from './types';
 
@@ -187,6 +188,27 @@ describe('ZEN movetext (whole game)', () => {
     expect(parsed.root.children.length).toBe(2);
     // full round-trip stable
     expect(treeToZen(parsed.startState, parsed.root, parsed.meta)).toBe(s1);
+  });
+});
+
+describe('custom-start navigation (rebuildStateFromNodeWithStart)', () => {
+  it('replays from a custom start — root reconstructs the start, not the standard board', () => {
+    // Custom start: a marble already on the board, player 2 to move.
+    const start = createInitialState(37);
+    start.rings.get(coordToId(0, 0))!.marble = { color: 'white' };
+    start.reserve = { white: 5, gray: 8, black: 10 };
+    start.currentPlayer = 'player2';
+
+    // Play one move off the custom start.
+    const root = createRootNode();
+    const move = placementAt(start, 0);
+    const node = addMoveToTree(root, move, start.currentPlayer, start.moveNumber, start.boardSize);
+    const afterMove = apply(start, move);
+
+    // Navigating back to root must give the custom start, not createInitialState.
+    expect(stateToZip(rebuildStateFromNodeWithStart(start, root))).toBe(stateToZip(start));
+    // Navigating to the move node reproduces the played position.
+    expect(stateToZip(rebuildStateFromNodeWithStart(start, node))).toBe(stateToZip(afterMove));
   });
 });
 
