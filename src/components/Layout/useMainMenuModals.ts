@@ -1,9 +1,10 @@
 import { useState } from 'react';
 
-export type NavTab = 'playOnline' | 'playLocal' | 'loadGame' | 'rules' | 'players' | 'challenges' | 'lobby';
+export type NavTab = 'playOnline' | 'playLocal' | 'loadGame' | 'import' | 'rules' | 'players' | 'challenges' | 'lobby';
 
 export function useMainMenuModals() {
   const [showLoadDialog, setShowLoadDialog] = useState(false);
+  const [showImportDialog, setShowImportDialog] = useState(false);
   const [showBoardDialog, setShowBoardDialog] = useState(false);
   const [showOnlineDialog, setShowOnlineDialog] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -22,6 +23,7 @@ export function useMainMenuModals() {
       case 'playOnline': setShowOnlineDialog(true); break;
       case 'playLocal': setShowBoardDialog(true); break;
       case 'loadGame': setShowLoadDialog(true); break;
+      case 'import': setShowImportDialog(true); break;
       case 'rules': setShowRulesModal(true); break;
       case 'players': setShowPlayersModal(true); break;
       case 'challenges': setShowChallengesModal(true); break;
@@ -31,6 +33,7 @@ export function useMainMenuModals() {
 
   return {
     showLoadDialog, setShowLoadDialog,
+    showImportDialog, setShowImportDialog,
     showBoardDialog, setShowBoardDialog,
     showOnlineDialog, setShowOnlineDialog,
     showAuthModal, setShowAuthModal,

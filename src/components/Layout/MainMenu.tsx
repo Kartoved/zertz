@@ -13,6 +13,7 @@ import PlayerProfileCard from '../UI/PlayerProfileCard';
 import GlobalChat from '../UI/GlobalChat';
 import { Settings, Users, Swords } from 'lucide-react';
 import LoadGameModal from './LoadGameModal';
+import ImportPositionModal from './ImportPositionModal';
 import RulesModal from './RulesModal';
 import WhatsNewModal, { getUnseenVersion } from './WhatsNewModal';
 import BoardSelectionModal from './BoardSelectionModal';
@@ -206,6 +207,12 @@ export default function MainMenu() {
                   className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
                   {t.loadGame}
+                </button>
+                <button
+                  onClick={() => { modals.handleNavTab('import'); setActiveDropdown(null); }}
+                  className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  {t.importPosition}
                 </button>
               </div>
             )}
@@ -687,6 +694,10 @@ export default function MainMenu() {
           onClose={() => modals.setShowLoadDialog(false)}
           onLoadGame={handleLoadGame}
         />
+      )}
+
+      {modals.showImportDialog && (
+        <ImportPositionModal onClose={() => modals.setShowImportDialog(false)} />
       )}
 
       {modals.showBoardDialog && (

@@ -50,6 +50,8 @@ interface GameStore {
   isBotThinking: boolean;
 
   newGame: (boardSize?: 37 | 48 | 61) => void;
+  loadPosition: (state: GameState) => void;
+  loadTree: (startState: GameState, root: GameNode, names?: { player1: string; player2: string }) => void;
   newBotGame: (boardSize: 37 | 48 | 61, botPlayer: Player, level: BotLevel) => void;
   triggerBotMove: () => void;
   selectMarbleColor: (color: MarbleColor | null) => void;
@@ -108,6 +110,50 @@ export const useGameStore = create<GameStore>((set, get) => ({
       gameId: newGameId,
       winType: null,
       isLoadedGame: false,
+      botPlayer: null,
+      isBotThinking: false,
+    });
+  },
+
+  // Start a fresh local game from an arbitrary position (e.g. imported ZIP).
+  loadPosition: (state) => {
+    const rootNode = createRootNode();
+    const defaults = getDefaultPlayerNames();
+    const authUser = useAuthStore.getState().user;
+    set({
+      state,
+      gameTree: rootNode,
+      currentNode: rootNode,
+      selectedMarbleColor: null,
+      selectedRingId: null,
+      highlightedCaptures: [],
+      availableCaptureChains: [],
+      playerNames: { player1: authUser ? authUser.username : defaults.player1, player2: defaults.player2 },
+      gameId: formatGameId(Date.now()),
+      winType: null,
+      isLoadedGame: false,
+      botPlayer: null,
+      isBotThinking: false,
+    });
+  },
+
+  // Load a whole imported game (ZEN) as a local game to navigate/analyze. Assumes
+  // a standard start position (the common case); navigation replays from
+  // createInitialState, so custom-start games aren't fully supported yet.
+  loadTree: (startState, root, names) => {
+    const defaults = getDefaultPlayerNames();
+    set({
+      state: startState,
+      gameTree: root,
+      currentNode: root,
+      selectedMarbleColor: null,
+      selectedRingId: null,
+      highlightedCaptures: [],
+      availableCaptureChains: [],
+      playerNames: names ?? defaults,
+      gameId: formatGameId(Date.now()),
+      winType: null,
+      isLoadedGame: true,
       botPlayer: null,
       isBotThinking: false,
     });
