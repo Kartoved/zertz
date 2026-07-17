@@ -15,14 +15,15 @@
 > once from the START position and reused, so a cell keeps its name as neighbours
 > are removed.
 >
-> **Open integration item:** `zipToState` reconstructs a board in **relative**
-> coordinates (leftmost col at q=0, bottom at r=0) with a placeholder `boardSize`
-> (`inferBoardSize` by cell count). So a ZEN-decoded tree is internally consistent
-> and round-trips byte-stably, but its ring **ids differ from the app's template
-> coordinates** (algebraic labels still match). Before wiring ZEN into app load
-> (studies import, share links), decide: remap decoded coords onto the matching
-> 37/48/61 template, or move the app to intrinsic coordinates. Not needed for the
-> pure encode/decode + copy-to-clipboard use.
+> **Coordinate frame — RESOLVED (variant 1).** `zipToState` now **anchors the
+> decoded shape onto the matching standard template** (37/48/61) by pure
+> translation (`anchorToTemplate` / `findTranslation`, smallest that fits), so the
+> reconstructed board uses the **same absolute ids as the engine**, includes
+> removed rings as `isRemoved`, and sets the correct `boardSize` — drop-in for
+> `rebuildStateFromNode` / `idToAlgebraic`. A genuinely custom shape that fits no
+> template keeps relative coordinates (`inferBoardSize` fallback). This also makes
+> ZEN-decoded trees use app coordinates, so **import is unblocked** for standard
+> boards.
 
 Two text formats, analogous to chess FEN/PGN:
 

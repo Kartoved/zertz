@@ -89,6 +89,26 @@ describe('ZIP decode', () => {
     expect(present.filter(r => r.marble?.color === 'black').length).toBe(1);
   });
 
+  it('anchors a standard board back onto its template (ids match the engine)', () => {
+    for (const size of [37, 48, 61] as const) {
+      const s = zipToState(stateToZip(createInitialState(size)));
+      expect(s.boardSize).toBe(size);
+      const present = [...s.rings.values()].filter(r => !r.isRemoved);
+      expect(present.length).toBe(size);
+      // A specific engine coordinate exists with the same id (a1 = q=-3,r=6 on 37).
+      if (size === 37) expect(s.rings.has(coordToId(-3, 6))).toBe(true);
+    }
+  });
+
+  it('includes removed rings as isRemoved after anchoring', () => {
+    const src = createInitialState(37);
+    src.rings.get(coordToId(0, 3))!.isRemoved = true; // remove an interior ring
+    const s = zipToState(stateToZip(src));
+    expect(s.boardSize).toBe(37);
+    expect(s.rings.get(coordToId(0, 3))!.isRemoved).toBe(true);      // hole preserved
+    expect([...s.rings.values()].filter(r => !r.isRemoved).length).toBe(36);
+  });
+
   it('reads an RLE hole run correctly (2ooWo = 2 holes, empty, empty, white, empty)', () => {
     // single column, isolated — just exercise the column parser via a full ZIP
     const s = zipToState('2ooWo 6/8/10 0/0/0 0/0/0 1');

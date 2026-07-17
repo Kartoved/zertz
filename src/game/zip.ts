@@ -16,7 +16,7 @@
 // sheared, so a symmetric board still yields asymmetric leading offset digits.
 
 import { GameState, MarbleColor, Ring } from './types';
-import { coordToId } from './Board';
+import { coordToId, idToCoord, createBoard } from './Board';
 import { createInitialState } from './GameEngine';
 
 const COLOR_TO_CHAR: Record<MarbleColor, string> = { white: 'W', gray: 'G', black: 'B' };
@@ -94,20 +94,33 @@ export function zipToState(zip: string): GameState {
   if (parts.length < 5) throw new Error(`Invalid ZIP: expected 5 fields, got ${parts.length}`);
   const [layout, pool, cap1, cap2, side] = parts;
 
-  const cells = decodeLayout(layout); // [{ q, r, char }]
+  const cells = decodeLayout(layout); // [{ q, r, char }] in relative coordinates
 
-  // Start from a plain 37 shell; replace its board with the decoded cells.
-  // NOTE: boardSize inference / template-anchored coordinates are deferred to the
-  // ZEN phase (see docs). Here we build a self-consistent board from the decoded
-  // relative coordinates — adjacency is preserved, which is what the engine needs.
-  const state = createInitialState(inferBoardSize(cells.length));
-  const rings = new Map<string, Ring>();
-  for (const { q, r, char } of cells) {
-    const id = coordToId(q, r);
-    const marble = char === 'o' ? null : { color: CHAR_TO_COLOR[char] };
-    rings.set(id, { id, q, r, marble, isRemoved: false });
+  // Anchor onto a standard template (37/48/61) when the shape fits, so the
+  // reconstructed board uses the SAME absolute coordinates + ids as the engine
+  // (drop-in for rebuildStateFromNode, idToAlgebraic, etc.) and includes removed
+  // rings as isRemoved. Truly custom shapes that fit no template keep relative
+  // coordinates. Either way adjacency is preserved.
+  const anchored = anchorToTemplate(cells);
+  let state: GameState;
+  if (anchored) {
+    state = createInitialState(anchored.boardSize);
+    const contentById = new Map(anchored.cells.map(c => [coordToId(c.q, c.r), c.char]));
+    for (const ring of state.rings.values()) {
+      const char = contentById.get(ring.id);
+      if (char === undefined) ring.isRemoved = true;
+      else ring.marble = char === 'o' ? null : { color: CHAR_TO_COLOR[char] };
+    }
+  } else {
+    state = createInitialState(inferBoardSize(cells.length));
+    const rings = new Map<string, Ring>();
+    for (const { q, r, char } of cells) {
+      const id = coordToId(q, r);
+      const marble = char === 'o' ? null : { color: CHAR_TO_COLOR[char] };
+      rings.set(id, { id, q, r, marble, isRemoved: false });
+    }
+    state.rings = rings;
   }
-  state.rings = rings;
 
   const [w, g, b] = pool.split('/').map(Number);
   state.reserve = { white: w, gray: g, black: b };
@@ -152,8 +165,44 @@ function triple(s: string): { white: number; gray: number; black: number } {
   return { white, gray, black };
 }
 
-// Placeholder board-size inference (real template anchoring is a ZEN-phase task):
-// the smallest standard board whose ring count can hold the decoded cells.
+// Try to place the decoded (relative) cells onto a standard template by pure
+// translation. Returns template-anchored cells + the board size, or null if no
+// template fits (a genuinely custom shape). Smallest template first, so a 37
+// board decodes as 37. Translation preserves adjacency, so any valid offset is
+// equally correct; we take the first.
+function anchorToTemplate(
+  cells: DecodedCell[],
+): { boardSize: 37 | 48 | 61; cells: DecodedCell[] } | null {
+  if (cells.length === 0) return null;
+  for (const boardSize of [37, 48, 61] as const) {
+    const template = new Set(createBoard(boardSize).keys());
+    if (cells.length > template.size) continue;
+    const off = findTranslation(cells, template);
+    if (off) {
+      return {
+        boardSize,
+        cells: cells.map(c => ({ q: c.q + off.dq, r: c.r + off.dr, char: c.char })),
+      };
+    }
+  }
+  return null;
+}
+
+// A translation (dq,dr) mapping every decoded cell into the template cell set,
+// found by trying to send the first decoded cell to each template cell.
+function findTranslation(cells: DecodedCell[], template: Set<string>): { dq: number; dr: number } | null {
+  const d0 = cells[0];
+  for (const id of template) {
+    const { q, r } = idToCoord(id);
+    const dq = q - d0.q;
+    const dr = r - d0.r;
+    if (cells.every(c => template.has(coordToId(c.q + dq, c.r + dr)))) return { dq, dr };
+  }
+  return null;
+}
+
+// Fallback board-size (only for custom shapes that fit no template): the smallest
+// standard board whose ring count can hold the decoded cells.
 function inferBoardSize(cellCount: number): 37 | 48 | 61 {
   if (cellCount <= 37) return 37;
   if (cellCount <= 48) return 48;
