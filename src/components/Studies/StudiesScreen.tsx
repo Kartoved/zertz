@@ -135,10 +135,10 @@ export default function StudiesScreen() {
         <span className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t.studies}</span>
         {user && (
           <button
-            onClick={() => setMobileSidebar(v => !v)}
+            onClick={() => { if (mobileSidebar) setLandingTab('all'); setMobileSidebar(v => !v); }}
             className="lg:hidden ml-auto px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-sm text-gray-700 dark:text-gray-200"
           >
-            ☰ {t.myStudies}
+            {mobileSidebar ? `📖 ${t.studiesAll}` : `☰ ${t.myStudies}`}
           </button>
         )}
       </header>
