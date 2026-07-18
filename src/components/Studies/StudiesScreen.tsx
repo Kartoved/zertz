@@ -22,10 +22,11 @@ export default function StudiesScreen() {
   const { user } = useAuthStore();
   const { setScreen } = useUIStore();
   const {
-    current, currentLoading, error, publicStudies,
+    current, currentLoading, error, publicStudies, tree,
     loadTree, openStudy, loadPublic, cloneStudy, setPublic, changeSlug, renameStudy, createStudy, createStudyFromState, createStudyFromGame, saveStudyTree, setMeta, expand,
   } = useStudyStore();
   const [mobileSidebar, setMobileSidebar] = useState(false);
+  const [landingTab, setLandingTab] = useState<'all' | 'mine'>('all');
   const [showEditor, setShowEditor] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showMeta, setShowMeta] = useState(false);
@@ -96,6 +97,36 @@ export default function StudiesScreen() {
     await renameStudy(current.id, title.trim());
   };
 
+  const cardClass = 'text-left p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-indigo-400 transition-colors';
+  const emptyMsg = <p className="text-sm text-gray-400 dark:text-gray-500">{t.studyEmpty}</p>;
+
+  const publicGrid = publicStudies.length === 0 ? emptyMsg : (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      {publicStudies.map(s => (
+        <button key={s.id} onClick={() => navigate(`/studies/${encodeURIComponent(s.ownerName)}/${encodeURIComponent(s.slug)}`)} className={cardClass}>
+          <div className="font-semibold text-gray-800 dark:text-gray-100 truncate">{s.title}</div>
+          <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+            {s.ownerCountry && <span className="mr-1">{s.ownerCountry}</span>}
+            {s.ownerName} · {s.boardSize}
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+
+  const myGrid = tree.length === 0 ? emptyMsg : (
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+      {tree.map(s => (
+        <button key={s.id} onClick={() => open(s.slug)} className={cardClass}>
+          <div className="font-semibold text-gray-800 dark:text-gray-100 truncate flex items-center gap-1">
+            <span className="truncate">{s.title}</span>
+            {s.isPublic && <span className="text-[10px] text-green-500 flex-shrink-0">●</span>}
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+
   return (
     <div className="h-screen h-[100dvh] flex flex-col bg-gray-50 dark:bg-gray-900">
       {/* Header */}
@@ -129,6 +160,12 @@ export default function StudiesScreen() {
               <div className="flex-1 flex items-center justify-center text-gray-400">{t.studyNotFound}</div>
             ) : (
               <div className="max-w-5xl w-full mx-auto p-4 md:p-6">
+                <button
+                  onClick={() => navigate('/studies')}
+                  className="mb-3 text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+                >
+                  {t.studiesBack}
+                </button>
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <h1 className="text-2xl font-bold text-gray-900 dark:text-white break-words">{current.title}</h1>
@@ -222,22 +259,30 @@ export default function StudiesScreen() {
                 </div>
               )}
 
-              <h2 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mt-6 mb-2">{t.publicStudies}</h2>
-              {publicStudies.length === 0 ? (
-                <p className="text-sm text-gray-400 dark:text-gray-500">{t.studyEmpty}</p>
+              {user ? (
+                <>
+                  <div className="flex gap-1 mt-6 mb-3 border-b border-gray-200 dark:border-gray-700">
+                    {(['all', 'mine'] as const).map(tab => (
+                      <button
+                        key={tab}
+                        onClick={() => setLandingTab(tab)}
+                        className={`px-3 py-1.5 text-sm font-semibold -mb-px border-b-2 ${
+                          landingTab === tab
+                            ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400'
+                            : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                        }`}
+                      >
+                        {tab === 'all' ? t.studiesAll : t.myStudies}
+                      </button>
+                    ))}
+                  </div>
+                  {landingTab === 'all' ? publicGrid : myGrid}
+                </>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {publicStudies.map(s => (
-                    <button key={s.id} onClick={() => navigate(`/studies/${encodeURIComponent(s.ownerName)}/${encodeURIComponent(s.slug)}`)}
-                      className="text-left p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-indigo-400 transition-colors">
-                      <div className="font-semibold text-gray-800 dark:text-gray-100 truncate">{s.title}</div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                        {s.ownerCountry && <span className="mr-1">{s.ownerCountry}</span>}
-                        {s.ownerName} · {s.boardSize}
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                <>
+                  <h2 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide mt-6 mb-2">{t.publicStudies}</h2>
+                  {publicGrid}
+                </>
               )}
             </div>
           )}

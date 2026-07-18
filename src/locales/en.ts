@@ -393,6 +393,8 @@ export const en = {
   studyPlayer2: 'Player 2',
   studyNewFromPosition: 'From position',
   studyImport: 'Import ZEN/ZIP',
+  studiesAll: 'All studies',
+  studiesBack: '← Studies',
   studyImportTitle: 'Title (optional)',
   editorTitle: 'Position editor',
   editorEraseMarble: 'Erase marble',

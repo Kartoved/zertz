@@ -393,6 +393,8 @@ export const eo = {
   studyPlayer2: 'Ludanto 2',
   studyNewFromPosition: 'El pozicio',
   studyImport: 'Importi ZEN/ZIP',
+  studiesAll: 'Ĉiuj studioj',
+  studiesBack: '← Studioj',
   studyImportTitle: 'Titolo (nedeviga)',
   editorTitle: 'Pozicia redaktilo',
   editorEraseMarble: 'Forigi globon',
