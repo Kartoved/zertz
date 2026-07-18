@@ -282,6 +282,16 @@ export default function OnlineChallengeModal({
                   {t.goToGame}
                 </button>
               </div>
+              <button
+                onClick={async () => {
+                  await roomsApi.deleteRoom(createdRoomId).catch(() => {});
+                  roomsApi.getPendingRooms().catch(() => {});
+                  onClose();
+                }}
+                className="w-full mt-3 py-2.5 px-4 text-sm font-semibold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-xl transition-colors"
+              >
+                ✕ {t.lobbyCancel}
+              </button>
             </>
           )}
         </div>
