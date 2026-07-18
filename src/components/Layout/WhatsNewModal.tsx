@@ -23,6 +23,30 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.17.1',
+    date: '2026-07-18',
+    changes: {
+      ru: [
+        'Фикс: в асинхронных партиях уведомление «Ваш предход сыгран автоматически» больше не залипает — оно само исчезает и его можно закрыть крестиком',
+        '✕ Отмена только что созданной онлайн-игры прямо с экрана приглашения (раньше её приходилось искать в списке «Комнаты»)',
+        'Студии: переименование и удаление переведены на надёжные окошки вместо системных диалогов (те иногда «не срабатывали»)',
+        'Версия обновлена до v0.17.1',
+      ],
+      en: [
+        'Fix: in async games the “your pre-move was played automatically” toast no longer gets stuck — it auto-hides and has a close button',
+        '✕ Cancel a just-created online game right from the invite screen (you used to have to find it in the Rooms list)',
+        'Studies: rename and delete now use reliable dialogs instead of native browser prompts (which sometimes “didn’t work”)',
+        'Version updated to v0.17.1',
+      ],
+      eo: [
+        'Riparo: en asinkronaj ludoj la ŝprucmesaĝo «via antaŭmovo ludiĝis aŭtomate» ne plu blokiĝas — ĝi memkaŝiĝas kaj havas fermbutonon',
+        '✕ Nuligi ĵus kreitan retan ludon rekte de la invita ekrano (antaŭe necesis trovi ĝin en la listo «Ĉambroj»)',
+        'Studioj: alinomado kaj forigo nun uzas fidindajn fenestrojn anstataŭ nativajn retumilajn dialogojn (kiuj foje «ne funkciis»)',
+        'Versio ĝisdatigita al v0.17.1',
+      ],
+    },
+  },
+  {
     version: '0.17.0',
     date: '2026-07-18',
     changes: {
