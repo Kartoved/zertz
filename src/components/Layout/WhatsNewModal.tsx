@@ -23,6 +23,36 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.17.0',
+    date: '2026-07-18',
+    changes: {
+      ru: [
+        '🎯 Режим тренировки в студиях — тоггл прячет решение (дерево ходов, комментарии, стрелки и переход вперёд), чтобы ученик сам искал ход. Автор может включить его по умолчанию, читатель — переопределить для конкретной студии',
+        '📥 Импорт партии/позиции в студию — вставь ZEN или ZIP, и создастся новая студия (кнопка «Импорт ZEN/ZIP» на странице студий)',
+        '♟️ Онлайн-игра с произвольной позиции — при создании вызова можно вставить ZIP-позицию, и партия начнётся с неё (сервер честно проверяет ходы от кастомного старта)',
+        '📚 Навигация по студиям: вкладки «Все студии / Мои студии» и ссылка «← К студиям», чтобы вернуться к обзору из открытой студии; на мобиле переключатель стал понятнее',
+        'Кнопка «Новая» в студиях переведена на надёжную модалку (раньше зависела от системного диалога и могла «не срабатывать»); пункт «Импорт позиции» добавлен и в мобильное меню',
+        'Версия обновлена до v0.17.0',
+      ],
+      en: [
+        '🎯 Training mode in studies — a toggle hides the solution (move tree, comments, arrows and forward navigation) so a learner finds the move themselves. The author can make it the default; a reader can override it per study',
+        '📥 Import a game/position as a study — paste ZEN or ZIP and a new study is created (the “Import ZEN/ZIP” button on the studies page)',
+        '♟️ Online game from a custom position — when creating a challenge you can paste a ZIP position and the game starts from it (the server verifies moves against the custom start)',
+        '📚 Studies navigation: “All studies / My studies” tabs and a “← Studies” link to return to discovery from an open study; the mobile toggle is clearer now',
+        'The studies “New” button now uses a reliable modal (it used to depend on a browser dialog and could “not work”); “Import position” was also added to the mobile menu',
+        'Version updated to v0.17.0',
+      ],
+      eo: [
+        '🎯 Trejnreĝimo en studioj — baskulo kaŝas la solvon (movarbo, komentoj, sagoj kaj antaŭennavigado), por ke lernanto mem trovu la movon. La aŭtoro povas fari ĝin defaŭlta; leganto povas superregi ĝin por studio',
+        '📥 Importi ludon/pozicion kiel studion — algluu ZEN aŭ ZIP kaj nova studio kreiĝas (butono «Importi ZEN/ZIP» sur la studia paĝo)',
+        '♟️ Reta ludo el propra pozicio — kreante defion vi povas alglui ZIP-pozicion kaj la ludo komenciĝas de ĝi (la servilo kontrolas movojn kontraŭ la propra komenco)',
+        '📚 Navigado en studioj: langetoj «Ĉiuj studioj / Miaj studioj» kaj ligilo «← Studioj» por reveni al esplorado el malfermita studio; la poŝtelefona baskulo nun pli klaras',
+        'La butono «Nova» en studioj nun uzas fidindan modalon (antaŭe ĝi dependis de retumila dialogo kaj povis «ne funkcii»); «Importi pozicion» aldoniĝis ankaŭ al la poŝtelefona menuo',
+        'Versio ĝisdatigita al v0.17.0',
+      ],
+    },
+  },
+  {
     version: '0.16.0',
     date: '2026-07-17',
     changes: {

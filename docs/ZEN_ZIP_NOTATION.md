@@ -7,12 +7,15 @@
 >   intrinsic labels (`buildLabels`), and whole-game movetext (`treeToZen` /
 >   `zenToTree`) — tags, numbering, `{comments}`, `(variations)`, `[%cal]/[%csl]`
 >   annotations ↔ `GameNode.shapes`. Start position rides in a `[ZIP]` tag.
-> - **UI** ✅ `NotationButtons` (copy ZIP / export ZEN) in the local game
->   (`ControlPanel`), online room (`RoomScreen` header) and studies
->   (`StudyBoardViewer`). Import via **Play → Import position** (`ImportPositionModal`,
->   auto-detects ZIP vs ZEN) → `gameStore.loadPosition` / `loadTree`. Custom starts
->   navigate correctly via `gameStore.customStart` + `rebuildStateFromNodeWithStart`
->   (verified end-to-end for ZIP import with Playwright).
+> - **UI** ✅ (shipped v0.16–0.17) `NotationButtons` (copy ZIP / export ZEN) in the
+>   local game (`ControlPanel`), online room (`RoomScreen` header) and studies
+>   (`StudyBoardViewer`). Import: **Play → Import position** (local, mobile menu too),
+>   **Studies → Import ZEN/ZIP** (creates a study), and **online challenge → Import
+>   position** (creates a room from a custom start). Custom starts round-trip through
+>   client navigation (`gameStore.customStart` / `roomStore.roomSetup` +
+>   `rebuildStateFromNodeWithStart`) and **server anti-cheat verification replays from
+>   `rooms.setup_json`** (`verifyState.js`). Verified end-to-end live (register →
+>   create room from ZIP → move passes `PUT /state` = 200).
 >
 > **Labeling — DECIDED (was open #5):** ZEN uses **intrinsic** algebraic labels
 > (leftmost column = `a`, per-column bottom = row 1), from the position's own rings

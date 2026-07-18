@@ -1,94 +1,86 @@
 # Деплой ZERTZ Online
 
-## ⚡ ВАРИАНТ 1: Railway.app (самый простой)
+Продакшн работает через **Docker Compose на самостоятельном VDS** (`docker compose up -d` поднимает `web` + `db`). Railway больше не используется — `railway:*` скрипты в package.json оставлены как legacy.
 
-**Время:** 5 минут | **Цена:** Бесплатно
+## Локальная разработка
 
-### Шаги:
+Postgres — в Docker, фронт и бэк — в двух терминалах:
 
-1. **Залей код на GitHub** (уже сделано)
+```bash
+docker compose up -d db          # postgres на 5432 (ТОЛЬКО db, не весь стек)
+cp .env.example .env             # затем впиши JWT_SECRET
+npm install
+npm run dev                      # Vite на 5173, проксирует /api → 127.0.0.1:5050
+npm run dev:server               # Express на 5050 (нет hot-reload — рестарть после правок server/)
+```
 
-2. **Зайди на [railway.app](https://railway.app)** и войди через GitHub
+> ⚠️ `docker-compose.yml` описывает **два** сервиса: `db` (postgres) и `web` (полный образ приложения). Локально поднимай только `db`. Если оставить запущенным `web`, он займёт порт 5050 (возможно, устаревшей сборкой) и будет конфликтовать с `npm run dev:server`.
 
-3. **New Project → Deploy from GitHub repo** → выбери `zertz`
-
-4. **Добавь PostgreSQL:**
-   - В проекте нажми "Add Service" → "Database" → "PostgreSQL"
-   - Railway сам создаст переменные окружения
-
-5. **Готово!** Railway даст ссылку типа `https://zertz-xxx.up.railway.app`
-
-> ⚠️ Проект использует **Dockerfile** — билд происходит в контейнере, без ошибок с tsc.
+**Переменные окружения** (`.env`): `JWT_SECRET` (обязательно), плюс `DATABASE_URL` **или** отдельные `PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD`. VAPID-ключи для web-push — опционально.
 
 ---
 
-## 🐳 ВАРИАНТ 2: VPS с Docker (полный контроль)
+## Продакшн: Docker Compose на VDS
 
-**Время:** 15-30 минут | **Цена:** от $5/мес (DigitalOcean, Vultr, Selectel)
+**Требования:** VDS с Ubuntu 22.04+, Docker + Docker Compose, домен (для SSL).
 
-### Требования:
-- VPS с Ubuntu 22.04+
-- Docker и Docker Compose
-- Домен (опционально)
-
-### Шаг 1: Установка Docker на VPS
+### 1. Docker
 
 ```bash
-# Подключись к серверу
 ssh root@YOUR_SERVER_IP
-
-# Установи Docker
 curl -fsSL https://get.docker.com | sh
 ```
 
-### Шаг 2: Клонирование проекта
+### 2. Проект
 
 ```bash
 git clone https://github.com/Kartoved/zertz.git /opt/zertz
 cd /opt/zertz
 ```
 
-### Шаг 3: Настройка переменных
+### 3. `.env`
 
 ```bash
-cat > .env << EOF
+cat > .env << 'EOF'
 PGHOST=db
 PGPORT=5432
 PGDATABASE=zertz
 PGUSER=zertz
-PGPASSWORD=zertz_secret_password
+PGPASSWORD=change_me_to_a_strong_secret
 PORT=5050
+JWT_SECRET=change_me_to_a_long_random_string
 EOF
 ```
 
-### Шаг 4: Запуск
+### 4. Запуск (весь стек)
 
 ```bash
-docker compose up -d
+docker compose up -d          # поднимает web + db
+docker compose ps             # оба контейнера должны быть healthy
+docker compose logs -f web    # логи приложения
 ```
 
-### Шаг 5: Проверка
+Сервер сам создаёт все таблицы на старте (идемпотентные `CREATE TABLE` + `ALTER … ADD COLUMN IF NOT EXISTS` в `server/db.js`), так что миграции руками не нужны.
+
+> ⏰ **Таймзона.** Контейнеры работают в **UTC** (переменная `TZ` не задаётся). На это завязана логика часов: все `TIMESTAMP`-колонки — UTC, `server/db.js` форсит node-postgres читать их как UTC (`types.setTypeParser(1114, …)`). Не меняй таймзону контейнеров — иначе таймеры блиц-партий «сгорят» из-за смещения.
+
+Игра доступна на `http://YOUR_SERVER_IP:5050`.
+
+### 5. Обновление
 
 ```bash
-# Проверь что контейнеры работают
-docker compose ps
-
-# Открой в браузере
-curl http://localhost:5050/api/health
+cd /opt/zertz
+git pull
+docker compose up -d --build      # пересобирает web-образ и перезапускает
 ```
 
-Игра доступна на `http://YOUR_SERVER_IP:5050`
-
-### Шаг 6: SSL с Nginx (опционально)
+### 6. SSL через Nginx (опционально)
 
 ```bash
 sudo apt install -y nginx certbot python3-certbot-nginx
-
-# Создай конфиг nginx
 sudo nano /etc/nginx/sites-available/zertz
 ```
 
-Содержимое файла:
 ```nginx
 server {
     listen 80;
@@ -106,68 +98,49 @@ server {
 
 ```bash
 sudo ln -s /etc/nginx/sites-available/zertz /etc/nginx/sites-enabled/
-sudo nginx -t
-sudo systemctl reload nginx
+sudo nginx -t && sudo systemctl reload nginx
 sudo certbot --nginx -d YOUR_DOMAIN
 ```
 
-## Структура проекта
+---
+
+## Архитектура (кратко)
 
 ```
 zertz/
-├── dist/           # Собранный фронтенд
-├── server/
-│   └── server.js   # Express API сервер
-├── src/            # Исходники React
-├── .env            # Переменные окружения
-└── package.json
+├── Dockerfile           # билд фронта (tsc + vite) + рантайм node server/
+├── docker-compose.yml   # web (образ приложения) + db (postgres)
+├── dist/                # собранный фронт (создаётся при билде, отдаётся статикой из server/)
+├── server/              # Express API (routes/, utils/, db.js) + server.js
+├── shared/              # ESM-модули для клиента И сервера (explorer/ — байт-идентичный replay)
+├── src/                 # React + TypeScript (game/, store/, components/, …)
+└── .env                 # секреты
 ```
 
-## API эндпоинты
+- **Транспорт онлайн-игр:** HTTP polling (не WebSockets). Оптимизировано `HEAD /:id/head` — тяжёлый fetch только при реальном изменении.
+- **Клиент — источник состояния для локальных игр** (IndexedDB), сервер — для онлайн (`state_json`/`tree_json` в таблице `rooms`).
+- **Античит:** серверная верификация каждого хода реплеем (`server/utils/verifyState.js`, движок `shared/explorer/replay.js`); кастомные стартовые позиции реплеятся от `rooms.setup_json`.
 
-- `GET /api/health` — проверка здоровья
-- `POST /api/rooms` — создать комнату
-- `GET /api/rooms/:id` — получить комнату
-- `PUT /api/rooms/:id/state` — обновить состояние
-- `GET /api/rooms/:id/messages` — получить чат
-- `POST /api/rooms/:id/messages` — отправить сообщение
+Полное описание подсистем — в [CLAUDE.md](CLAUDE.md).
 
-## Мобильный UX (обновлено)
+## Основные API-эндпоинты
 
-- Локальная игра:
-  - Карточки игроков в мобильной версии отображаются горизонтально (2 колонки).
-  - Кнопки `Undo` и `Сдаться` находятся в карточке выбора шарика.
-  - Кнопка `Сдаться` открывает подтверждающую модалку.
-
-- Онлайн игра:
-  - Нижние вкладки: `Игра` и `Чат`.
-  - Во вкладке `Игра` отображаются и карточки игроков, и доска (как в локальном режиме).
-  - Кнопки `Undo` и `Сдаться` находятся в карточке выбора шарика.
-  - Вкладка `Чат`: поле ввода закреплено над нижним таббаром.
-
-- Undo в онлайн:
-  - Разрешен только откат **собственного последнего хода**.
-  - Подтверждение оппонентом сейчас не реализовано серверно (нет отдельного протокола undo-request/undo-approve).
+| Метод | Путь | Назначение |
+|---|---|---|
+| `POST` | `/api/auth/register`, `/api/auth/login`, magic-link | Аутентификация (JWT) |
+| `POST/GET/PUT` | `/api/rooms`, `/api/rooms/:id`, `/api/rooms/:id/state` | Комнаты, синк состояния (с верификацией) |
+| `GET` | `/api/rooms/tv` | ZERTZ TV (живые + последняя завершённая) |
+| `GET/PUT` | `/api/rooms/:id/premoves` | Условные пре-мувы (correspondence) |
+| `POST` | `/api/matchmake` | Матчмейкинг по рейтингу |
+| `GET/POST` | `/api/challenges`, `/api/lobby` | Вызовы, публичное лобби |
+| `GET` | `/api/players`, `/api/games`, `/api/explorer` | Профили/лидерборд, история, дебют-эксплорер |
+| `CRUD` | `/api/studies` | Студии (Lichess-style уроки) |
+| `POST` | `/api/push/*`, `/api/global-chat` | Web-push, глобальный чат |
 
 ## Мониторинг
 
 ```bash
-# Логи PM2
-pm2 logs zertz
-
-# Статус
-pm2 status
-
-# Перезапуск
-pm2 restart zertz
-```
-
-## Обновление
-
-```bash
-cd /var/www/zertz
-git pull
-npm install
-npm run build
-pm2 restart zertz
+docker compose ps
+docker compose logs -f web
+docker compose restart web
 ```
