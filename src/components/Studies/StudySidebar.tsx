@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import { useStudyStore } from '../../store/studyStore';
 import { StudyTreeNode } from '../../db/studiesApi';
 import { useI18n } from '../../i18n';
+import TextInputModal from './TextInputModal';
+import ConfirmModal from './ConfirmModal';
 
 interface StudySidebarProps {
   currentId: number | null;
@@ -18,6 +20,8 @@ export default function StudySidebar({ currentId, onOpen, onNew, onNewFromPositi
   const { tree, expanded, toggleExpand, renameStudy, deleteStudy, moveStudy } = useStudyStore();
   const [dragId, setDragId] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<number | 'root' | null>(null);
+  const [renameNode, setRenameNode] = useState<StudyTreeNode | null>(null);
+  const [deleteNode, setDeleteNode] = useState<StudyTreeNode | null>(null);
 
   // Group children by parent for O(1) recursive render.
   const byParent = useMemo(() => {
@@ -31,18 +35,8 @@ export default function StudySidebar({ currentId, onOpen, onNew, onNewFromPositi
     return m;
   }, [tree]);
 
-  const handleRename = async (n: StudyTreeNode) => {
-    const title = window.prompt(t.studyRenamePrompt, n.title);
-    if (!title || !title.trim() || title.trim() === n.title) return;
-    await renameStudy(n.id, title.trim());
-  };
-
-  const handleDelete = async (n: StudyTreeNode) => {
-    const kids = byParent.get(n.id)?.length ?? 0;
-    const msg = kids > 0 ? t.studyDeleteWithChildren : t.studyDeleteConfirm;
-    if (!window.confirm(msg)) return;
-    await deleteStudy(n.id);
-  };
+  const handleRename = (n: StudyTreeNode) => setRenameNode(n);
+  const handleDelete = (n: StudyTreeNode) => setDeleteNode(n);
 
   const handleDrop = async (targetId: number | null) => {
     const id = dragId;
@@ -141,6 +135,24 @@ export default function StudySidebar({ currentId, onOpen, onNew, onNewFromPositi
           roots.map(n => renderNode(n, 0))
         )}
       </div>
+
+      {renameNode && (
+        <TextInputModal
+          title={t.studyRename}
+          initialValue={renameNode.title}
+          onClose={() => setRenameNode(null)}
+          onSubmit={async v => { if (v !== renameNode.title) await renameStudy(renameNode.id, v); setRenameNode(null); }}
+        />
+      )}
+      {deleteNode && (
+        <ConfirmModal
+          message={(byParent.get(deleteNode.id)?.length ?? 0) > 0 ? t.studyDeleteWithChildren : t.studyDeleteConfirm}
+          confirmLabel={t.studyDelete}
+          danger
+          onClose={() => setDeleteNode(null)}
+          onConfirm={async () => { await deleteStudy(deleteNode.id); setDeleteNode(null); }}
+        />
+      )}
     </div>
   );
 }

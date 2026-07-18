@@ -5,7 +5,7 @@ import StudySidebar from './StudySidebar';
 import StudyBoardViewer from './StudyBoardViewer';
 import PositionEditorModal from './PositionEditorModal';
 import ImportStudyModal from './ImportStudyModal';
-import NewStudyModal from './NewStudyModal';
+import TextInputModal from './TextInputModal';
 import StudyMetaModal from './StudyMetaModal';
 import { useStudyStore } from '../../store/studyStore';
 import { zipToState } from '../../game/zip';
@@ -32,6 +32,8 @@ export default function StudiesScreen() {
   const [showMeta, setShowMeta] = useState(false);
   // Parent for a new blank study: number | null while the modal is open, undefined when closed.
   const [newParent, setNewParent] = useState<number | null | undefined>(undefined);
+  const [renameOpen, setRenameOpen] = useState(false);
+  const [slugOpen, setSlugOpen] = useState(false);
 
   const handleNewStudy = async (title: string) => {
     const parentId = newParent ?? null;
@@ -82,19 +84,18 @@ export default function StudiesScreen() {
     if (r) navigate(`/studies/${encodeURIComponent(r.ownerName)}/${encodeURIComponent(r.slug)}`);
   };
 
-  const handleEditSlug = async () => {
-    if (!current) return;
-    const next = window.prompt(t.studySlugPrompt, current.slug);
-    if (!next || !next.trim() || next.trim() === current.slug) return;
-    const newSlug = await changeSlug(current.id, next.trim());
+  const handleEditSlug = () => { if (current) setSlugOpen(true); };
+  const submitSlug = async (next: string) => {
+    if (!current || next === current.slug) { setSlugOpen(false); return; }
+    const newSlug = await changeSlug(current.id, next);
+    setSlugOpen(false);
     if (newSlug) navigate(`/studies/${encodeURIComponent(current.ownerName)}/${encodeURIComponent(newSlug)}`);
   };
 
-  const handleRename = async () => {
-    if (!current) return;
-    const title = window.prompt(t.studyRenamePrompt, current.title);
-    if (!title || !title.trim() || title.trim() === current.title) return;
-    await renameStudy(current.id, title.trim());
+  const handleRename = () => { if (current) setRenameOpen(true); };
+  const submitRename = async (title: string) => {
+    if (current && title !== current.title) await renameStudy(current.id, title);
+    setRenameOpen(false);
   };
 
   const cardClass = 'text-left p-3 rounded-xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:border-indigo-400 transition-colors';
@@ -296,7 +297,28 @@ export default function StudiesScreen() {
         <ImportStudyModal onClose={() => setShowImport(false)} onImport={handleImport} />
       )}
       {newParent !== undefined && (
-        <NewStudyModal onClose={() => setNewParent(undefined)} onCreate={handleNewStudy} />
+        <TextInputModal
+          title={t.studyNew}
+          placeholder={t.studyNewTitlePrompt}
+          onClose={() => setNewParent(undefined)}
+          onSubmit={handleNewStudy}
+        />
+      )}
+      {renameOpen && current && (
+        <TextInputModal
+          title={t.studyRename}
+          initialValue={current.title}
+          onClose={() => setRenameOpen(false)}
+          onSubmit={submitRename}
+        />
+      )}
+      {slugOpen && current && (
+        <TextInputModal
+          title={t.studySlugPrompt}
+          initialValue={current.slug}
+          onClose={() => setSlugOpen(false)}
+          onSubmit={submitSlug}
+        />
       )}
       {showMeta && current && (
         <StudyMetaModal

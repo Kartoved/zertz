@@ -10,6 +10,7 @@ import { getValidRemovableRings } from '../../game/Board';
 import { stateToZip } from '../../game/zip';
 import { treeToZen } from '../../game/zen';
 import NotationButtons from '../UI/NotationButtons';
+import ConfirmModal from './ConfirmModal';
 import {
   computeAnalysisRingSelection,
   applyAnalysisPlacement,
@@ -72,6 +73,7 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
   const [currentNode, setCurrentNode] = useState<GameNode>(rootRef.current);
   const [boardState, setBoardState] = useState<GameState>(() => studyStateAtNode(study.setupJson, rootRef.current));
   const [saving, setSaving] = useState(false);
+  const [deleteBranchNode, setDeleteBranchNode] = useState<GameNode | null>(null);
 
   // Training mode: hide the whole solution (move tree, comments, arrows, forward
   // nav) so the learner explores freely without spoilers. Effective value =
@@ -152,9 +154,14 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
   }, [changeSeqRef.current, dirty, saving, canEdit, boardState.phase]);
 
   const handleDeleteBranch = (node: GameNode) => {
-    const parent = node.parent;
-    if (!parent) return;
-    if (!window.confirm(t.studyDeleteVariantConfirm)) return;
+    if (node.parent) setDeleteBranchNode(node);
+  };
+
+  const confirmDeleteBranch = () => {
+    const node = deleteBranchNode;
+    setDeleteBranchNode(null);
+    const parent = node?.parent;
+    if (!node || !parent) return;
     // If the viewed node lives inside the pruned subtree, retreat to the parent.
     if (findNodeById(node, currentNode.id)) navigateTo(parent);
     parent.children = parent.children.filter(c => c !== node);
@@ -439,6 +446,16 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
         ) : null}
         <p className="text-[11px] text-gray-400 dark:text-gray-500 px-1">{canEdit ? t.studyEditHint : t.studyExploreHint}</p>
       </div>
+
+      {deleteBranchNode && (
+        <ConfirmModal
+          message={t.studyDeleteVariantConfirm}
+          confirmLabel={t.studyDelete}
+          danger
+          onClose={() => setDeleteBranchNode(null)}
+          onConfirm={confirmDeleteBranch}
+        />
+      )}
     </div>
   );
 }
