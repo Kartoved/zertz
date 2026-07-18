@@ -5,6 +5,7 @@ import StudySidebar from './StudySidebar';
 import StudyBoardViewer from './StudyBoardViewer';
 import PositionEditorModal from './PositionEditorModal';
 import ImportStudyModal from './ImportStudyModal';
+import NewStudyModal from './NewStudyModal';
 import StudyMetaModal from './StudyMetaModal';
 import { useStudyStore } from '../../store/studyStore';
 import { zipToState } from '../../game/zip';
@@ -22,12 +23,22 @@ export default function StudiesScreen() {
   const { setScreen } = useUIStore();
   const {
     current, currentLoading, error, publicStudies,
-    loadTree, openStudy, loadPublic, cloneStudy, setPublic, changeSlug, renameStudy, createStudyFromState, createStudyFromGame, saveStudyTree, setMeta,
+    loadTree, openStudy, loadPublic, cloneStudy, setPublic, changeSlug, renameStudy, createStudy, createStudyFromState, createStudyFromGame, saveStudyTree, setMeta, expand,
   } = useStudyStore();
   const [mobileSidebar, setMobileSidebar] = useState(false);
   const [showEditor, setShowEditor] = useState(false);
   const [showImport, setShowImport] = useState(false);
   const [showMeta, setShowMeta] = useState(false);
+  // Parent for a new blank study: number | null while the modal is open, undefined when closed.
+  const [newParent, setNewParent] = useState<number | null | undefined>(undefined);
+
+  const handleNewStudy = async (title: string) => {
+    const parentId = newParent ?? null;
+    const r = await createStudy(parentId, title);
+    setNewParent(undefined);
+    if (parentId != null) expand(parentId);
+    if (r) navigate(`/studies/${encodeURIComponent(r.ownerName)}/${encodeURIComponent(r.slug)}`);
+  };
 
   const handleCreateFromPosition = async (title: string, state: GameState) => {
     const r = await createStudyFromState(title, state);
@@ -105,7 +116,7 @@ export default function StudiesScreen() {
         {/* Sidebar (author's hierarchy) */}
         {user && (
           <aside className={`${mobileSidebar ? 'flex' : 'hidden'} lg:flex w-full lg:w-72 flex-shrink-0 flex-col bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700`}>
-            <StudySidebar currentId={current?.id ?? null} onOpen={open} onNewFromPosition={() => setShowEditor(true)} />
+            <StudySidebar currentId={current?.id ?? null} onOpen={open} onNew={setNewParent} onNewFromPosition={() => setShowEditor(true)} />
           </aside>
         )}
 
@@ -191,8 +202,14 @@ export default function StudiesScreen() {
               {user && (
                 <div className="mt-3 flex flex-wrap gap-2">
                   <button
-                    onClick={() => setShowEditor(true)}
+                    onClick={() => setNewParent(null)}
                     className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-indigo-500 hover:bg-indigo-600 text-white"
+                  >
+                    + {t.studyNew}
+                  </button>
+                  <button
+                    onClick={() => setShowEditor(true)}
+                    className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600"
                   >
                     ⊞ {t.studyNewFromPosition}
                   </button>
@@ -232,6 +249,9 @@ export default function StudiesScreen() {
       )}
       {showImport && (
         <ImportStudyModal onClose={() => setShowImport(false)} onImport={handleImport} />
+      )}
+      {newParent !== undefined && (
+        <NewStudyModal onClose={() => setNewParent(undefined)} onCreate={handleNewStudy} />
       )}
       {showMeta && current && (
         <StudyMetaModal

@@ -6,15 +6,16 @@ import { useI18n } from '../../i18n';
 interface StudySidebarProps {
   currentId: number | null;
   onOpen: (slug: string) => void;
+  onNew: (parentId: number | null) => void;
   onNewFromPosition: () => void;
 }
 
 // Notion-like hierarchy of the author's own studies. Create child, rename,
 // delete, and drag a node onto another to re-parent (drop on the header →
 // top level). Content-free — bodies load on open.
-export default function StudySidebar({ currentId, onOpen, onNewFromPosition }: StudySidebarProps) {
+export default function StudySidebar({ currentId, onOpen, onNew, onNewFromPosition }: StudySidebarProps) {
   const { t } = useI18n();
-  const { tree, expanded, toggleExpand, createStudy, renameStudy, deleteStudy, moveStudy } = useStudyStore();
+  const { tree, expanded, toggleExpand, renameStudy, deleteStudy, moveStudy } = useStudyStore();
   const [dragId, setDragId] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<number | 'root' | null>(null);
 
@@ -29,13 +30,6 @@ export default function StudySidebar({ currentId, onOpen, onNewFromPosition }: S
     for (const arr of m.values()) arr.sort((a, b) => a.sort - b.sort);
     return m;
   }, [tree]);
-
-  const handleCreate = async (parentId: number | null) => {
-    const title = window.prompt(t.studyNewTitlePrompt);
-    if (!title || !title.trim()) return;
-    const r = await createStudy(parentId, title.trim());
-    if (r) onOpen(r.slug);
-  };
 
   const handleRename = async (n: StudyTreeNode) => {
     const title = window.prompt(t.studyRenamePrompt, n.title);
@@ -95,7 +89,7 @@ export default function StudySidebar({ currentId, onOpen, onNewFromPosition }: S
             {n.isPublic && <span className="text-[9px] text-green-500 flex-shrink-0" title={t.studyPublic}>●</span>}
           </button>
           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-            <button type="button" title={t.studyNewChild} onClick={(e) => { e.stopPropagation(); handleCreate(n.id); }}
+            <button type="button" title={t.studyNewChild} onClick={(e) => { e.stopPropagation(); onNew(n.id); }}
               className="w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600">+</button>
             <button type="button" title={t.studyRename} onClick={(e) => { e.stopPropagation(); handleRename(n); }}
               className="w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600 text-xs">✎</button>
@@ -132,7 +126,7 @@ export default function StudySidebar({ currentId, onOpen, onNewFromPosition }: S
           </button>
           <button
             type="button"
-            onClick={() => handleCreate(null)}
+            onClick={() => onNew(null)}
             className="px-2 py-1 rounded-md text-sm font-semibold bg-indigo-500 hover:bg-indigo-600 text-white"
           >
             + {t.studyNew}
