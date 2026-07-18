@@ -165,17 +165,24 @@ export function RoomScreen() {
     { message: string; confirmLabel?: string; onConfirm?: () => void | Promise<void> } | null
   >(null);
   const prevNoticeAtRef = useRef<number>(0);
+  // Show the toast only when a genuinely new notice arrives (keyed by `at`).
+  // Polling re-delivers the same notice object, so guard on `at`.
   useEffect(() => {
     if (!premoveNotice || premoveNotice.at === prevNoticeAtRef.current) return;
     prevNoticeAtRef.current = premoveNotice.at;
-    const msg =
+    setPremoveToast(
       premoveNotice.type === 'fired'
         ? t.premoveFiredToast.replace('{move}', premoveNotice.notation || '')
-        : t.premovePrunedToast;
-    setPremoveToast(msg);
-    const timer = setTimeout(() => setPremoveToast(null), 4000);
-    return () => clearTimeout(timer);
+        : t.premovePrunedToast
+    );
   }, [premoveNotice, t]);
+  // Auto-hide is tied to the toast itself (not to premoveNotice), so repeated
+  // polls that re-deliver the same notice can't cancel the timer and leave it stuck.
+  useEffect(() => {
+    if (!premoveToast) return;
+    const timer = setTimeout(() => setPremoveToast(null), 6000);
+    return () => clearTimeout(timer);
+  }, [premoveToast]);
 
   const isTimedGame = timeControlBaseMs != null;
 
@@ -1348,8 +1355,16 @@ export function RoomScreen() {
       )}
 
       {premoveToast && (
-        <div className="fixed top-32 left-1/2 -translate-x-1/2 z-[90] px-4 py-2 bg-indigo-600 text-white rounded-lg shadow-lg text-sm font-medium pointer-events-none">
-          {premoveToast}
+        <div className="fixed top-32 left-1/2 -translate-x-1/2 z-[90] max-w-[calc(100vw-2rem)] flex items-center gap-2 pl-4 pr-2 py-2 bg-indigo-600 text-white rounded-lg shadow-lg text-sm font-medium">
+          <span className="min-w-0">{premoveToast}</span>
+          <button
+            type="button"
+            onClick={() => setPremoveToast(null)}
+            aria-label={t.close}
+            className="flex-shrink-0 w-6 h-6 flex items-center justify-center rounded hover:bg-white/20 text-white/90 text-base leading-none"
+          >
+            ✕
+          </button>
         </div>
       )}
 
