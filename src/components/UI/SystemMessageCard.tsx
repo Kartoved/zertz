@@ -10,7 +10,28 @@ export function tryRenderSystemBody(body: string): { node: React.ReactElement; k
   if (blog) {
     return { kind: 'blog', node: <BlogPostCard slug={blog[1]} title={blog[2]} /> };
   }
+  const tour = body.match(/^\[TOURNAMENT\]([^|]+)\|(.+)$/s);
+  if (tour) {
+    return { kind: 'tournament', node: <TournamentCard id={tour[1]} name={tour[2]} /> };
+  }
   return null;
+}
+
+function TournamentCard({ id, name }: { id: string; name: string }) {
+  const { t } = useI18n();
+  return (
+    <Link
+      to={`/tournaments/${id}`}
+      className="block bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-200 dark:border-indigo-700/50 rounded-lg p-2.5 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 transition-colors"
+    >
+      <div className="text-[10px] uppercase tracking-wide font-semibold text-indigo-700 dark:text-indigo-300">
+        🏆 {t.arenaStatusActive}
+      </div>
+      <div className="text-sm font-medium text-gray-900 dark:text-white mt-0.5">
+        {name}
+      </div>
+    </Link>
+  );
 }
 
 function BlogPostCard({ slug, title }: { slug: string; title: string }) {

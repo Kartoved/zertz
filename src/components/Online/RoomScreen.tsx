@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useRoomStore } from '../../store/roomStore';
 import { useAuthStore } from '../../store/authStore';
 import { useUIStore } from '../../store/uiStore';
+import { berserkRoom } from '../../db/roomsApi';
 import HexBoard from '../Board/HexBoard';
 import { ChatPanel } from './ChatPanel';
 import MarbleSelector from '../UI/MarbleSelector';
@@ -40,6 +41,7 @@ export function RoomScreen() {
   const [showSurrenderConfirm, setShowSurrenderConfirm] = useState(false);
   const [clockNowMs, setClockNowMs] = useState(() => Date.now());
   const [addTimeCooldown, setAddTimeCooldown] = useState(false);
+  const [berserking, setBerserking] = useState(false);
 
   const navTabs: Array<{ id: string; label: string; authOnly?: boolean }> = [
     { id: 'playLocal', label: t.playLocal },
@@ -116,6 +118,8 @@ export function RoomScreen() {
     pendingMove,
     confirmPendingMove,
     cancelPendingMove,
+    tournamentId,
+    berserk,
   } = useRoomStore();
   const { user } = useAuthStore();
   const isAuthed = !!user;
@@ -632,8 +636,42 @@ export function RoomScreen() {
     );
   }
 
+  // Arena berserk: available only before you've made your first move.
+  const myBerserked = berserk ? (myPlayer === 1 ? berserk.player1 : myPlayer === 2 ? berserk.player2 : false) : false;
+  const canBerserk =
+    !!tournamentId && !state.winner && !!myPlayer && !myBerserked && !isAnalyzing &&
+    (myPlayer === 1 ? state.moveNumber === 1 : state.moveNumber <= 2);
+  const handleBerserk = async () => {
+    if (!roomId || berserking) return;
+    setBerserking(true);
+    try { await berserkRoom(roomId); await pollRoom(); } catch { /* ignore */ } finally { setBerserking(false); }
+  };
+
   return (
     <div className="h-screen h-[100dvh] overflow-hidden bg-gray-100 dark:bg-gray-900 flex flex-col overflow-x-hidden">
+      {/* Arena: berserk prompt (pre-first-move) / back-to-arena (game over) */}
+      {tournamentId && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-40 flex flex-col items-center gap-2 pointer-events-none">
+          {canBerserk && (
+            <button
+              onClick={handleBerserk}
+              disabled={berserking}
+              title={t.arenaBerserkHint}
+              className="pointer-events-auto px-4 py-2 rounded-full bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-bold shadow-lg animate-pulse"
+            >
+              ⚡ {t.arenaBerserkBtn}
+            </button>
+          )}
+          {state.winner && (
+            <button
+              onClick={() => navigate(`/tournaments/${tournamentId}`)}
+              className="pointer-events-auto px-4 py-2 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold shadow-lg"
+            >
+              ← {t.arenaBackToArena}
+            </button>
+          )}
+        </div>
+      )}
       {/* Header */}
       <header className="bg-white dark:bg-gray-800 shadow-sm p-3 md:p-4">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">

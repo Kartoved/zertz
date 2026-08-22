@@ -111,6 +111,9 @@ interface RoomStore {
   // Custom starting position (imported ZIP). When set, board state for a node is
   // replayed from here instead of the standard board. null for ordinary games.
   roomSetup: GameState | null;
+  // Arena tournament metadata (null for non-arena rooms). berserk = per-seat flags.
+  tournamentId: number | null;
+  berserk: { player1: boolean; player2: boolean } | null;
 
   // Actions
   createRoom: (
@@ -348,6 +351,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   premoves: null,
   premoveNotice: null,
   roomSetup: null,
+  tournamentId: null,
+  berserk: null,
 
   createRoom: async (boardSize, creatorPlayer = 1, rated = true, timeControl = null, startState = null) => {
     set({ isLoading: true, error: null });
@@ -474,6 +479,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         clockP1Ms: room.clockP1Ms,
         clockP2Ms: room.clockP2Ms,
         clockRunningSince: room.clockRunningSince,
+        tournamentId: room.tournamentId,
+        berserk: room.berserk,
       });
 
       // Only the user's own games belong in local storage (the "Current" list);
@@ -569,6 +576,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
           clockP1Ms: room.clockP1Ms,
           clockP2Ms: room.clockP2Ms,
           clockRunningSince: room.clockRunningSince,
+          tournamentId: room.tournamentId,
+          berserk: room.berserk,
           ...(mergedAnalysisTree ? { analysisGameTree: mergedAnalysisTree, lastLiveMergeAt: Date.now() } : {}),
         });
         if (myP) await persistOnlineGame(roomId, syncedState, room.tree, room.playerNames, room.winType);

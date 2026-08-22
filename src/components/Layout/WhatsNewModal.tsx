@@ -23,6 +23,36 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.18.0',
+    date: '2026-08-22',
+    changes: {
+      ru: [
+        '🏆 Турниры-арены (в стиле Lichess)! Создай арену на заданное окно времени — участники автоматически подбираются в пары, доиграл партию — сразу новый соперник. Живая таблица лидеров, очки за победы',
+        '🔥 Серии: две победы подряд — и следующие победы приносят ×2 очка',
+        '⚡ Берсерк: перед первым ходом можешь урезать себе часы вдвое ради +1 очка за победу',
+        'Партии в арене рейтинговые (блиц 5+5). Создать турнир может любой залогиненный игрок — вкладка «Турниры» в меню',
+        'Если игрока «спарили», а он отошёл и проиграл по времени не сделав ни хода — его ставят на паузу, чтобы не копить поражения (можно вернуться кнопкой «Продолжить»)',
+        'Версия обновлена до v0.18.0',
+      ],
+      en: [
+        '🏆 Arena tournaments (Lichess-style)! Create an arena for a fixed time window — players are auto-paired, and finishing a game gets you a new opponent right away. Live leaderboard, points for wins',
+        '🔥 Streaks: win two in a row and your next wins are worth ×2 points',
+        '⚡ Berserk: before your first move you can halve your own clock for +1 point on a win',
+        'Arena games are rated (blitz 5+5). Any logged-in player can create one — the “Tournaments” tab in the menu',
+        'If you get paired but step away and lose on time without moving, you’re auto-paused so you don’t pile up losses (hit “Resume” to come back)',
+        'Version updated to v0.18.0',
+      ],
+      eo: [
+        '🏆 Arena-turniroj (Lichess-stile)! Kreu arenon por fiksa tempofenestro — ludantoj aŭtomate pariĝas, kaj fininte ludon vi tuj ricevas novan kontraŭulon. Viva rangtabelo, poentoj por venkoj',
+        '🔥 Serioj: venku dufoje sinsekve kaj viaj sekvaj venkoj valoras ×2 poentojn',
+        '⚡ Berserk: antaŭ via unua movo vi povas duonigi vian horloĝon por +1 poento ĉe venko',
+        'Arenaj ludoj estas taksataj (fulmo 5+5). Iu ajn ensalutinta ludanto povas krei — la langeto «Turniroj» en la menuo',
+        'Se vi pariĝas sed foriras kaj malvenkas pro tempo sen movi, vi estas aŭtomate paŭzigita (premu «Daŭrigi» por reveni)',
+        'Versio ĝisdatigita al v0.18.0',
+      ],
+    },
+  },
+  {
     version: '0.17.1',
     date: '2026-07-18',
     changes: {

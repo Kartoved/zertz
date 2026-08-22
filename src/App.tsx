@@ -14,6 +14,8 @@ const MagicLinkPage = lazy(() => import('./components/Auth/MagicLinkPage'));
 const BlogList = lazy(() => import('./components/Blog/BlogList'));
 const BlogPostPage = lazy(() => import('./components/Blog/BlogPostPage'));
 const StudiesScreen = lazy(() => import('./components/Studies/StudiesScreen'));
+const TournamentsScreen = lazy(() => import('./components/Tournaments/TournamentsScreen'));
+const TournamentDetailScreen = lazy(() => import('./components/Tournaments/TournamentDetailScreen'));
 
 function ScreenFallback() {
   return (
@@ -52,6 +54,8 @@ function App() {
             <Route path="/news/:slug" element={<BlogPostPage />} />
             <Route path="/studies" element={<StudiesScreen />} />
             <Route path="/studies/:owner/:slug" element={<StudiesScreen />} />
+            <Route path="/tournaments" element={<TournamentsScreen />} />
+            <Route path="/tournaments/:id" element={<TournamentDetailScreen />} />
           </Routes>
         </Suspense>
       </BrowserRouter>

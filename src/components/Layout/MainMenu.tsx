@@ -312,6 +312,16 @@ export default function MainMenu() {
             )}
           </div>
 
+          {/* TOURNAMENTS — top-level tab, links to /tournaments */}
+          <button
+            onClick={() => navigate('/tournaments')}
+            className="px-4 py-2 text-sm font-semibold rounded-lg transition-colors
+              text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700
+              hover:text-gray-900 dark:hover:text-white uppercase tracking-wide"
+          >
+            {t.tournaments}
+          </button>
+
           {/* NEWS — top-level tab, links to /news */}
           <button
             onClick={() => navigate('/news')}
@@ -463,6 +473,12 @@ export default function MainMenu() {
                 {tab.label}
               </button>
             ))}
+          <button
+            onClick={() => { modals.setShowMobileMenu(false); navigate('/tournaments'); }}
+            className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700"
+          >
+            🏆 {t.tournaments}
+          </button>
           <button
             onClick={() => { modals.setShowMobileMenu(false); navigate('/news'); }}
             className="w-full text-left px-3 py-2 rounded-lg text-sm font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-gray-700"

@@ -5,6 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 import { ensureSchema } from './db.js';
+import { startArenaEngine } from './arenaEngine.js';
 import authRouter from './routes/auth.js';
 import playersRouter, { followsRouter } from './routes/players.js';
 import challengesRouter from './routes/challenges.js';
@@ -16,6 +17,7 @@ import pushRouter from './routes/push.js';
 import lobbyRouter from './routes/lobby.js';
 import explorerRouter from './routes/explorer.js';
 import studiesRouter from './routes/studies.js';
+import tournamentsRouter from './routes/tournaments.js';
 import {
   authLimiter,
   chatLimiter,
@@ -49,6 +51,7 @@ app.use('/api/push', pushRouter);
 app.use('/api/lobby', createRoomLimiter, lobbyRouter);
 app.use('/api/explorer', explorerRouter);
 app.use('/api/studies', studiesRouter);
+app.use('/api/tournaments', tournamentsRouter); // per-route limiters applied inside
 
 // Serve static files
 const __filename = fileURLToPath(import.meta.url);
@@ -64,6 +67,7 @@ const startServer = async () => {
   try {
     await ensureSchema();
     console.log('Postgres connected.');
+    startArenaEngine();
   } catch (err) {
     console.error('Postgres unavailable, running without API persistence.');
   }

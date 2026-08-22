@@ -517,6 +517,19 @@ router.get('/:id', async (req, res) => {
       player2: { before: Math.round(row.rating2_before), after: Math.round(row.rating2_after), delta: Math.round(row.rating2_after) - Math.round(row.rating2_before) },
     } : null;
 
+    // Arena metadata: if this room is a tournament game, expose the tournament id
+    // + per-seat berserk flags so the client can render the arena UI.
+    let tournamentId = null;
+    let berserk = null;
+    const tgRow = await pool.query(
+      'SELECT tournament_id, p1_berserk, p2_berserk FROM tournament_games WHERE room_id = $1',
+      [row.id]
+    );
+    if (tgRow.rows.length > 0) {
+      tournamentId = tgRow.rows[0].tournament_id;
+      berserk = { player1: tgRow.rows[0].p1_berserk, player2: tgRow.rows[0].p2_berserk };
+    }
+
     res.json({
       id: row.id,
       boardSize: row.board_size,
@@ -541,10 +554,76 @@ router.get('/:id', async (req, res) => {
       clockP2Ms: row.clock_p2_ms,
       clockRunningSince: row.clock_running_since ? row.clock_running_since.getTime() : null,
       setupJson: row.setup_json || null,
+      tournamentId,
+      berserk,
     });
   } catch (err) {
     console.error('Error getting room:', err);
     res.status(500).json({ error: 'Failed to get room' });
+  }
+});
+
+// POST /:id/berserk — arena berserk: halve your own clock for a shot at +1
+// tournament point on a win. Allowed only before you've made your first move.
+router.post('/:id/berserk', authRequired, async (req, res) => {
+  const roomId = parseInt(req.params.id, 10);
+  const userId = req.user.id;
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const roomRes = await client.query(
+      `SELECT id, user1_id, user2_id, winner, state_json,
+              clock_p1_ms, clock_p2_ms, time_control_base_ms
+       FROM rooms WHERE id = $1 FOR UPDATE`,
+      [roomId]
+    );
+    if (roomRes.rows.length === 0) { await client.query('ROLLBACK'); return res.status(404).json({ error: 'Room not found' }); }
+    const room = roomRes.rows[0];
+
+    const tgRes = await client.query(
+      `SELECT id, p1_berserk, p2_berserk FROM tournament_games
+       WHERE room_id = $1 AND scored = false FOR UPDATE`,
+      [roomId]
+    );
+    if (tgRes.rows.length === 0) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Not an arena game' }); }
+    const tg = tgRes.rows[0];
+
+    if (room.winner != null) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Game already finished' }); }
+
+    let seat = null;
+    if (room.user1_id === userId) seat = 1;
+    else if (room.user2_id === userId) seat = 2;
+    if (!seat) { await client.query('ROLLBACK'); return res.status(403).json({ error: 'Not a player' }); }
+
+    if ((seat === 1 && tg.p1_berserk) || (seat === 2 && tg.p2_berserk)) {
+      await client.query('ROLLBACK'); return res.status(400).json({ error: 'Already berserked' });
+    }
+
+    // Only before your first move. state.moveNumber starts at 1 and increments
+    // per completed turn, so player1 hasn't moved iff moveNumber === 1 and
+    // player2 iff moveNumber <= 2.
+    let moveNumber = 1;
+    try { moveNumber = JSON.parse(room.state_json).moveNumber ?? 1; } catch { /* keep default */ }
+    const canBerserk = seat === 1 ? moveNumber === 1 : moveNumber <= 2;
+    if (!canBerserk) { await client.query('ROLLBACK'); return res.status(400).json({ error: 'Too late to berserk' }); }
+
+    // Halve the caller's clock and flag the berserk (scoring reads the flag).
+    const clockCol = seat === 1 ? 'clock_p1_ms' : 'clock_p2_ms';
+    const berserkCol = seat === 1 ? 'p1_berserk' : 'p2_berserk';
+    const currentMs = Number(seat === 1 ? room.clock_p1_ms : room.clock_p2_ms) || Number(room.time_control_base_ms);
+    const halved = Math.floor(currentMs / 2);
+    await client.query(`UPDATE rooms SET ${clockCol} = $2, updated_at = NOW() WHERE id = $1`, [roomId, halved]);
+    await client.query(`UPDATE tournament_games SET ${berserkCol} = true WHERE id = $1`, [tg.id]);
+
+    await client.query('COMMIT');
+    res.json({ ok: true, seat, clockMs: halved });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('POST /rooms/:id/berserk error:', err);
+    res.status(500).json({ error: 'Berserk failed' });
+  } finally {
+    client.release();
   }
 });
 

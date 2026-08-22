@@ -328,6 +328,72 @@ async function ensureSchema() {
   await pool.query(`CREATE UNIQUE INDEX IF NOT EXISTS studies_owner_slug ON studies(owner_id, slug);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS studies_owner_parent ON studies(owner_id, parent_id, sort);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS studies_public_idx ON studies(is_public) WHERE is_public;`);
+
+  // ─── Arena tournaments ───────────────────────────────────────────────
+  // A time-boxed event that continuously auto-pairs free players into rated
+  // games (Lichess-style Arena). state_json/tree_json hold the canonical game
+  // seed (built by the creator's client) reused for every paired game. Window
+  // transitions + pairing are driven by the background loop in arenaEngine.js.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tournaments (
+      id             SERIAL PRIMARY KEY,
+      name           TEXT NOT NULL,
+      created_by     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      board_size     INTEGER NOT NULL DEFAULT 37,
+      time_control_base_ms      BIGINT NOT NULL,
+      time_control_increment_ms BIGINT NOT NULL,
+      rated          BOOLEAN NOT NULL DEFAULT true,
+      berserk_enabled BOOLEAN NOT NULL DEFAULT true,
+      starts_at      TIMESTAMP NOT NULL,
+      duration_min   INTEGER NOT NULL,
+      finishes_at    TIMESTAMP NOT NULL,
+      status         TEXT NOT NULL DEFAULT 'scheduled',
+      state_json     TEXT NOT NULL,
+      tree_json      TEXT NOT NULL,
+      winner_user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      created_at     TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_tournaments_status ON tournaments(status, starts_at);`);
+
+  // One row per player who joined an arena. current_room_id null = free to be
+  // paired; paused = joined but not currently seeking a game.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tournament_players (
+      tournament_id   INTEGER NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+      user_id         INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      username        TEXT NOT NULL,
+      rating          REAL NOT NULL DEFAULT 1500,
+      country         TEXT NOT NULL DEFAULT '🌍',
+      score           INTEGER NOT NULL DEFAULT 0,
+      streak          INTEGER NOT NULL DEFAULT 0,
+      games_played    INTEGER NOT NULL DEFAULT 0,
+      paused          BOOLEAN NOT NULL DEFAULT false,
+      current_room_id INTEGER REFERENCES rooms(id) ON DELETE SET NULL,
+      joined_at       TIMESTAMP NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (tournament_id, user_id)
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_tplayers_standings ON tournament_players(tournament_id, score DESC);`);
+
+  // One row per arena game. scored = has this game's result been applied to the
+  // players' scores yet (idempotency guard for the reconciliation pass).
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tournament_games (
+      id             SERIAL PRIMARY KEY,
+      tournament_id  INTEGER NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+      room_id        INTEGER REFERENCES rooms(id) ON DELETE SET NULL,
+      user1_id       INTEGER NOT NULL,
+      user2_id       INTEGER NOT NULL,
+      p1_berserk     BOOLEAN NOT NULL DEFAULT false,
+      p2_berserk     BOOLEAN NOT NULL DEFAULT false,
+      winner_user_id INTEGER,
+      scored         BOOLEAN NOT NULL DEFAULT false,
+      created_at     TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_tgames_reconcile ON tournament_games(tournament_id, scored);`);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_tgames_room ON tournament_games(room_id);`);
 }
 
 export { pool, ensureSchema };

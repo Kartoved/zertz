@@ -35,6 +35,8 @@ export interface RoomData {
   clockP2Ms: number | null;
   clockRunningSince: number | null;
   setupJson: string | null;
+  tournamentId: number | null;
+  berserk: { player1: boolean; player2: boolean } | null;
 }
 
 export interface ChatMessage {
@@ -106,6 +108,8 @@ export async function getRoom(id: number | string): Promise<{
   clockP2Ms: number | null;
   clockRunningSince: number | null;
   setupJson: string | null;
+  tournamentId: number | null;
+  berserk: { player1: boolean; player2: boolean } | null;
 } | null> {
   const response = await fetch(`${API_BASE}/api/rooms/${id}`);
   
@@ -140,7 +144,23 @@ export async function getRoom(id: number | string): Promise<{
     clockP2Ms: data.clockP2Ms,
     clockRunningSince: data.clockRunningSince,
     setupJson: data.setupJson ?? null,
+    tournamentId: data.tournamentId ?? null,
+    berserk: data.berserk ?? null,
   };
+}
+
+// Arena berserk: halve your clock for a shot at +1 point on a win. Server rejects
+// if it's not an arena game or you've already made your first move.
+export async function berserkRoom(id: number | string): Promise<{ ok: boolean; clockMs: number }> {
+  const res = await fetch(`${API_BASE}/api/rooms/${id}/berserk`, {
+    method: 'POST',
+    headers: authHeaders(false),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error((err as any).error || 'Berserk failed');
+  }
+  return res.json();
 }
 
 export async function updateRoomState(
