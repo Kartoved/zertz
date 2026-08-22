@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import { Ring } from '../../game/types';
 import { useGameStore } from '../../store/gameStore';
 import { pickCaptureChain } from '../../store/analysisActions';
@@ -19,7 +20,7 @@ interface HexRingProps {
   onClick?: (ringId: string) => void;
 }
 
-export default function HexRing({
+function HexRing({
   ring,
   idPrefix = '',
   x,
@@ -33,8 +34,11 @@ export default function HexRing({
   ghost,
   onClick,
 }: HexRingProps) {
-  const { selectRing, handleCapture, selectedRingId, availableCaptureChains, currentNode } = useGameStore();
-  
+  // Store values are only needed at click time, so read them lazily via
+  // getState() instead of subscribing — a reactive subscription here would
+  // re-render every ring on every board (incl. menu previews) on any store
+  // change. Combined with React.memo below, a ring only re-renders when its
+  // own props change.
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -44,7 +48,9 @@ export default function HexRing({
       onClick(ring.id);
       return;
     }
-    
+
+    const { selectRing, handleCapture, selectedRingId, availableCaptureChains, currentNode } = useGameStore.getState();
+
     // Local mode — use pre-computed chains from the store (set by selectRing).
     if (isCaptureTarget && selectedRingId) {
       const fullChain = pickCaptureChain(availableCaptureChains, ring.id, currentNode);
@@ -53,7 +59,7 @@ export default function HexRing({
       }
       return;
     }
-    
+
     selectRing(ring.id);
   };
   
@@ -239,3 +245,5 @@ export default function HexRing({
     </g>
   );
 }
+
+export default memo(HexRing);

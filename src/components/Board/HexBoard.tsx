@@ -88,10 +88,13 @@ interface HexBoardProps {
 }
 
 export default function HexBoard(props: HexBoardProps = {}) {
-  const gameStore = useGameStore();
-  const state = props.state || gameStore.state;
-  const selectedRingId = props.selectedRingId !== undefined ? props.selectedRingId : gameStore.selectedRingId;
-  const highlightedCaptures = props.highlightedCaptures || gameStore.highlightedCaptures;
+  // Subscribe to the *effective* value (prop overrides store), so a preview
+  // board — which passes everything as props — returns its stable prop
+  // reference and never re-renders on unrelated gameStore changes, while a live
+  // board still reacts to just these slices.
+  const state = useGameStore(s => props.state || s.state);
+  const selectedRingId = useGameStore(s => (props.selectedRingId !== undefined ? props.selectedRingId : s.selectedRingId));
+  const highlightedCaptures = useGameStore(s => props.highlightedCaptures || s.highlightedCaptures);
   // Unique per-instance prefix for SVG gradient ids. Multiple HexBoards can be on
   // one page (e.g. the menu current-games previews + the hidden mobile carousel);
   // without a unique prefix their duplicate gradient ids collide and `url(#id)`
