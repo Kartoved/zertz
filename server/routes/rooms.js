@@ -5,6 +5,7 @@ import { glicko2Update } from '../utils/glicko2.js';
 import { sendPushToUser } from '../utils/pushNotifications.js';
 import { indexRoom } from '../explorer.js';
 import { verifySubmittedState, computePremoveResponse } from '../utils/verifyState.js';
+import { validateSetupState } from '../../shared/explorer/validateSetup.js';
 import { parsePremoves, selectPremoveResponse, setNotice, clearNotice } from '../utils/premoveTree.js';
 import { moveLimiter, createRoomLimiter, chatLimiter, addTimeLimiter } from '../middleware/rateLimits.js';
 
@@ -175,6 +176,17 @@ router.post('/', createRoomLimiter, optionalAuth, async (req, res) => {
   if (!stateJson || !treeJson) {
     res.status(400).json({ error: 'Missing state or tree' });
     return;
+  }
+
+  // Custom start positions (imported ZIP / editor) are client-supplied; validate
+  // the position is well-formed and not pre-decided before trusting it as the
+  // starting position of a (possibly rated) game.
+  if (setupJson != null) {
+    const check = validateSetupState(setupJson, boardSize);
+    if (!check.ok) {
+      res.status(400).json({ error: `Invalid setup position: ${check.reason}` });
+      return;
+    }
   }
 
   const userId = req.user ? req.user.id : null;

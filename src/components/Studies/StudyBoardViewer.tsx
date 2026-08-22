@@ -10,7 +10,7 @@ import { getValidRemovableRings } from '../../game/Board';
 import { stateToZip } from '../../game/zip';
 import { treeToZen } from '../../game/zen';
 import NotationButtons from '../UI/NotationButtons';
-import ConfirmModal from './ConfirmModal';
+import ConfirmModal from '../UI/ConfirmModal';
 import {
   computeAnalysisRingSelection,
   applyAnalysisPlacement,

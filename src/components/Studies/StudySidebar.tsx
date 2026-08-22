@@ -3,7 +3,7 @@ import { useStudyStore } from '../../store/studyStore';
 import { StudyTreeNode } from '../../db/studiesApi';
 import { useI18n } from '../../i18n';
 import TextInputModal from './TextInputModal';
-import ConfirmModal from './ConfirmModal';
+import ConfirmModal from '../UI/ConfirmModal';
 
 interface StudySidebarProps {
   currentId: number | null;

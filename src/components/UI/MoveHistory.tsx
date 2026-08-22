@@ -1,19 +1,19 @@
-import { useEffect, useCallback, useRef } from 'react';
+import { useEffect, useCallback, useRef, useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { GameNode } from '../../game/types';
 import { useI18n } from '../../i18n';
+import ConfirmModal from './ConfirmModal';
 
 interface MoveElementProps {
   node: GameNode;
   isCurrentMove: boolean;
   onNavigate: (node: GameNode) => void;
-  onDelete: (node: GameNode) => void;
+  onRequestDelete: (node: GameNode) => void;
   canDelete: boolean;
-  deleteConfirmText: string;
   activeRef?: React.RefObject<HTMLSpanElement>;
 }
 
-function MoveElement({ node, isCurrentMove, onNavigate, onDelete, canDelete, deleteConfirmText, activeRef }: MoveElementProps) {
+function MoveElement({ node, isCurrentMove, onNavigate, onRequestDelete, canDelete, activeRef }: MoveElementProps) {
   const moveNum = `${node.moveNumber}. `;
 
   return (
@@ -23,9 +23,7 @@ function MoveElement({ node, isCurrentMove, onNavigate, onDelete, canDelete, del
       onContextMenu={(e) => {
         e.preventDefault();
         if (!canDelete) return;
-        if (window.confirm(deleteConfirmText)) {
-          onDelete(node);
-        }
+        onRequestDelete(node);
       }}
       className={`
         cursor-pointer px-1 rounded transition-colors select-none whitespace-nowrap
@@ -55,9 +53,8 @@ function renderMoveTree(
   node: GameNode,
   currentNodeId: string,
   onNavigate: (node: GameNode) => void,
-  onDelete: (node: GameNode) => void,
+  onRequestDelete: (node: GameNode) => void,
   canDeleteNode: (node: GameNode) => boolean,
-  deleteConfirmText: string,
   activeRef: React.RefObject<HTMLSpanElement>
 ): JSX.Element[] {
   const elements: JSX.Element[] = [];
@@ -71,9 +68,8 @@ function renderMoveTree(
       node={mainChild}
       isCurrentMove={mainChild.id === currentNodeId}
       onNavigate={onNavigate}
-      onDelete={onDelete}
+      onRequestDelete={onRequestDelete}
       canDelete={canDeleteNode(mainChild)}
-      deleteConfirmText={deleteConfirmText}
       activeRef={activeRef}
     />
   );
@@ -89,19 +85,18 @@ function renderMoveTree(
         node={variation}
         isCurrentMove={variation.id === currentNodeId}
         onNavigate={onNavigate}
-        onDelete={onDelete}
+        onRequestDelete={onRequestDelete}
         canDelete={canDeleteNode(variation)}
-        deleteConfirmText={deleteConfirmText}
         activeRef={activeRef}
       />
     );
-    elements.push(...renderMoveTree(variation, currentNodeId, onNavigate, onDelete, canDeleteNode, deleteConfirmText, activeRef));
+    elements.push(...renderMoveTree(variation, currentNodeId, onNavigate, onRequestDelete, canDeleteNode, activeRef));
     elements.push(
       <span key={`var-close-${variation.id}`} className="text-gray-500">)</span>
     );
   }
 
-  elements.push(...renderMoveTree(mainChild, currentNodeId, onNavigate, onDelete, canDeleteNode, deleteConfirmText, activeRef));
+  elements.push(...renderMoveTree(mainChild, currentNodeId, onNavigate, onRequestDelete, canDeleteNode, activeRef));
 
   return elements;
 }
@@ -109,7 +104,8 @@ function renderMoveTree(
 export default function MoveHistory() {
   const { t } = useI18n();
   const { state, winType, gameTree, currentNode, navigateToNode, deleteBranchFrom, isLoadedGame } = useGameStore();
-  
+  const [pendingDelete, setPendingDelete] = useState<GameNode | null>(null);
+
   const navigatePrev = useCallback(() => {
     if (currentNode.parent) {
       navigateToNode(currentNode.parent);
@@ -155,7 +151,7 @@ export default function MoveHistory() {
     didInitialScrollRef.current = true;
   }, [currentNode.id]);
 
-  const moves = renderMoveTree(gameTree, currentNode.id, navigateToNode, handleDelete, canDeleteNode, t.deleteMovesConfirm, activeRef);
+  const moves = renderMoveTree(gameTree, currentNode.id, navigateToNode, setPendingDelete, canDeleteNode, activeRef);
   const isAtStart = currentNode.id === 'root';
   const marker = winMarker(state.winner, winType, t);
 
@@ -168,26 +164,39 @@ export default function MoveHistory() {
   }
 
   return (
-    <div
-      className="flex gap-1 overflow-x-auto whitespace-nowrap text-sm font-mono text-gray-800 dark:text-gray-200 [&::-webkit-scrollbar]:hidden"
-      style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}
-    >
-      <span
-        ref={isAtStart ? activeRef : undefined}
-        onClick={() => navigateToNode(gameTree)}
-        className={`cursor-pointer px-1 rounded transition-colors select-none whitespace-nowrap ${isAtStart ? 'bg-blue-500 text-white' : 'hover:bg-gray-200 dark:hover:bg-gray-700'}`}
+    <>
+      <div
+        className="flex gap-1 overflow-x-auto whitespace-nowrap text-sm font-mono text-gray-800 dark:text-gray-200 [&::-webkit-scrollbar]:hidden"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' } as React.CSSProperties}
       >
-        {`0. ${t.moveStart}`}
-      </span>
-      {moves}
-      {marker && (
         <span
-          title={marker.title}
-          className="px-1 select-none text-gray-700 dark:text-gray-200 font-bold"
+          ref={isAtStart ? activeRef : undefined}
+          onClick={() => navigateToNode(gameTree)}
+          className={`cursor-pointer px-1 rounded transition-colors select-none whitespace-nowrap ${isAtStart ? 'bg-blue-500 text-white' : 'hover:bg-gray-200 dark:hover:bg-gray-700'}`}
         >
-          {marker.symbol}
+          {`0. ${t.moveStart}`}
         </span>
+        {moves}
+        {marker && (
+          <span
+            title={marker.title}
+            className="px-1 select-none text-gray-700 dark:text-gray-200 font-bold"
+          >
+            {marker.symbol}
+          </span>
+        )}
+      </div>
+      {pendingDelete && (
+        <ConfirmModal
+          message={t.deleteMovesConfirm}
+          danger
+          onClose={() => setPendingDelete(null)}
+          onConfirm={() => {
+            handleDelete(pendingDelete);
+            setPendingDelete(null);
+          }}
+        />
       )}
-    </div>
+    </>
   );
 }

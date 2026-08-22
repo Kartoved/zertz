@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useI18n } from '../../i18n';
 
 // Reusable confirm dialog. Replaces window.confirm so it keeps working when the
-// browser suppresses dialogs.
+// browser suppresses dialogs (e.g. installed PWA) and stays visually consistent.
 export default function ConfirmModal({
   message,
   confirmLabel,

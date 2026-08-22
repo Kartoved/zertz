@@ -43,6 +43,17 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // Stable framework chunk — changes rarely, so it stays cached across
+          // app deploys.
+          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+        },
+      },
+    },
+  },
   server: {
     proxy: {
       '/api': 'http://127.0.0.1:5050',
