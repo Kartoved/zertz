@@ -17,11 +17,8 @@
  */
 
 import { generateBoardCoords } from './axial.js';
+import { MARBLE_SUPPLY as SUPPLY, WIN_CONDITIONS } from './constants.js';
 
-// Mirror src/game/types.ts INITIAL_RESERVE — the fixed marble supply.
-const SUPPLY = { white: 6, gray: 8, black: 10 };
-// Mirror src/game/types.ts WIN_CONDITIONS.
-const WIN_CONDITIONS = { white: 4, gray: 5, black: 6, allColors: 3 };
 const COLORS = ['white', 'gray', 'black'];
 
 function coordToId(q, r) { return `${q},${r}`; }

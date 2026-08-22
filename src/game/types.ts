@@ -85,18 +85,9 @@ export interface BoardConfig {
   size: 37 | 48 | 61;
 }
 
-export const INITIAL_RESERVE = {
-  white: 6,
-  gray: 8,
-  black: 10,
-};
-
-export const WIN_CONDITIONS = {
-  white: 4,
-  gray: 5,
-  black: 6,
-  allColors: 3,
-};
+// Fixed numeric rules live in one shared JS module (also used by the server +
+// replay/validation code). Re-exported here so client imports stay `./types`.
+export { MARBLE_SUPPLY as INITIAL_RESERVE, WIN_CONDITIONS } from '../../shared/explorer/constants.js';
 
 // Conditional pre-moves for correspondence games — modelled as a TREE.
 //

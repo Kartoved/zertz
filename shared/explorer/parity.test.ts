@@ -88,6 +88,27 @@ function assertParity(boardSize: 37 | 48 | 61, moves: Move[]) {
   }
 }
 
+// Seed both engines with an identical hand-built position, apply one move to
+// each, and assert parity. Lets us exercise the isolation auto-capture path,
+// which is awkward to reach through a pure opening move sequence but trivial to
+// set up directly. `setup` mutates a fresh state's rings Map in place.
+function assertSeededParity(
+  boardSize: 37 | 48 | 61,
+  setup: (state: GameState) => void,
+  move: Move,
+): { tsState: GameState; jsState: GameState } {
+  const tsState = createTsState(boardSize);
+  const jsState = createJsState(boardSize) as unknown as GameState;
+  setup(tsState);
+  setup(jsState);
+  expect(toComparable(jsState)).toEqual(toComparable(tsState)); // seeds identical
+
+  tsApplyMove(tsState, move);
+  jsApplyMove(jsState, move);
+  expect(toComparable(jsState)).toEqual(toComparable(tsState));
+  return { tsState, jsState };
+}
+
 describe('cross-engine parity', () => {
   it('initial states match for 37, 48, and 61', () => {
     for (const size of [37, 48, 61] as const) {
@@ -141,6 +162,44 @@ describe('cross-engine parity', () => {
           marbleColor: 'white', capturedColor: 'gray',
         } },
     ]);
+  });
+
+  it('matches when a ring removal isolates and auto-captures a fully-filled group', () => {
+    // White marble on corner "3,0" whose neighbors are all removed → an
+    // isolated, fully-occupied singleton. Removing an unrelated ring elsewhere
+    // triggers handleIsolation, which must capture it identically in both engines.
+    const { tsState } = assertSeededParity(
+      37,
+      s => {
+        s.rings.get('3,0')!.marble = { color: 'white' };
+        s.rings.get('2,0')!.isRemoved = true;
+        s.rings.get('2,1')!.isRemoved = true;
+        s.rings.get('3,1')!.isRemoved = true;
+      },
+      { type: 'placement', data: { marbleColor: 'gray', ringId: '-3,6', removedRingId: '0,6' } },
+    );
+    // Sanity: the isolation capture actually fired (guards against a scenario
+    // that trivially passes because nothing happened on either side).
+    expect(tsState.captures.player1.white).toBe(1);
+    expect(tsState.rings.get('3,0')!.marble).toBeNull();
+  });
+
+  it('matches when an isolated group still has an empty ring (no capture)', () => {
+    // Group {"2,0","3,0"} is isolated but "2,0" is empty → NOT captured. Both
+    // engines must leave the white marble in place.
+    const { tsState } = assertSeededParity(
+      37,
+      s => {
+        s.rings.get('1,0')!.isRemoved = true;
+        s.rings.get('1,1')!.isRemoved = true;
+        s.rings.get('2,1')!.isRemoved = true;
+        s.rings.get('3,1')!.isRemoved = true;
+        s.rings.get('3,0')!.marble = { color: 'white' };
+      },
+      { type: 'placement', data: { marbleColor: 'gray', ringId: '-3,6', removedRingId: '0,6' } },
+    );
+    expect(tsState.captures.player1.white).toBe(0);
+    expect(tsState.rings.get('3,0')!.marble).not.toBeNull();
   });
 
   it('matches across a deeper game with several captures intermixed', () => {

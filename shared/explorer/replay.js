@@ -10,8 +10,7 @@
  */
 
 import { generateBoardCoords } from './axial.js';
-
-const INITIAL_RESERVE = { white: 6, gray: 8, black: 10 };
+import { MARBLE_SUPPLY as INITIAL_RESERVE } from './constants.js';
 
 const HEX_DIRECTIONS = [
   { q: 1, r: 0 },  { q: 1, r: -1 }, { q: 0, r: -1 },

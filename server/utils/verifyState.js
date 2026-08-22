@@ -28,9 +28,7 @@ import {
   normalizePhase,
   hasAvailableCaptures,
 } from '../../shared/explorer/replay.js';
-
-// Mirror src/game/types.ts WIN_CONDITIONS.
-const WIN_CONDITIONS = { white: 4, gray: 5, black: 6, allColors: 3 };
+import { WIN_CONDITIONS } from '../../shared/explorer/constants.js';
 
 function naturalWinner(state) {
   for (const player of ['player1', 'player2']) {
