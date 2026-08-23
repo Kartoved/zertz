@@ -394,6 +394,45 @@ async function ensureSchema() {
   `);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_tgames_reconcile ON tournament_games(tournament_id, scored);`);
   await pool.query(`CREATE INDEX IF NOT EXISTS idx_tgames_room ON tournament_games(room_id);`);
+
+  // Recurring arena schedules. The engine materializes the next concrete
+  // `tournaments` row from each active schedule (one upcoming instance at a
+  // time). Recurrence is stored as a UTC weekday + minute-of-day derived from
+  // the creator's chosen first-run instant, so it's DST-free (fixed local time
+  // for non-DST zones like RU). last_start_at = the last occurrence already
+  // materialized, so deleting one instance skips exactly that occurrence.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS tournament_schedules (
+      id             SERIAL PRIMARY KEY,
+      created_by     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+      name           TEXT NOT NULL,
+      board_size     INTEGER NOT NULL DEFAULT 37,
+      time_control_base_ms      BIGINT NOT NULL,
+      time_control_increment_ms BIGINT NOT NULL,
+      rated          BOOLEAN NOT NULL DEFAULT true,
+      berserk_enabled BOOLEAN NOT NULL DEFAULT true,
+      duration_min   INTEGER NOT NULL,
+      freq           TEXT NOT NULL,          -- 'daily' | 'weekly'
+      utc_weekday    INTEGER,                -- 0..6 (Sun..Sat), NULL for daily
+      utc_minute     INTEGER NOT NULL,       -- 0..1439 minute-of-day (UTC)
+      state_json     TEXT NOT NULL,
+      tree_json      TEXT NOT NULL,
+      active         BOOLEAN NOT NULL DEFAULT true,
+      last_start_at  TIMESTAMP,
+      created_at     TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+  `);
+  await pool.query(`CREATE INDEX IF NOT EXISTS idx_tschedules_active ON tournament_schedules(active);`);
+
+  // Link materialized instances back to their schedule + a reminder-sent guard
+  // (added via ALTER for DBs where `tournaments` already exists).
+  await pool.query(`
+    DO $$ BEGIN
+      ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS schedule_id INTEGER REFERENCES tournament_schedules(id) ON DELETE SET NULL;
+      ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS reminder_sent BOOLEAN NOT NULL DEFAULT false;
+    EXCEPTION WHEN others THEN NULL;
+    END $$;
+  `);
 }
 
 export { pool, ensureSchema };

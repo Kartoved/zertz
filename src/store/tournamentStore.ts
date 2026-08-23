@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import {
   TournamentSummary, TournamentDetail,
-  getTournaments, getTournament, createTournament,
+  getTournaments, getTournament, createTournament, createSchedule,
+  updateTournament, deleteTournament, updateSchedule, deleteSchedule,
   joinTournament, pauseTournament, resumeTournament,
 } from '../db/tournamentApi';
 import { serializeState, serializeTree } from '../db/apiClient';
@@ -23,6 +24,18 @@ interface TournamentStore {
     boardSize: 37 | 48 | 61;
     berserk: boolean;
   }) => Promise<number>;
+  createRecurring: (params: {
+    name: string;
+    freq: 'daily' | 'weekly';
+    firstStartAt: number;
+    durationMin: number;
+    boardSize: 37 | 48 | 61;
+    berserk: boolean;
+  }) => Promise<void>;
+  editTournament: (id: number, body: { name: string; startsAt: number; durationMin: number; boardSize: number; berserk: boolean }) => Promise<void>;
+  removeTournament: (id: number) => Promise<void>;
+  editSchedule: (id: number, body: { name: string; freq: 'daily' | 'weekly'; firstStartAt: number; durationMin: number; boardSize: number; berserk: boolean }) => Promise<void>;
+  removeSchedule: (id: number) => Promise<void>;
   join: (id: number) => Promise<void>;
   pause: (id: number) => Promise<void>;
   resume: (id: number) => Promise<void>;
@@ -78,6 +91,43 @@ export const useTournamentStore = create<TournamentStore>((set, get) => ({
     } finally {
       set({ isLoading: false });
     }
+  },
+
+  createRecurring: async ({ name, freq, firstStartAt, durationMin, boardSize, berserk }) => {
+    set({ isLoading: true, error: null });
+    try {
+      const state = createInitialState(boardSize);
+      const root = createRootNode();
+      await createSchedule({
+        name, freq, firstStartAt, durationMin, boardSize, berserk,
+        stateJson: serializeState(state),
+        treeJson: serializeTree(root),
+      });
+      await get().fetchList();
+    } catch (err: any) {
+      set({ error: err.message || 'Ошибка создания' });
+      throw err;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  editTournament: async (id, body) => {
+    await updateTournament(id, body);
+    await get().fetchDetail(id);
+    await get().fetchList();
+  },
+  removeTournament: async (id) => {
+    await deleteTournament(id);
+    await get().fetchList();
+  },
+  editSchedule: async (id, body) => {
+    await updateSchedule(id, body);
+    await get().fetchList();
+  },
+  removeSchedule: async (id) => {
+    await deleteSchedule(id);
+    await get().fetchList();
   },
 
   join: async (id) => {

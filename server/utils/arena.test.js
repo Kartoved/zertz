@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { applyGameResult, buildPairings } from './arena.js';
+import { applyGameResult, buildPairings, nextOccurrence } from './arena.js';
 
 const base = {
   user1Id: 1, user2Id: 2,
@@ -103,5 +103,48 @@ describe('buildPairings', () => {
   it('falls back to a rematch when no alternative exists', () => {
     const pairs = buildPairings([P(1, 4, 1500), P(2, 4, 1500)], { 1: 2, 2: 1 });
     expect(pairs).toHaveLength(1); // only option is the rematch
+  });
+});
+
+function toSunday(ms) {
+  let t = ms;
+  while (new Date(t).getUTCDay() !== 0) t += 24 * 3600 * 1000;
+  return t;
+}
+
+describe('nextOccurrence', () => {
+  it('daily: returns today at the time when still upcoming', () => {
+    const after = Date.UTC(2026, 0, 1, 9, 0);
+    expect(nextOccurrence({ freq: 'daily', utcMinute: 600 }, after)).toBe(Date.UTC(2026, 0, 1, 10, 0));
+  });
+
+  it('daily: rolls to tomorrow once the time has passed', () => {
+    const after = Date.UTC(2026, 0, 1, 11, 0);
+    expect(nextOccurrence({ freq: 'daily', utcMinute: 600 }, after)).toBe(Date.UTC(2026, 0, 2, 10, 0));
+  });
+
+  it('weekly: lands on the right UTC weekday + time in the coming week', () => {
+    const after = Date.UTC(2026, 0, 1, 9, 0);
+    const r = nextOccurrence({ freq: 'weekly', utcWeekday: 0, utcMinute: 750 }, after);
+    const d = new Date(r);
+    expect(d.getUTCDay()).toBe(0);
+    expect(d.getUTCHours()).toBe(12);
+    expect(d.getUTCMinutes()).toBe(30);
+    expect(r).toBeGreaterThan(after);
+    expect(r - after).toBeLessThanOrEqual(7 * 24 * 3600 * 1000);
+  });
+
+  it('weekly: same weekday but time already passed -> next week', () => {
+    const sundayAfternoon = toSunday(Date.UTC(2026, 0, 4, 13, 0));
+    const r = nextOccurrence({ freq: 'weekly', utcWeekday: 0, utcMinute: 750 }, sundayAfternoon);
+    expect(new Date(r).getUTCDay()).toBe(0);
+    expect(r - sundayAfternoon).toBeGreaterThan(6 * 24 * 3600 * 1000);
+  });
+
+  it('weekly: same weekday, time still upcoming -> same day', () => {
+    const sundayMorning = toSunday(Date.UTC(2026, 0, 4, 9, 0));
+    const d0 = new Date(sundayMorning);
+    const expected = Date.UTC(d0.getUTCFullYear(), d0.getUTCMonth(), d0.getUTCDate(), 12, 30);
+    expect(nextOccurrence({ freq: 'weekly', utcWeekday: 0, utcMinute: 750 }, sundayMorning)).toBe(expected);
   });
 });

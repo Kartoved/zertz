@@ -54,6 +54,35 @@ export function applyGameResult(g) {
 }
 
 /**
+ * Next occurrence (epoch ms, UTC) of a recurring schedule strictly after
+ * `afterMs`. Recurrence is a UTC weekday + minute-of-day, so this is DST-free.
+ * Pure.
+ *
+ * @param {{freq: 'daily'|'weekly', utcMinute: number, utcWeekday?: number}} rule
+ * @param {number} afterMs
+ * @returns {number} epoch ms of the next occurrence
+ */
+export function nextOccurrence(rule, afterMs) {
+  const { freq, utcMinute } = rule;
+  const h = Math.floor(utcMinute / 60);
+  const m = utcMinute % 60;
+  const a = new Date(afterMs);
+  const y = a.getUTCFullYear();
+  const mo = a.getUTCMonth();
+  const d = a.getUTCDate();
+  // Walk forward day-by-day (handles month/year rollover via Date.UTC) and take
+  // the first candidate strictly after `afterMs` that matches the frequency.
+  for (let i = 0; i <= 14; i++) {
+    const cand = Date.UTC(y, mo, d + i, h, m, 0, 0);
+    if (cand <= afterMs) continue;
+    if (freq === 'weekly' && new Date(cand).getUTCDay() !== rule.utcWeekday) continue;
+    return cand;
+  }
+  // Unreachable for valid rules (a match always exists within 14 days).
+  return Date.UTC(y, mo, d + 7, h, m, 0, 0);
+}
+
+/**
  * Greedy Arena pairing. Sorts free players by score (then rating, then id for
  * determinism) and pairs neighbours, best-effort avoiding an immediate rematch.
  * An odd player out is left unpaired (picked up next tick). Pure.

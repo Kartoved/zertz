@@ -23,6 +23,36 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.19.0',
+    date: '2026-08-23',
+    changes: {
+      ru: [
+        '📅 В создании арены теперь выбор конкретной даты и времени старта (вместо «старт через N минут»)',
+        '🔁 Повторяющиеся турниры: «каждый день» или «каждую неделю» (напр. каждое воскресенье в 12:30) — следующий турнир создаётся автоматически',
+        '✏️ Организатор может изменить или удалить турнир до его старта; у серии — «изменить серию», «пропустить эту дату» или «остановить серию»',
+        '🔔 Напоминание в пуше тем, кто записался, за пару минут до старта',
+        '🥇 Экран итогов с подиумом (топ-3) когда турнир завершён',
+        'Версия обновлена до v0.19.0',
+      ],
+      en: [
+        '📅 Arena creation now lets you pick an exact start date & time (instead of “starts in N minutes”)',
+        '🔁 Recurring tournaments: “daily” or “weekly” (e.g. every Sunday at 12:30) — the next one is created automatically',
+        '✏️ The organizer can edit or delete a tournament before it starts; for a series — “edit series”, “skip this one”, or “stop series”',
+        '🔔 A push reminder goes to registered players a couple of minutes before the start',
+        '🥇 Results screen with a podium (top 3) when a tournament finishes',
+        'Version updated to v0.19.0',
+      ],
+      eo: [
+        '📅 Kreado de areno nun permesas elekti precizan daton kaj horon (anstataŭ «komenciĝas post N minutoj»)',
+        '🔁 Ripetiĝantaj turniroj: «ĉiutage» aŭ «ĉiusemajne» (ekz. ĉiun dimanĉon je 12:30) — la sekva kreiĝas aŭtomate',
+        '✏️ La organizanto povas redakti aŭ forigi turniron antaŭ ĝia komenco; por serio — «redakti serion», «preterlasi ĉi tiun» aŭ «ĉesigi serion»',
+        '🔔 Puŝ-memorigo iras al aliĝintaj ludantoj kelkajn minutojn antaŭ la komenco',
+        '🥇 Rezulta ekrano kun podio (plej bonaj 3) kiam turniro finiĝas',
+        'Versio ĝisdatigita al v0.19.0',
+      ],
+    },
+  },
+  {
     version: '0.18.0',
     date: '2026-08-22',
     changes: {

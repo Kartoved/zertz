@@ -36,17 +36,30 @@ function tournamentDTO(r) {
     finishesAt: r.finishes_at.getTime(),
     status: r.status,
     winnerUserId: r.winner_user_id,
+    scheduleId: r.schedule_id ?? null,
     createdAt: r.created_at.getTime(),
   };
 }
+
+// Derive the DST-free recurrence (UTC weekday + minute-of-day) from the chosen
+// first-run instant.
+function deriveRecurrence(firstStartMs, freq) {
+  const d = new Date(firstStartMs);
+  return {
+    utcMinute: d.getUTCHours() * 60 + d.getUTCMinutes(),
+    utcWeekday: freq === 'weekly' ? d.getUTCDay() : null,
+  };
+}
+
+const TOURNAMENT_COLS = `id, name, created_by, board_size, time_control_base_ms, time_control_increment_ms,
+       rated, berserk_enabled, starts_at, duration_min, finishes_at, status,
+       winner_user_id, schedule_id, created_at`;
 
 // GET /api/tournaments — recent + upcoming + active arenas.
 router.get('/', optionalAuth, async (req, res) => {
   try {
     const result = await pool.query(
-      `SELECT id, name, created_by, board_size, time_control_base_ms, time_control_increment_ms,
-              rated, berserk_enabled, starts_at, duration_min, finishes_at, status,
-              winner_user_id, created_at
+      `SELECT ${TOURNAMENT_COLS}
        FROM tournaments
        WHERE status <> 'finished' OR finishes_at > NOW() - INTERVAL '1 day'
        ORDER BY starts_at DESC
@@ -114,10 +127,7 @@ router.get('/:id', optionalAuth, async (req, res) => {
 
   try {
     const tRes = await pool.query(
-      `SELECT id, name, created_by, board_size, time_control_base_ms, time_control_increment_ms,
-              rated, berserk_enabled, starts_at, duration_min, finishes_at, status,
-              winner_user_id, created_at
-       FROM tournaments WHERE id = $1`,
+      `SELECT ${TOURNAMENT_COLS} FROM tournaments WHERE id = $1`,
       [id]
     );
     if (tRes.rows.length === 0) return res.status(404).json({ error: 'Турнир не найден' });
@@ -150,10 +160,166 @@ router.get('/:id', optionalAuth, async (req, res) => {
         : { joined: false, paused: false, currentRoomId: null };
     }
 
-    res.json({ tournament: tournamentDTO(tRes.rows[0]), standings, me });
+    // Recurrence info (for the "manage series" UI) when this is a recurring instance.
+    let schedule = null;
+    if (tRes.rows[0].schedule_id) {
+      const sRes = await pool.query(
+        `SELECT id, freq, utc_weekday, utc_minute, active FROM tournament_schedules WHERE id = $1`,
+        [tRes.rows[0].schedule_id]
+      );
+      if (sRes.rows.length > 0) {
+        const s = sRes.rows[0];
+        schedule = { id: s.id, freq: s.freq, utcWeekday: s.utc_weekday, utcMinute: s.utc_minute, active: s.active };
+      }
+    }
+
+    res.json({ tournament: tournamentDTO(tRes.rows[0]), standings, me, schedule });
   } catch (err) {
     console.error('GET /tournaments/:id error:', err);
     res.status(500).json({ error: 'Ошибка получения турнира' });
+  }
+});
+
+// PUT /api/tournaments/:id — edit a not-yet-started tournament (creator only).
+router.put('/:id', authRequired, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Bad id' });
+  const { name, startsAt, durationMin, boardSize, berserk } = req.body;
+
+  const cleanName = typeof name === 'string' ? name.trim() : '';
+  if (!cleanName || cleanName.length > MAX_NAME) return res.status(400).json({ error: 'Invalid tournament name' });
+  if (!Number.isFinite(startsAt) || startsAt > Date.now() + 30 * 24 * 60 * 60 * 1000) return res.status(400).json({ error: 'Invalid start time' });
+  if (!Number.isInteger(durationMin) || durationMin < MIN_DURATION || durationMin > MAX_DURATION) return res.status(400).json({ error: 'Invalid duration' });
+  if (!VALID_BOARD_SIZES.includes(Number(boardSize))) return res.status(400).json({ error: 'Invalid board size' });
+
+  const startMs = Math.max(startsAt, Date.now());
+  const finishMs = startMs + durationMin * 60 * 1000;
+  try {
+    const r = await pool.query(
+      `UPDATE tournaments
+       SET name = $3, board_size = $4, berserk_enabled = $5, starts_at = $6, duration_min = $7, finishes_at = $8
+       WHERE id = $1 AND created_by = $2 AND status = 'scheduled'`,
+      [id, req.user.id, cleanName, Number(boardSize), !!berserk, toPgUtc(startMs), durationMin, toPgUtc(finishMs)]
+    );
+    if (r.rowCount === 0) return res.status(403).json({ error: 'Нельзя изменить (не ваш или уже начался)' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('PUT /tournaments/:id error:', err);
+    res.status(500).json({ error: 'Ошибка изменения' });
+  }
+});
+
+// DELETE /api/tournaments/:id — delete a not-yet-started tournament (creator only).
+// For a recurring instance this skips just that occurrence (the schedule's
+// last_start_at already advanced past it, so the engine won't recreate it).
+router.delete('/:id', authRequired, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Bad id' });
+  try {
+    const r = await pool.query(
+      `DELETE FROM tournaments WHERE id = $1 AND created_by = $2 AND status = 'scheduled'`,
+      [id, req.user.id]
+    );
+    if (r.rowCount === 0) return res.status(403).json({ error: 'Нельзя удалить (не ваш или уже начался)' });
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('DELETE /tournaments/:id error:', err);
+    res.status(500).json({ error: 'Ошибка удаления' });
+  }
+});
+
+// POST /api/tournaments/schedules — create a recurring arena (any logged-in user).
+router.post('/schedules', createRoomLimiter, authRequired, async (req, res) => {
+  const {
+    name, freq, firstStartAt, durationMin,
+    boardSize = 37, berserk = true, stateJson, treeJson,
+  } = req.body;
+
+  const cleanName = typeof name === 'string' ? name.trim() : '';
+  if (!cleanName || cleanName.length > MAX_NAME) return res.status(400).json({ error: 'Invalid tournament name' });
+  if (freq !== 'daily' && freq !== 'weekly') return res.status(400).json({ error: 'Invalid frequency' });
+  if (!Number.isFinite(firstStartAt)) return res.status(400).json({ error: 'Invalid start time' });
+  if (!Number.isInteger(durationMin) || durationMin < MIN_DURATION || durationMin > MAX_DURATION) return res.status(400).json({ error: 'Invalid duration' });
+  if (!VALID_BOARD_SIZES.includes(Number(boardSize))) return res.status(400).json({ error: 'Invalid board size' });
+  if (!stateJson || !treeJson) return res.status(400).json({ error: 'Missing game seed' });
+
+  const { utcMinute, utcWeekday } = deriveRecurrence(firstStartAt, freq);
+  try {
+    const result = await pool.query(
+      `INSERT INTO tournament_schedules
+         (name, created_by, board_size, time_control_base_ms, time_control_increment_ms,
+          rated, berserk_enabled, duration_min, freq, utc_weekday, utc_minute, state_json, tree_json)
+       VALUES ($1,$2,$3,$4,$5,true,$6,$7,$8,$9,$10,$11,$12)
+       RETURNING id`,
+      [cleanName, req.user.id, Number(boardSize), BLITZ_BASE_MS, BLITZ_INC_MS,
+       !!berserk, durationMin, freq, utcWeekday, utcMinute, stateJson, treeJson]
+    );
+    res.json({ scheduleId: result.rows[0].id });
+  } catch (err) {
+    console.error('POST /tournaments/schedules error:', err);
+    res.status(500).json({ error: 'Ошибка создания серии' });
+  }
+});
+
+// PUT /api/tournaments/schedules/:id — edit a recurring series (creator only).
+// Resets the upcoming materialized instance so the engine re-creates it fresh.
+router.put('/schedules/:id', authRequired, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Bad id' });
+  const { name, freq, firstStartAt, durationMin, boardSize, berserk } = req.body;
+
+  const cleanName = typeof name === 'string' ? name.trim() : '';
+  if (!cleanName || cleanName.length > MAX_NAME) return res.status(400).json({ error: 'Invalid tournament name' });
+  if (freq !== 'daily' && freq !== 'weekly') return res.status(400).json({ error: 'Invalid frequency' });
+  if (!Number.isFinite(firstStartAt)) return res.status(400).json({ error: 'Invalid start time' });
+  if (!Number.isInteger(durationMin) || durationMin < MIN_DURATION || durationMin > MAX_DURATION) return res.status(400).json({ error: 'Invalid duration' });
+  if (!VALID_BOARD_SIZES.includes(Number(boardSize))) return res.status(400).json({ error: 'Invalid board size' });
+
+  const { utcMinute, utcWeekday } = deriveRecurrence(firstStartAt, freq);
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const r = await client.query(
+      `UPDATE tournament_schedules
+       SET name = $3, board_size = $4, berserk_enabled = $5, duration_min = $6,
+           freq = $7, utc_weekday = $8, utc_minute = $9, last_start_at = NULL
+       WHERE id = $1 AND created_by = $2`,
+      [id, req.user.id, cleanName, Number(boardSize), !!berserk, durationMin, freq, utcWeekday, utcMinute]
+    );
+    if (r.rowCount === 0) { await client.query('ROLLBACK'); return res.status(403).json({ error: 'Не ваша серия' }); }
+    // Drop the upcoming instance so it re-materializes with the new settings.
+    await client.query(`DELETE FROM tournaments WHERE schedule_id = $1 AND status = 'scheduled'`, [id]);
+    await client.query('COMMIT');
+    res.json({ ok: true });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('PUT /tournaments/schedules/:id error:', err);
+    res.status(500).json({ error: 'Ошибка изменения серии' });
+  } finally {
+    client.release();
+  }
+});
+
+// DELETE /api/tournaments/schedules/:id — stop a recurring series (creator only)
+// and remove its upcoming (not-yet-started) instance.
+router.delete('/schedules/:id', authRequired, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Bad id' });
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const own = await client.query(`SELECT 1 FROM tournament_schedules WHERE id = $1 AND created_by = $2`, [id, req.user.id]);
+    if (own.rows.length === 0) { await client.query('ROLLBACK'); return res.status(403).json({ error: 'Не ваша серия' }); }
+    await client.query(`DELETE FROM tournaments WHERE schedule_id = $1 AND status = 'scheduled'`, [id]);
+    await client.query(`DELETE FROM tournament_schedules WHERE id = $1`, [id]);
+    await client.query('COMMIT');
+    res.json({ ok: true });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('DELETE /tournaments/schedules/:id error:', err);
+    res.status(500).json({ error: 'Ошибка удаления серии' });
+  } finally {
+    client.release();
   }
 });
 

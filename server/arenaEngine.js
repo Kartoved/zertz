@@ -13,9 +13,16 @@
  */
 
 import { pool } from './db.js';
-import { applyGameResult, buildPairings } from './utils/arena.js';
+import { applyGameResult, buildPairings, nextOccurrence } from './utils/arena.js';
+import { sendPushToUser } from './utils/pushNotifications.js';
 
 const TICK_MS = 4000;
+
+// Store epoch-ms as a bare UTC 'YYYY-MM-DD HH:MM:SS' string (timezone-independent,
+// matching the tournaments route + the db.js read parser).
+function pgUtc(ms) {
+  return new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
+}
 
 let _timer = null;
 let _ticking = false;
@@ -36,12 +43,90 @@ async function arenaTick() {
   if (_ticking) return;
   _ticking = true;
   try {
+    await materializeSchedules();
     await transitionWindows();
     await reconcileFinishedGames();
     await finalizeWinners();
+    await sendReminders();
     await pairActiveTournaments();
   } finally {
     _ticking = false;
+  }
+}
+
+// ── 0. materialize the next instance of each recurring schedule ───────────
+async function materializeSchedules() {
+  const schedules = await pool.query(
+    `SELECT id, name, created_by, board_size, time_control_base_ms, time_control_increment_ms,
+            rated, berserk_enabled, duration_min, freq, utc_weekday, utc_minute,
+            state_json, tree_json, last_start_at
+     FROM tournament_schedules WHERE active = true`
+  );
+  for (const s of schedules.rows) {
+    // Keep exactly one upcoming instance per schedule.
+    const existing = await pool.query(
+      `SELECT 1 FROM tournaments WHERE schedule_id = $1 AND status = 'scheduled' LIMIT 1`,
+      [s.id]
+    );
+    if (existing.rows.length > 0) continue;
+
+    // Next occurrence strictly after both "now" and the last one materialized —
+    // so a deleted instance is skipped rather than recreated.
+    const afterMs = Math.max(Date.now(), s.last_start_at ? new Date(s.last_start_at).getTime() : 0);
+    const startMs = nextOccurrence({ freq: s.freq, utcWeekday: s.utc_weekday, utcMinute: s.utc_minute }, afterMs);
+    const finishMs = startMs + s.duration_min * 60 * 1000;
+
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        `INSERT INTO tournaments
+           (name, created_by, board_size, time_control_base_ms, time_control_increment_ms,
+            rated, berserk_enabled, starts_at, duration_min, finishes_at, status,
+            state_json, tree_json, schedule_id)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'scheduled',$11,$12,$13)`,
+        [s.name, s.created_by, s.board_size, s.time_control_base_ms, s.time_control_increment_ms,
+         s.rated, s.berserk_enabled, pgUtc(startMs), s.duration_min, pgUtc(finishMs), s.state_json, s.tree_json, s.id]
+      );
+      await client.query(
+        `UPDATE tournament_schedules SET last_start_at = $2 WHERE id = $1`,
+        [s.id, pgUtc(startMs)]
+      );
+      await client.query('COMMIT');
+      console.log(`[arena] materialized schedule ${s.id} (${s.name}) → starts ${new Date(startMs).toISOString()}`);
+    } catch (err) {
+      await client.query('ROLLBACK').catch(() => {});
+      console.error('[arena] materializeSchedules error:', err.message);
+    } finally {
+      client.release();
+    }
+  }
+}
+
+// ── push a "starts soon" reminder to joined players (once per tournament) ──
+async function sendReminders() {
+  const soon = await pool.query(
+    `SELECT id, name FROM tournaments
+     WHERE status = 'scheduled' AND reminder_sent = false
+       AND starts_at <= NOW() + INTERVAL '2 minutes'
+       AND starts_at >  NOW() - INTERVAL '1 minute'`
+  );
+  for (const t of soon.rows) {
+    const claim = await pool.query(
+      `UPDATE tournaments SET reminder_sent = true WHERE id = $1 AND reminder_sent = false RETURNING id`,
+      [t.id]
+    );
+    if (claim.rowCount === 0) continue;
+    const players = await pool.query(`SELECT user_id FROM tournament_players WHERE tournament_id = $1`, [t.id]);
+    for (const p of players.rows) {
+      sendPushToUser(p.user_id, {
+        type: 'arena_reminder',
+        title: 'Zertz',
+        body: `Турнир «${t.name}» скоро начнётся!`,
+        url: `/tournaments/${t.id}`,
+      });
+    }
+    if (players.rows.length > 0) console.log(`[arena] reminded ${players.rows.length} players for t${t.id}`);
   }
 }
 
