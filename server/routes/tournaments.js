@@ -180,6 +180,65 @@ router.get('/:id', optionalAuth, async (req, res) => {
   }
 });
 
+// GET /api/tournaments/:id/games — this tournament's games: live (with state for a
+// board preview) and finished (result only; the board is fetched lazily on hover).
+router.get('/:id/games', optionalAuth, async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!Number.isInteger(id)) return res.status(400).json({ error: 'Bad id' });
+  try {
+    const rows = await pool.query(
+      `SELECT tg.room_id, tg.user1_id, tg.user2_id, tg.p1_berserk, tg.p2_berserk,
+              tg.winner_user_id, tg.created_at,
+              r.board_size, r.player1_name, r.player2_name, r.winner, r.win_type,
+              r.state_json, r.updated_at,
+              u1.rating AS r1, u2.rating AS r2
+         FROM tournament_games tg
+         JOIN rooms r ON r.id = tg.room_id
+         LEFT JOIN users u1 ON u1.id = tg.user1_id
+         LEFT JOIN users u2 ON u2.id = tg.user2_id
+        WHERE tg.tournament_id = $1
+        ORDER BY tg.created_at DESC
+        LIMIT 200`,
+      [id]
+    );
+
+    const live = [];
+    const finished = [];
+    for (const r of rows.rows) {
+      if (r.winner == null) {
+        live.push({
+          roomId: r.room_id,
+          boardSize: r.board_size,
+          playerNames: { player1: r.player1_name, player2: r.player2_name },
+          ratings: {
+            player1: r.r1 != null ? Math.round(r.r1) : null,
+            player2: r.r2 != null ? Math.round(r.r2) : null,
+          },
+          berserk: { player1: r.p1_berserk, player2: r.p2_berserk },
+          stateJson: r.state_json,
+        });
+      } else if (r.winner === 1 || r.winner === 2) {
+        // winner 0 = cancelled/annulled — skip (didn't count toward scores).
+        finished.push({
+          roomId: r.room_id,
+          boardSize: r.board_size,
+          user1Id: r.user1_id,
+          user2Id: r.user2_id,
+          playerNames: { player1: r.player1_name, player2: r.player2_name },
+          winnerUserId: r.winner_user_id,
+          winType: r.win_type,
+          berserk: { player1: r.p1_berserk, player2: r.p2_berserk },
+          updatedAt: r.updated_at.getTime(),
+        });
+      }
+    }
+    res.json({ live, finished });
+  } catch (err) {
+    console.error('GET /tournaments/:id/games error:', err);
+    res.status(500).json({ error: 'Ошибка получения партий' });
+  }
+});
+
 // PUT /api/tournaments/:id — edit a not-yet-started tournament (creator only).
 router.put('/:id', authRequired, async (req, res) => {
   const id = parseInt(req.params.id, 10);

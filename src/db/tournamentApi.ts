@@ -64,6 +64,37 @@ export async function getTournament(id: number): Promise<TournamentDetail> {
   return safeJson<TournamentDetail>(res);
 }
 
+export interface TournamentLiveGame {
+  roomId: number;
+  boardSize: number;
+  playerNames: { player1: string; player2: string };
+  ratings: { player1: number | null; player2: number | null };
+  berserk: { player1: boolean; player2: boolean };
+  stateJson: string;
+}
+
+export interface TournamentFinishedGame {
+  roomId: number;
+  boardSize: number;
+  user1Id: number;
+  user2Id: number;
+  playerNames: { player1: string; player2: string };
+  winnerUserId: number | null;
+  winType: string | null;
+  berserk: { player1: boolean; player2: boolean };
+  updatedAt: number;
+}
+
+export interface TournamentGames {
+  live: TournamentLiveGame[];
+  finished: TournamentFinishedGame[];
+}
+
+export async function getTournamentGames(id: number): Promise<TournamentGames> {
+  const res = await fetch(`${API_BASE}/api/tournaments/${id}/games`, { headers: authHeaders(false) });
+  return safeJson<TournamentGames>(res);
+}
+
 export async function createTournament(params: {
   name: string;
   startsAt: number;

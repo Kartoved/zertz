@@ -465,4 +465,6 @@ export const en = {
   arenaSkipConfirm: 'Skip this occurrence? The next one will be scheduled automatically.',
   arenaStopSeriesConfirm: 'Stop this series? Future tournaments will no longer be created.',
   arenaResults: 'Results',
+  arenaLiveGames: 'Live now',
+  arenaWatch: 'Watch',
 };

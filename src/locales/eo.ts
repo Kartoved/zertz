@@ -465,4 +465,6 @@ export const eo = {
   arenaSkipConfirm: 'Ĉu preterlasi ĉi tiun okazon? La sekva kreiĝos aŭtomate.',
   arenaStopSeriesConfirm: 'Ĉu ĉesigi la serion? Estontaj turniroj ne plu kreiĝos.',
   arenaResults: 'Rezultoj',
+  arenaLiveGames: 'Nun ludataj',
+  arenaWatch: 'Spekti',
 };

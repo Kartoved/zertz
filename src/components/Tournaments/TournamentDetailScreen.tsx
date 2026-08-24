@@ -1,10 +1,16 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTournamentStore } from '../../store/tournamentStore';
 import { useAuthStore } from '../../store/authStore';
-import { useI18n } from '../../i18n';
+import { useI18n, getWinTypeLabel } from '../../i18n';
 import ConfirmModal from '../UI/ConfirmModal';
 import TournamentForm, { TournamentFormValues } from './TournamentForm';
+import TournamentLiveGames from './TournamentLiveGames';
+import { useTournamentGames } from './useTournamentGames';
+import { TournamentFinishedGame } from '../../db/tournamentApi';
+import { getRoom } from '../../db/roomsApi';
+import type { GameState } from '../../game/types';
+import HexBoard from '../Board/HexBoard';
 
 function fmtCountdown(target: number, now: number): string {
   const ms = Math.max(0, target - now);
@@ -58,6 +64,38 @@ export default function TournamentDetailScreen() {
   const act = useCallback(async (fn: () => Promise<void>) => {
     setBusy(true);
     try { await fn(); } catch { /* error surfaced via store */ } finally { setBusy(false); }
+  }, []);
+
+  // This tournament's games (separate ~4s poll from the 3s detail poll).
+  const { live, finished } = useTournamentGames(tid);
+
+  // Each player's finished games (indexed under both seats), oldest→newest, for
+  // the clickable result markers in their standings row.
+  const gamesByPlayer = useMemo(() => {
+    const m = new Map<number, TournamentFinishedGame[]>();
+    for (const g of finished) {
+      for (const uid of [g.user1Id, g.user2Id]) {
+        const arr = m.get(uid) || [];
+        arr.push(g);
+        m.set(uid, arr);
+      }
+    }
+    for (const arr of m.values()) arr.sort((a, b) => a.updatedAt - b.updatedAt);
+    return m;
+  }, [finished]);
+
+  // Lazy hover-preview of a finished game's final position (desktop).
+  const [preview, setPreview] = useState<{ roomId: number; x: number; y: number } | null>(null);
+  const [previewStates, setPreviewStates] = useState<Record<number, GameState | null>>({});
+  const requestedRef = useRef<Set<number>>(new Set());
+  const handleMarkerEnter = useCallback((roomId: number, e: React.MouseEvent) => {
+    setPreview({ roomId, x: e.clientX, y: e.clientY });
+    if (!requestedRef.current.has(roomId)) {
+      requestedRef.current.add(roomId);
+      getRoom(roomId)
+        .then(room => setPreviewStates(p => ({ ...p, [roomId]: room?.state ?? null })))
+        .catch(() => { /* leave unresolved */ });
+    }
   }, []);
 
   if (!detail) {
@@ -226,6 +264,9 @@ export default function TournamentDetailScreen() {
               )}
             </div>
 
+            {/* Live games */}
+            <TournamentLiveGames games={live} />
+
             {/* Standings */}
             <h2 className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500 mb-2">
               {t.arenaPlayers} ({standings.length})
@@ -251,11 +292,40 @@ export default function TournamentDetailScreen() {
                           className={`border-t border-gray-100 dark:border-gray-700/60 ${isMe ? 'bg-indigo-50 dark:bg-indigo-900/20' : 'bg-white dark:bg-gray-800'}`}>
                           <td className="px-3 py-2 text-gray-400 dark:text-gray-500 font-mono">{s.rank}</td>
                           <td className="px-3 py-2">
-                            <span className="mr-1">{s.country}</span>
-                            <span className="font-medium text-gray-800 dark:text-gray-100">{s.username}</span>
-                            <span className="text-xs text-gray-400 ml-1">({s.rating})</span>
-                            {s.playing && <span className="ml-1.5 inline-block w-2 h-2 rounded-full bg-green-500 align-middle" title="playing" />}
-                            {s.paused && <span className="ml-1.5 text-xs text-gray-400">⏸</span>}
+                            <div>
+                              <span className="mr-1">{s.country}</span>
+                              <span className="font-medium text-gray-800 dark:text-gray-100">{s.username}</span>
+                              <span className="text-xs text-gray-400 ml-1">({s.rating})</span>
+                              {s.playing && <span className="ml-1.5 inline-block w-2 h-2 rounded-full bg-green-500 align-middle" title="playing" />}
+                              {s.paused && <span className="ml-1.5 text-xs text-gray-400">⏸</span>}
+                            </div>
+                            {(() => {
+                              const pg = gamesByPlayer.get(s.userId);
+                              if (!pg || pg.length === 0) return null;
+                              return (
+                                <div className="flex flex-wrap gap-1 mt-1.5">
+                                  {pg.map(g => {
+                                    const side = g.user1Id === s.userId ? 'player1' : 'player2';
+                                    const oppSide = side === 'player1' ? 'player2' : 'player1';
+                                    const won = g.winnerUserId === s.userId;
+                                    const berserked = g.berserk[side];
+                                    return (
+                                      <button
+                                        key={g.roomId}
+                                        onClick={() => navigate(`/room/${g.roomId}?watch=1`)}
+                                        onMouseEnter={e => handleMarkerEnter(g.roomId, e)}
+                                        onMouseMove={e => setPreview(p => (p?.roomId === g.roomId ? { roomId: g.roomId, x: e.clientX, y: e.clientY } : p))}
+                                        onMouseLeave={() => setPreview(null)}
+                                        title={`${getWinTypeLabel(t, g.winType)} · ${g.playerNames[oppSide]}`}
+                                        className={`w-4 h-4 rounded-sm text-[9px] leading-none flex items-center justify-center ${won ? 'bg-green-500 text-white' : 'bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-300'}`}
+                                      >
+                                        {berserked ? '⚡' : ''}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              );
+                            })()}
                           </td>
                           <td className="px-2 py-2 text-right text-gray-500 dark:text-gray-400">
                             {s.streak >= 2 ? `🔥${s.streak}` : s.streak || ''}
@@ -279,6 +349,23 @@ export default function TournamentDetailScreen() {
           onClose={() => setConfirm(null)}
           onConfirm={async () => { const fn = confirm.onConfirm; setConfirm(null); await fn(); }}
         />
+      )}
+
+      {/* Hover preview of a finished game's final position (desktop). */}
+      {preview && (
+        <div
+          className="hidden sm:block fixed z-50 pointer-events-none"
+          style={{
+            left: Math.min(preview.x + 16, (typeof window !== 'undefined' ? window.innerWidth : 9999) - 176),
+            top: Math.min(preview.y + 16, (typeof window !== 'undefined' ? window.innerHeight : 9999) - 176),
+          }}
+        >
+          <div className="w-40 h-40 rounded-lg overflow-hidden border-2 border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900 shadow-xl">
+            {previewStates[preview.roomId]
+              ? <HexBoard state={previewStates[preview.roomId] as GameState} preview />
+              : <div className="w-full h-full flex items-center justify-center text-gray-400 text-xs">…</div>}
+          </div>
+        </div>
       )}
     </div>
   );

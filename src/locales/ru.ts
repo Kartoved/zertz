@@ -465,4 +465,6 @@ export const ru = {
   arenaSkipConfirm: 'Пропустить это проведение? Следующее создастся по расписанию.',
   arenaStopSeriesConfirm: 'Остановить серию? Будущие турниры больше не будут создаваться.',
   arenaResults: 'Итоги',
+  arenaLiveGames: 'Идут сейчас',
+  arenaWatch: 'Смотреть',
 };

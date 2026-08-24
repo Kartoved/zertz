@@ -672,7 +672,8 @@ router.put('/:id/state', moveLimiter, authRequired, async (req, res) => {
     res.status(403).json({ error: 'Нельзя ходить за другого игрока' });
     return;
   }
-  if (room.current_player !== playerIndex) {
+  // A player may resign on any turn; every other submission must be on their turn.
+  if (winType !== 'surrender' && room.current_player !== playerIndex) {
     res.status(403).json({ error: 'Не ваш ход' });
     return;
   }
@@ -708,7 +709,10 @@ router.put('/:id/state', moveLimiter, authRequired, async (req, res) => {
 
   // For undo moves: preserve both clock values as-is; only restart clockRunningSince
   // so the restored player's clock begins ticking from now (no time penalty for either side).
-  if (isTimedGame && !isUndo) {
+  // Surrender ends the game immediately (winner already set to the opponent) — skip the
+  // per-move clock deduction so it can't be submitted on the opponent's turn and wrongly
+  // trip a time-forfeit; the clock is stopped below via the `nextWinner` guard.
+  if (isTimedGame && !isUndo && winType !== 'surrender') {
     const nowMs = Date.now();
     const startedMs = new Date(room.clock_running_since).getTime();
     const elapsedMs = Math.max(0, nowMs - startedMs);
