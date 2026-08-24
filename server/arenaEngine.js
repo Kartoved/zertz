@@ -15,14 +15,9 @@
 import { pool } from './db.js';
 import { applyGameResult, buildPairings, nextOccurrence } from './utils/arena.js';
 import { sendPushToUser } from './utils/pushNotifications.js';
+import { pgUtc } from './utils/pgTime.js';
 
 const TICK_MS = 4000;
-
-// Store epoch-ms as a bare UTC 'YYYY-MM-DD HH:MM:SS' string (timezone-independent,
-// matching the tournaments route + the db.js read parser).
-function pgUtc(ms) {
-  return new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
-}
 
 let _timer = null;
 let _ticking = false;

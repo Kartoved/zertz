@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { pool } from '../db.js';
 import { authRequired, optionalAuth } from '../middleware/auth.js';
 import { createRoomLimiter } from '../middleware/rateLimits.js';
+import { pgUtc } from '../utils/pgTime.js';
 
 const router = Router();
 
@@ -13,13 +14,6 @@ const MIN_DURATION = 5;
 const MAX_DURATION = 360;
 const MAX_NAME = 60;
 const VALID_BOARD_SIZES = [37, 48, 61];
-
-// All TIMESTAMP columns are UTC wall-clock (see server/db.js read parser). Store
-// client-supplied epoch-ms as a bare 'YYYY-MM-DD HH:MM:SS' UTC string so it
-// round-trips regardless of the DB session/host timezone.
-function toPgUtc(ms) {
-  return new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
-}
 
 function tournamentDTO(r) {
   return {
@@ -110,7 +104,7 @@ router.post('/', createRoomLimiter, authRequired, async (req, res) => {
        RETURNING id`,
       [
         cleanName, req.user.id, Number(boardSize), BLITZ_BASE_MS, BLITZ_INC_MS,
-        !!berserk, toPgUtc(startMs), durationMin, toPgUtc(finishMs), stateJson, treeJson,
+        !!berserk, pgUtc(startMs), durationMin, pgUtc(finishMs), stateJson, treeJson,
       ]
     );
     res.json({ id: result.rows[0].id });
@@ -258,7 +252,7 @@ router.put('/:id', authRequired, async (req, res) => {
       `UPDATE tournaments
        SET name = $3, board_size = $4, berserk_enabled = $5, starts_at = $6, duration_min = $7, finishes_at = $8
        WHERE id = $1 AND created_by = $2 AND status = 'scheduled'`,
-      [id, req.user.id, cleanName, Number(boardSize), !!berserk, toPgUtc(startMs), durationMin, toPgUtc(finishMs)]
+      [id, req.user.id, cleanName, Number(boardSize), !!berserk, pgUtc(startMs), durationMin, pgUtc(finishMs)]
     );
     if (r.rowCount === 0) return res.status(403).json({ error: 'Нельзя изменить (не ваш или уже начался)' });
     res.json({ ok: true });
