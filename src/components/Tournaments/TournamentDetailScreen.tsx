@@ -39,7 +39,6 @@ export default function TournamentDetailScreen() {
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
   const [confirm, setConfirm] = useState<{ message: string; danger?: boolean; onConfirm: () => Promise<void> } | null>(null);
-  const navigatedRoomRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!Number.isInteger(tid)) return;
@@ -52,14 +51,18 @@ export default function TournamentDetailScreen() {
     return () => clearInterval(iv);
   }, []);
 
+  // Auto-open your game ONLY when the engine pairs you into a NEW one — never bounce
+  // you back into a game you've already entered / deliberately left, so you can browse
+  // the tournament page while playing. "Entered" is remembered per tournament (survives
+  // refresh); room ids are globally unique, so a fresh pairing always differs.
   const currentRoomId = detail?.me?.currentRoomId ?? null;
   useEffect(() => {
-    if (currentRoomId && navigatedRoomRef.current !== currentRoomId) {
-      navigatedRoomRef.current = currentRoomId;
-      navigate(`/room/${currentRoomId}`);
-    }
-    if (!currentRoomId) navigatedRoomRef.current = null;
-  }, [currentRoomId, navigate]);
+    if (!currentRoomId) return;
+    const key = `zertz_arena_entered:${tid}`;
+    if (localStorage.getItem(key) === String(currentRoomId)) return;
+    localStorage.setItem(key, String(currentRoomId));
+    navigate(`/room/${currentRoomId}`);
+  }, [currentRoomId, navigate, tid]);
 
   const act = useCallback(async (fn: () => Promise<void>) => {
     setBusy(true);

@@ -690,6 +690,14 @@ export function RoomScreen() {
             >
               ← {t.roomMenu}
             </button>
+            {tournamentId && (
+              <button
+                onClick={() => navigate(`/tournaments/${tournamentId}`)}
+                className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 text-sm font-semibold whitespace-nowrap"
+              >
+                🏆 {t.arenaBackToArena}
+              </button>
+            )}
             <h1 className="text-lg md:text-xl font-bold text-gray-800 dark:text-gray-200">
               ZÈRTZ Online
             </h1>
