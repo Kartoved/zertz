@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useStudyStore } from '../../store/studyStore';
 import { StudyTreeNode } from '../../db/studiesApi';
 import { useI18n } from '../../i18n';
@@ -8,16 +8,25 @@ import ConfirmModal from '../UI/ConfirmModal';
 interface StudySidebarProps {
   currentId: number | null;
   onOpen: (slug: string) => void;
-  onNew: (parentId: number | null) => void;
-  onNewFromPosition: () => void;
+  onNew?: (parentId: number | null) => void;
+  onNewFromPosition?: () => void;
+  /** Nodes to render; defaults to the signed-in user's own hierarchy. */
+  nodes?: StudyTreeNode[];
+  /** Reading mode: no create/rename/delete/drag, just navigation. */
+  readOnly?: boolean;
+  /** Header label (defaults to «My studies»). */
+  heading?: string;
 }
 
-// Notion-like hierarchy of the author's own studies. Create child, rename,
-// delete, and drag a node onto another to re-parent (drop on the header →
-// top level). Content-free — bodies load on open.
-export default function StudySidebar({ currentId, onOpen, onNew, onNewFromPosition }: StudySidebarProps) {
+// Notion-like hierarchy of studies. In the author's own tree: create child,
+// rename, delete, and drag a node onto another to re-parent (drop on the
+// header → top level). In `readOnly` mode (someone else's public chapters,
+// guests included) it is a plain table of contents. Content-free — bodies
+// load on open.
+export default function StudySidebar({ currentId, onOpen, onNew, onNewFromPosition, nodes, readOnly = false, heading }: StudySidebarProps) {
   const { t } = useI18n();
-  const { tree, expanded, toggleExpand, renameStudy, deleteStudy, moveStudy } = useStudyStore();
+  const { tree: ownTree, expanded, expand, toggleExpand, renameStudy, deleteStudy, moveStudy } = useStudyStore();
+  const tree = nodes ?? ownTree;
   const [dragId, setDragId] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<number | 'root' | null>(null);
   const [renameNode, setRenameNode] = useState<StudyTreeNode | null>(null);
@@ -34,6 +43,15 @@ export default function StudySidebar({ currentId, onOpen, onNew, onNewFromPositi
     for (const arr of m.values()) arr.sort((a, b) => a.sort - b.sort);
     return m;
   }, [tree]);
+
+  // Keep the open chapter visible: expand every ancestor of the current node.
+  useEffect(() => {
+    if (currentId == null) return;
+    const parentOf = new Map(tree.map(n => [n.id, n.parentId]));
+    let p = parentOf.get(currentId) ?? null;
+    const seen = new Set<number>();
+    while (p != null && !seen.has(p)) { seen.add(p); expand(p); p = parentOf.get(p) ?? null; }
+  }, [currentId, tree, expand]);
 
   const handleRename = (n: StudyTreeNode) => setRenameNode(n);
   const handleDelete = (n: StudyTreeNode) => setDeleteNode(n);
@@ -57,11 +75,11 @@ export default function StudySidebar({ currentId, onOpen, onNew, onNewFromPositi
     return (
       <div key={n.id}>
         <div
-          draggable
-          onDragStart={() => setDragId(n.id)}
-          onDragOver={(e) => { e.preventDefault(); setDropTarget(n.id); }}
-          onDragLeave={() => setDropTarget(t => (t === n.id ? null : t))}
-          onDrop={(e) => { e.preventDefault(); handleDrop(n.id); }}
+          draggable={!readOnly}
+          onDragStart={readOnly ? undefined : () => setDragId(n.id)}
+          onDragOver={readOnly ? undefined : (e) => { e.preventDefault(); setDropTarget(n.id); }}
+          onDragLeave={readOnly ? undefined : () => setDropTarget(t => (t === n.id ? null : t))}
+          onDrop={readOnly ? undefined : (e) => { e.preventDefault(); handleDrop(n.id); }}
           className={`group flex items-center gap-1 pr-1 rounded-md cursor-pointer transition-colors ${
             isSelected ? 'bg-indigo-100 dark:bg-indigo-900/40' : 'hover:bg-gray-100 dark:hover:bg-gray-700/50'
           } ${dropTarget === n.id ? 'ring-2 ring-indigo-400' : ''}`}
@@ -80,16 +98,18 @@ export default function StudySidebar({ currentId, onOpen, onNew, onNewFromPositi
             className="flex-1 min-w-0 text-left py-1 text-sm text-gray-800 dark:text-gray-100 truncate flex items-center gap-1"
           >
             <span className="truncate">{n.title}</span>
-            {n.isPublic && <span className="text-[9px] text-green-500 flex-shrink-0" title={t.studyPublic}>●</span>}
+            {!readOnly && n.isPublic && <span className="text-[9px] text-green-500 flex-shrink-0" title={t.studyPublic}>●</span>}
           </button>
+          {!readOnly && (
           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-            <button type="button" title={t.studyNewChild} onClick={(e) => { e.stopPropagation(); onNew(n.id); }}
+            <button type="button" title={t.studyNewChild} onClick={(e) => { e.stopPropagation(); onNew?.(n.id); }}
               className="w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600">+</button>
             <button type="button" title={t.studyRename} onClick={(e) => { e.stopPropagation(); handleRename(n); }}
               className="w-5 h-5 flex items-center justify-center rounded text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600 text-xs">✎</button>
             <button type="button" title={t.studyDelete} onClick={(e) => { e.stopPropagation(); handleDelete(n); }}
               className="w-5 h-5 flex items-center justify-center rounded text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 text-xs">✕</button>
           </div>
+          )}
         </div>
         {isOpen && children.map(c => renderNode(c, depth + 1))}
       </div>
@@ -104,15 +124,16 @@ export default function StudySidebar({ currentId, onOpen, onNew, onNewFromPositi
         className={`flex items-center justify-between px-2 py-2 border-b border-gray-200 dark:border-gray-700 ${
           dropTarget === 'root' ? 'ring-2 ring-indigo-400 rounded-md' : ''
         }`}
-        onDragOver={(e) => { e.preventDefault(); setDropTarget('root'); }}
-        onDragLeave={() => setDropTarget(t => (t === 'root' ? null : t))}
-        onDrop={(e) => { e.preventDefault(); handleDrop(null); }}
+        onDragOver={readOnly ? undefined : (e) => { e.preventDefault(); setDropTarget('root'); }}
+        onDragLeave={readOnly ? undefined : () => setDropTarget(t => (t === 'root' ? null : t))}
+        onDrop={readOnly ? undefined : (e) => { e.preventDefault(); handleDrop(null); }}
       >
-        <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t.myStudies}</span>
+        <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide truncate">{heading ?? t.myStudies}</span>
+        {!readOnly && (
         <div className="flex items-center gap-1">
           <button
             type="button"
-            onClick={onNewFromPosition}
+            onClick={() => onNewFromPosition?.()}
             title={t.studyNewFromPosition}
             className="px-2 py-1 rounded-md text-sm font-semibold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"
           >
@@ -120,12 +141,13 @@ export default function StudySidebar({ currentId, onOpen, onNew, onNewFromPositi
           </button>
           <button
             type="button"
-            onClick={() => onNew(null)}
+            onClick={() => onNew?.(null)}
             className="px-2 py-1 rounded-md text-sm font-semibold bg-indigo-500 hover:bg-indigo-600 text-white"
           >
             + {t.studyNew}
           </button>
         </div>
+        )}
       </div>
 
       <div className="flex-1 overflow-y-auto py-1 px-1">

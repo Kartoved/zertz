@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import {
   StudyTreeNode, StudyNode, PublicStudy, StudyMeta,
-  getStudyTree, getStudy, getPublicStudies,
+  getStudyTree, getOwnerStudyTree, getStudy, getPublicStudies,
   createStudy as apiCreate, updateStudy, moveStudy as apiMove,
   deleteStudy as apiDelete, cloneStudy as apiClone,
 } from '../db/studiesApi';
@@ -12,6 +12,8 @@ import { GameState, GameNode } from '../game/types';
 
 interface StudyStore {
   tree: StudyTreeNode[];        // the signed-in user's hierarchy (content-free)
+  ownerTree: StudyTreeNode[];   // the viewed author's hierarchy (read-only sidebar)
+  ownerTreeName: string | null; // whose hierarchy `ownerTree` holds
   expanded: Set<number>;        // expanded sidebar node ids
   current: StudyNode | null;    // opened node content
   currentLoading: boolean;
@@ -19,6 +21,7 @@ interface StudyStore {
   error: string | null;
 
   loadTree: () => Promise<void>;
+  loadOwnerTree: (owner: string) => Promise<void>;
   toggleExpand: (id: number) => void;
   expand: (id: number) => void;
   openStudy: (owner: string, slug: string) => Promise<StudyNode | null>;
@@ -49,6 +52,8 @@ function blankStudyContent() {
 
 export const useStudyStore = create<StudyStore>((set, get) => ({
   tree: [],
+  ownerTree: [],
+  ownerTreeName: null,
   expanded: new Set<number>(),
   current: null,
   currentLoading: false,
@@ -61,6 +66,18 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
       set({ tree });
     } catch {
       /* guests get [] from the api layer; ignore */
+    }
+  },
+
+  // Someone else's (or your own, when read via /:owner/:slug) public hierarchy.
+  // Cached per owner so switching chapters doesn't refetch.
+  loadOwnerTree: async (owner) => {
+    if (get().ownerTreeName?.toLowerCase() === owner.toLowerCase()) return;
+    try {
+      const { ownerName, nodes } = await getOwnerStudyTree(owner);
+      set({ ownerTree: nodes, ownerTreeName: ownerName });
+    } catch {
+      set({ ownerTree: [], ownerTreeName: null });
     }
   },
 
@@ -168,5 +185,5 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
     set({ publicStudies });
   },
 
-  reset: () => set({ tree: [], expanded: new Set<number>(), current: null, publicStudies: [], error: null }),
+  reset: () => set({ tree: [], ownerTree: [], ownerTreeName: null, expanded: new Set<number>(), current: null, publicStudies: [], error: null }),
 }));

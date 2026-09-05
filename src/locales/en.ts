@@ -413,6 +413,7 @@ export const en = {
   studyWelcome: 'Interactive lessons: build analyses with branches and comments.',
   studyNotFound: 'Study not found',
   studyChildren: 'Nested studies',
+  studyContents: 'Contents',
   loginToCreateStudies: 'Log in to create studies',
   playersTotal: 'Total',
   playersOnline: 'Online',

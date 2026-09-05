@@ -89,6 +89,14 @@ export async function getStudyTree(): Promise<StudyTreeNode[]> {
   return res.json();
 }
 
+// One author's hierarchy as visible to the current viewer (public nodes for
+// guests/other users, everything for the owner). Used by the reading sidebar.
+export async function getOwnerStudyTree(owner: string): Promise<{ ownerName: string; nodes: StudyTreeNode[] }> {
+  const res = await fetch(`${API_BASE}/api/studies/tree/${encodeURIComponent(owner)}`, { headers: authHeaders(false) });
+  if (!res.ok) return { ownerName: owner, nodes: [] };
+  return res.json();
+}
+
 export async function getPublicStudies(limit = 30, offset = 0): Promise<PublicStudy[]> {
   const res = await fetch(`${API_BASE}/api/studies/public?limit=${limit}&offset=${offset}`);
   if (!res.ok) return [];

@@ -22,8 +22,8 @@ export default function StudiesScreen() {
   const { user } = useAuthStore();
   const { setScreen } = useUIStore();
   const {
-    current, currentLoading, error, publicStudies, tree,
-    loadTree, openStudy, loadPublic, cloneStudy, setPublic, changeSlug, renameStudy, createStudy, createStudyFromState, createStudyFromGame, saveStudyTree, setMeta, expand,
+    current, currentLoading, error, publicStudies, tree, ownerTree, ownerTreeName,
+    loadTree, loadOwnerTree, openStudy, loadPublic, cloneStudy, setPublic, changeSlug, renameStudy, createStudy, createStudyFromState, createStudyFromGame, saveStudyTree, setMeta, expand,
   } = useStudyStore();
   const [mobileSidebar, setMobileSidebar] = useState(false);
   const [landingTab, setLandingTab] = useState<'all' | 'mine'>('all');
@@ -75,8 +75,19 @@ export default function StudiesScreen() {
     if (owner && slug) { openStudy(owner, slug); setMobileSidebar(false); }
   }, [owner, slug, openStudy]);
 
+  // Chapter tree of the author being read — available to guests too.
+  useEffect(() => { if (owner) loadOwnerTree(owner); }, [owner, loadOwnerTree]);
+
+  // Reading someone else's study (or reading as a guest) → read-only chapters
+  // of that author; otherwise your own editable hierarchy.
+  const readingOther = !!owner && owner.toLowerCase() !== (user?.username || '').toLowerCase();
+  const sidebarNodes = readingOther ? ownerTree : tree;
+  const showSidebar = readingOther ? ownerTree.length > 0 : !!user;
+
   const goBack = () => { setScreen('menu'); navigate('/'); };
   const open = (s: string) => navigate(`/studies/${encodeURIComponent(user?.username || owner || '')}/${encodeURIComponent(s)}`);
+  // Navigate within the author being read (keeps the URL owner, not the viewer).
+  const openOther = (s: string) => navigate(`/studies/${encodeURIComponent(ownerTreeName || owner || '')}/${encodeURIComponent(s)}`);
 
   const handleClone = async () => {
     if (!current) return;
@@ -134,21 +145,31 @@ export default function StudiesScreen() {
       <header className="flex items-center gap-3 px-4 py-2 bg-white dark:bg-gray-800 shadow-sm flex-shrink-0">
         <button onClick={goBack} className="text-lg font-bold text-gray-900 dark:text-white hover:opacity-70">← ZERTZ</button>
         <span className="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t.studies}</span>
-        {user && (
+        {showSidebar && (
           <button
             onClick={() => { if (mobileSidebar) setLandingTab('all'); setMobileSidebar(v => !v); }}
             className="lg:hidden ml-auto px-2 py-1 rounded-md bg-gray-100 dark:bg-gray-700 text-sm text-gray-700 dark:text-gray-200"
           >
-            {mobileSidebar ? `📖 ${t.studiesAll}` : `☰ ${t.myStudies}`}
+            {mobileSidebar
+              ? `📖 ${readingOther ? t.studyContents : t.studiesAll}`
+              : `☰ ${readingOther ? t.studyContents : t.myStudies}`}
           </button>
         )}
       </header>
 
       <div className="flex-1 min-h-0 flex">
         {/* Sidebar (author's hierarchy) */}
-        {user && (
+        {showSidebar && (
           <aside className={`${mobileSidebar ? 'flex' : 'hidden'} lg:flex w-full lg:w-72 flex-shrink-0 flex-col bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700`}>
-            <StudySidebar currentId={current?.id ?? null} onOpen={open} onNew={setNewParent} onNewFromPosition={() => setShowEditor(true)} />
+            <StudySidebar
+              currentId={current?.id ?? null}
+              onOpen={readingOther ? openOther : open}
+              onNew={setNewParent}
+              onNewFromPosition={() => setShowEditor(true)}
+              nodes={sidebarNodes}
+              readOnly={readingOther}
+              heading={readingOther ? (ownerTreeName || owner) : undefined}
+            />
           </aside>
         )}
 

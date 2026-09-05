@@ -413,6 +413,7 @@ export const eo = {
   studyWelcome: 'Interagaj lecionoj: kreu analizojn kun branĉoj kaj komentoj.',
   studyNotFound: 'Studio ne trovita',
   studyChildren: 'Ingitaj studioj',
+  studyContents: 'Enhavo',
   loginToCreateStudies: 'Ensalutu por krei studiojn',
   playersTotal: 'Entute',
   playersOnline: 'Konektitaj',

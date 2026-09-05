@@ -60,6 +60,43 @@ router.get('/tree', authRequired, async (req, res) => {
   }
 });
 
+// GET /api/studies/tree/:owner — one author's hierarchy, content-free, as seen
+// by the viewer: public nodes for anyone (including guests), everything when
+// the viewer IS the owner. Powers the chapter sidebar in reading mode.
+router.get('/tree/:owner', optionalAuth, async (req, res) => {
+  const viewerId = req.user ? req.user.id : null;
+  try {
+    const owner = await pool.query('SELECT id, username FROM users WHERE lower(username) = lower($1)', [req.params.owner]);
+    if (owner.rows.length === 0) return res.json({ ownerName: req.params.owner, nodes: [] });
+    const ownerId = owner.rows[0].id;
+    const isOwner = viewerId != null && viewerId === ownerId;
+    const { rows } = await pool.query(
+      `SELECT id, parent_id, slug, title, sort, is_public
+         FROM studies
+        WHERE owner_id = $1 ${isOwner ? '' : 'AND is_public = true'}
+        ORDER BY parent_id NULLS FIRST, sort ASC`,
+      [ownerId]
+    );
+    // A public node under a private parent would otherwise dangle — lift it to
+    // the root so the reader still sees it.
+    const visible = new Set(rows.map(r => r.id));
+    res.json({
+      ownerName: owner.rows[0].username,
+      nodes: rows.map(r => ({
+        id: r.id,
+        parentId: r.parent_id != null && visible.has(r.parent_id) ? r.parent_id : null,
+        slug: r.slug,
+        title: r.title,
+        sort: r.sort,
+        isPublic: r.is_public,
+      })),
+    });
+  } catch (err) {
+    console.error('Studies owner tree error:', err);
+    res.status(500).json({ error: 'Failed to load studies' });
+  }
+});
+
 // GET /api/studies/public — public studies for the Learning list (paginated).
 router.get('/public', async (req, res) => {
   const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 30));

@@ -413,6 +413,7 @@ export const ru = {
   studyWelcome: 'Интерактивные уроки: создавайте разборы с ветками и комментариями.',
   studyNotFound: 'Студия не найдена',
   studyChildren: 'Вложенные студии',
+  studyContents: 'Оглавление',
   loginToCreateStudies: 'Войдите, чтобы создавать студии',
   playersTotal: 'Всего',
   playersOnline: 'Онлайн',
