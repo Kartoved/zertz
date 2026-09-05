@@ -23,6 +23,36 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.19.1',
+    date: '2026-09-05',
+    changes: {
+      ru: [
+        '📚 В студиях появилось оглавление для читателей: слева видно всё дерево глав автора — раньше его видел только сам автор',
+        '🔓 Оглавление работает и без регистрации — можно дать ссылку на урок кому угодно, и человек сразу увидит весь курс',
+        '📂 Главы по умолчанию развёрнуты, есть кнопка «свернуть / развернуть всё», а выбор запоминается между визитами',
+        '🌐 Логотип ZERTZ Online теперь на вкладке браузера, на иконке приложения и в шапке меню',
+        '🇷🇺 При первом заходе язык подбирается сам: русский для России и СНГ, английский для остальных. Переключил вручную — запомнится',
+        'Версия обновлена до v0.19.1',
+      ],
+      en: [
+        '📚 Studies now show a table of contents to readers: the author’s whole chapter tree sits in the left sidebar — previously only the author could see it',
+        '🔓 It works without an account too — send a lesson link to anyone and they see the full course right away',
+        '📂 Chapters are expanded by default, there is a “collapse / expand all” button, and your choice is remembered between visits',
+        '🌐 The ZERTZ Online logo is now the browser tab icon, the app icon and the menu header',
+        '🇷🇺 On a first visit the language picks itself: Russian for Russia/CIS, English for everyone else. Switch it manually and your choice sticks',
+        'Version updated to v0.19.1',
+      ],
+      eo: [
+        '📚 Studioj nun montras enhavtabelon al legantoj: la tuta ĉapitra arbo de la aŭtoro estas en la maldekstra flanko — antaŭe nur la aŭtoro vidis ĝin',
+        '🔓 Ĝi funkcias ankaŭ sen konto — sendu lecionan ligilon al iu ajn kaj li tuj vidas la tutan kurson',
+        '📂 Ĉapitroj estas defaŭlte malfalditaj, estas butono «faldi / malfaldi ĉion», kaj via elekto memoriĝas inter vizitoj',
+        '🌐 La emblemo de ZERTZ Online nun estas la langeta ikono, la aplikaĵa ikono kaj la menua kapo',
+        '🇷🇺 Ĉe la unua vizito la lingvo elektiĝas mem: rusa por Rusio/SSK, angla por ĉiuj aliaj. Ŝanĝu ĝin permane kaj via elekto restas',
+        'Versio ĝisdatigita al v0.19.1',
+      ],
+    },
+  },
+  {
     version: '0.19.0',
     date: '2026-08-23',
     changes: {

@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { getPushPref, subscribeToPush, unsubscribeFromPush, initPushIfFirstVisit } from '../pushNotifications';
+import { detectLanguage } from '../utils/detectLanguage';
 
 type Screen = 'menu' | 'game' | 'history' | 'rules' | 'settings';
 export type Language = 'ru' | 'en' | 'eo';
@@ -13,7 +14,15 @@ const ls: Storage | null = typeof localStorage !== 'undefined' ? localStorage : 
 function getInitialLanguage(): Language {
   const saved = ls?.getItem(LANGUAGE_KEY);
   if (saved === 'en' || saved === 'eo' || saved === 'ru') return saved;
-  return 'en';
+  // Nothing stored yet → guess from the browser (ru for Russia/CIS, en
+  // otherwise). Not persisted: only an explicit switch writes LANGUAGE_KEY, so
+  // a guessed language keeps re-detecting until the user actually picks one.
+  return detectLanguage();
+}
+
+// Keeps <html lang> honest for screen readers and hyphenation.
+function applyHtmlLang(language: Language) {
+  if (typeof document !== 'undefined') document.documentElement.lang = language;
 }
 
 function getInitialShowCoordinates(): boolean {
@@ -42,13 +51,16 @@ interface UIStore {
   togglePush: () => void;
 }
 
+const initialLanguage = getInitialLanguage();
+applyHtmlLang(initialLanguage);
+
 export const useUIStore = create<UIStore>((set) => ({
   screen: 'menu',
   previousScreen: 'menu',
   isDarkMode: false,
   showMoveHistory: false,
   showCoordinates: getInitialShowCoordinates(),
-  language: getInitialLanguage(),
+  language: initialLanguage,
   pushEnabled: getPushPref(),
   pushPending: false,
   
@@ -76,6 +88,7 @@ export const useUIStore = create<UIStore>((set) => ({
 
   setLanguage: (language) => {
     ls?.setItem(LANGUAGE_KEY, language);
+    applyHtmlLang(language);
     set({ language });
   },
 
@@ -84,6 +97,7 @@ export const useUIStore = create<UIStore>((set) => ({
     const idx = order.indexOf(state.language);
     const next = order[(idx + 1) % order.length];
     ls?.setItem(LANGUAGE_KEY, next);
+    applyHtmlLang(next);
     return { language: next };
   }),
 

@@ -2,6 +2,7 @@ import { Language, useUIStore } from './store/uiStore';
 import { ru } from './locales/ru';
 import { en } from './locales/en';
 import { eo } from './locales/eo';
+import { detectLanguage } from './utils/detectLanguage';
 
 export const LANGUAGE_LOCALE: Record<Language, string> = {
   ru: 'ru-RU',
@@ -26,9 +27,10 @@ export function useI18n() {
   };
 }
 
+// Same resolution as the store, for the few call sites that run outside React.
 export function getI18nFromStorage() {
   const saved = localStorage.getItem('zertz_language');
-  const language: Language = saved === 'ru' || saved === 'eo' || saved === 'en' ? saved : 'en';
+  const language: Language = saved === 'ru' || saved === 'eo' || saved === 'en' ? saved : detectLanguage();
   return {
     language,
     t: I18N[language],

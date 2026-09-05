@@ -178,7 +178,8 @@ export default function MainMenu() {
       {/* ═══════ TOP NAV BAR ═══════ */}
       <header className="bg-white dark:bg-gray-800 shadow-md px-4 py-2 flex items-center justify-between relative z-30">
         {/* Logo */}
-        <div className="flex items-center gap-3 flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <img src="/logo.png" alt="" className="w-8 h-8 rounded-lg flex-shrink-0" />
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white tracking-tight">ZERTZ</h1>
         </div>
 
