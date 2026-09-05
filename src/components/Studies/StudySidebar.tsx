@@ -25,7 +25,7 @@ interface StudySidebarProps {
 // load on open.
 export default function StudySidebar({ currentId, onOpen, onNew, onNewFromPosition, nodes, readOnly = false, heading }: StudySidebarProps) {
   const { t } = useI18n();
-  const { tree: ownTree, expanded, expand, toggleExpand, renameStudy, deleteStudy, moveStudy } = useStudyStore();
+  const { tree: ownTree, collapsed, expand, expandAll, collapseAll, toggleExpand, renameStudy, deleteStudy, moveStudy } = useStudyStore();
   const tree = nodes ?? ownTree;
   const [dragId, setDragId] = useState<number | null>(null);
   const [dropTarget, setDropTarget] = useState<number | 'root' | null>(null);
@@ -70,7 +70,7 @@ export default function StudySidebar({ currentId, onOpen, onNew, onNewFromPositi
 
   const renderNode = (n: StudyTreeNode, depth: number) => {
     const children = byParent.get(n.id) ?? [];
-    const isOpen = expanded.has(n.id);
+    const isOpen = !collapsed.has(n.id);
     const isSelected = n.id === currentId;
     return (
       <div key={n.id}>
@@ -117,6 +117,12 @@ export default function StudySidebar({ currentId, onOpen, onNew, onNewFromPositi
   };
 
   const roots = byParent.get(null) ?? [];
+  // Only nodes that actually have children can be folded.
+  const parentIds = useMemo(
+    () => tree.filter(n => (byParent.get(n.id)?.length ?? 0) > 0).map(n => n.id),
+    [tree, byParent]
+  );
+  const allCollapsed = parentIds.length > 0 && parentIds.every(id => collapsed.has(id));
 
   return (
     <div className="flex flex-col h-full">
@@ -129,8 +135,19 @@ export default function StudySidebar({ currentId, onOpen, onNew, onNewFromPositi
         onDrop={readOnly ? undefined : (e) => { e.preventDefault(); handleDrop(null); }}
       >
         <span className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wide truncate">{heading ?? t.myStudies}</span>
-        {!readOnly && (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {parentIds.length > 0 && (
+            <button
+              type="button"
+              onClick={() => (allCollapsed ? expandAll() : collapseAll(parentIds))}
+              title={allCollapsed ? t.studyExpandAll : t.studyCollapseAll}
+              className="px-2 py-1 rounded-md text-xs font-semibold bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+            >
+              {allCollapsed ? '⇊' : '⇈'}
+            </button>
+          )}
+          {!readOnly && (
+          <>
           <button
             type="button"
             onClick={() => onNewFromPosition?.()}
@@ -146,8 +163,9 @@ export default function StudySidebar({ currentId, onOpen, onNew, onNewFromPositi
           >
             + {t.studyNew}
           </button>
+          </>
+          )}
         </div>
-        )}
       </div>
 
       <div className="flex-1 overflow-y-auto py-1 px-1">

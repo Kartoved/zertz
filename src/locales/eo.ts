@@ -414,6 +414,8 @@ export const eo = {
   studyNotFound: 'Studio ne trovita',
   studyChildren: 'Ingitaj studioj',
   studyContents: 'Enhavo',
+  studyExpandAll: 'Malfaldi ĉion',
+  studyCollapseAll: 'Faldi ĉion',
   loginToCreateStudies: 'Ensalutu por krei studiojn',
   playersTotal: 'Entute',
   playersOnline: 'Konektitaj',

@@ -14,7 +14,7 @@ interface StudyStore {
   tree: StudyTreeNode[];        // the signed-in user's hierarchy (content-free)
   ownerTree: StudyTreeNode[];   // the viewed author's hierarchy (read-only sidebar)
   ownerTreeName: string | null; // whose hierarchy `ownerTree` holds
-  expanded: Set<number>;        // expanded sidebar node ids
+  collapsed: Set<number>;       // sidebar nodes the user folded (default: everything open)
   current: StudyNode | null;    // opened node content
   currentLoading: boolean;
   publicStudies: PublicStudy[];
@@ -24,6 +24,8 @@ interface StudyStore {
   loadOwnerTree: (owner: string) => Promise<void>;
   toggleExpand: (id: number) => void;
   expand: (id: number) => void;
+  expandAll: () => void;
+  collapseAll: (ids: number[]) => void;
   openStudy: (owner: string, slug: string) => Promise<StudyNode | null>;
   createStudy: (parentId: number | null, title: string) => Promise<{ id: number; slug: string; ownerName: string } | null>;
   createStudyFromState: (title: string, state: GameState, parentId?: number | null) => Promise<{ id: number; slug: string; ownerName: string } | null>;
@@ -40,6 +42,26 @@ interface StudyStore {
   reset: () => void;
 }
 
+// Sidebar folding is stored INVERTED — as the set of collapsed ids — so a
+// brand-new node (and a first-time visitor) starts fully expanded, and the
+// persisted blob stays small.
+const COLLAPSED_KEY = 'zertz_study_collapsed';
+
+function loadCollapsed(): Set<number> {
+  try {
+    const raw = localStorage.getItem(COLLAPSED_KEY);
+    if (!raw) return new Set<number>();
+    const arr = JSON.parse(raw);
+    return new Set<number>(Array.isArray(arr) ? arr.filter((n: unknown) => typeof n === 'number') : []);
+  } catch {
+    return new Set<number>();
+  }
+}
+
+function saveCollapsed(set: Set<number>) {
+  try { localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...set])); } catch { /* private mode / quota */ }
+}
+
 // A fresh study starts from the standard opening position (board 37) with an
 // empty move tree — the position editor (Etap D) can replace the setup later.
 function blankStudyContent() {
@@ -54,7 +76,7 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
   tree: [],
   ownerTree: [],
   ownerTreeName: null,
-  expanded: new Set<number>(),
+  collapsed: loadCollapsed(),
   current: null,
   currentLoading: false,
   publicStudies: [],
@@ -82,16 +104,33 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
   },
 
   toggleExpand: (id) => set(s => {
-    const next = new Set(s.expanded);
+    const next = new Set(s.collapsed);
     next.has(id) ? next.delete(id) : next.add(id);
-    return { expanded: next };
+    saveCollapsed(next);
+    return { collapsed: next };
   }),
 
   expand: (id) => set(s => {
-    if (s.expanded.has(id)) return s;
-    const next = new Set(s.expanded);
-    next.add(id);
-    return { expanded: next };
+    if (!s.collapsed.has(id)) return s;
+    const next = new Set(s.collapsed);
+    next.delete(id);
+    saveCollapsed(next);
+    return { collapsed: next };
+  }),
+
+  expandAll: () => set(s => {
+    if (s.collapsed.size === 0) return s;
+    saveCollapsed(new Set<number>());
+    return { collapsed: new Set<number>() };
+  }),
+
+  // `ids` = the nodes that actually have children in the tree on screen; other
+  // authors' folds stay untouched.
+  collapseAll: (ids) => set(s => {
+    const next = new Set(s.collapsed);
+    for (const id of ids) next.add(id);
+    saveCollapsed(next);
+    return { collapsed: next };
   }),
 
   openStudy: async (owner, slug) => {
@@ -185,5 +224,5 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
     set({ publicStudies });
   },
 
-  reset: () => set({ tree: [], ownerTree: [], ownerTreeName: null, expanded: new Set<number>(), current: null, publicStudies: [], error: null }),
+  reset: () => set({ tree: [], ownerTree: [], ownerTreeName: null, current: null, publicStudies: [], error: null }),
 }));

@@ -414,6 +414,8 @@ export const en = {
   studyNotFound: 'Study not found',
   studyChildren: 'Nested studies',
   studyContents: 'Contents',
+  studyExpandAll: 'Expand all',
+  studyCollapseAll: 'Collapse all',
   loginToCreateStudies: 'Log in to create studies',
   playersTotal: 'Total',
   playersOnline: 'Online',

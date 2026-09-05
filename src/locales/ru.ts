@@ -414,6 +414,8 @@ export const ru = {
   studyNotFound: 'Студия не найдена',
   studyChildren: 'Вложенные студии',
   studyContents: 'Оглавление',
+  studyExpandAll: 'Развернуть всё',
+  studyCollapseAll: 'Свернуть всё',
   loginToCreateStudies: 'Войдите, чтобы создавать студии',
   playersTotal: 'Всего',
   playersOnline: 'Онлайн',
