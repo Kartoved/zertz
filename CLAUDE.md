@@ -133,6 +133,7 @@ Express app with JWT auth middleware. All routes under `/api`, static `dist/` se
 
 `server/scripts/`:
 - `backfillExplorer.js` — one-shot indexer for finished games into `position_moves` / `position_games`
+- `abortUnstartedGames.js` — one-shot re-scoring of games lost on time before a first move (pre-abort-rule history) as `aborted`: Lichess-style rating refund from the room's own stamps (`utils/abortUnstarted.js`, pure + tested), explorer de-index, `games` copy. Dry run by default; `--apply` is one transaction that first copies touched rows into `bak_abort_<stamp>_*` tables. Arena games are exempt. A full Glicko replay of the history was tried and rejected: rooms get deleted and `updated_at` is not the order ratings were applied in, so the replay cannot even reproduce today's ratings.
 - `announceBlog.js` — pushes blog posts into global chat as system messages from the username **"Zertz System"** (`user_id = NULL`, body `[BLOG_POST]<slug>|<title>`). Idempotent via the `blog_announced` table (slug PK). Run as `npm run blog:announce`; flags: `--slug=X` (force one post), `--dry-run`, `--list`. The `tryRenderSystemBody()` helper in `src/components/UI/SystemMessageCard.tsx` recognises the `[BLOG_POST]...` body and renders a clickable amber card linking to `/news/<slug>`.
 
 ### Conventions worth remembering
@@ -169,8 +170,8 @@ Express app with JWT auth middleware. All routes under `/api`, static `dist/` se
 
 - **Mandatory captures**: if any capture exists, player must capture (no placement allowed)
 - **Free ring**: empty ring with ≥2 adjacent free edges — eligible for removal
-- **Isolation auto-capture**: after a ring removal, **every** fully-occupied isolated group is captured by the removing player (play continues on whichever group still has an empty ring). This includes the case where the split leaves *all* remaining marbles in one filled group — those are captured and can trigger the win. Mirrored in `shared/explorer/replay.js` (`handleIsolation`).
-- **Win**: 4 white, 5 gray, 6 black, OR 3 of each color in captures
+- **Isolation auto-capture**: after a ring removal, **every** fully-occupied isolated group is captured by the removing player (play continues on whichever group still has an empty ring). This includes the case where the split leaves *all* remaining marbles in one filled group — those are captured and can trigger the win. **The same check runs when a placement leaves no ring removable** (`skipRingRemoval` returns the claimed colours, like `removeRing`): filling the last vacant ring of an already isolated group claims it (official rules). Mirrored in `shared/explorer/replay.js` (`handleIsolation`, also on the no-removal branch).
+- **Win**: 4 white, 5 gray, 6 black, OR 3 of each color in captures — OR **the full board** (win type `fullBoard`): if the last vacant ring of the whole board is filled, the mover claims everything and wins even without a goal ("it is the one who makes the last move who wins"). Detected as "no ring left in play" in `checkWinCondition` / server `naturalWinner`. Before this fix such games hung with no legal move.
 
 **Board sizes** (axial hex, flat-top): 37 rings (7 rows), 48 rings (8 rows), 61 rings (9 rows). Coordinates precomputed in `Board.ts`.
 

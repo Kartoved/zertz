@@ -44,5 +44,6 @@ export function getWinTypeLabel(t: Dict, winType: string | null | undefined): st
   if (winType === 'black') return t.winByBlack;
   if (winType === 'mixed') return t.winByMixed;
   if (winType === 'time') return t.winByTime;
+  if (winType === 'fullBoard') return t.winByFullBoard;
   return t.winUnknown;
 }

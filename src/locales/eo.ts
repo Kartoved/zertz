@@ -191,6 +191,7 @@ export const eo = {
   winByBlack: 'Venko per nigraj globetoj!',
   winByMixed: 'Venko per miksitaj globetoj!',
   winByTime: 'Venko laŭ tempo!',
+  winByFullBoard: 'Venko: la tabulo pleniĝis!',
   winUnknown: 'Venko!',
   phasePlacement: 'Metu globeton',
   phaseRingRemoval: 'Forigu ringon',

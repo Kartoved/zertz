@@ -74,7 +74,10 @@ export function applyPlacement(
   };
 
   if (!needsRingRemoval) {
-    skipRingRemoval(newState);
+    // Filling the last vacant ring of an isolated group (or of the board)
+    // claims it even though no ring is removed.
+    const isolated = skipRingRemoval(newState);
+    if (isolated.length > 0 && move.type === 'placement') move.data.isolatedCaptures = isolated;
   }
 
   const winner = resolveWin(newState);

@@ -184,6 +184,32 @@ describe('cross-engine parity', () => {
     expect(tsState.rings.get('3,0')!.marble).toBeNull();
   });
 
+  it('matches when a placement with no ring to remove fills the whole board (claimed by the mover)', () => {
+    const keep: Record<string, 'white' | 'gray' | 'black' | null> = { '0,3': 'white', '1,3': 'gray', '2,3': null };
+    const { tsState, jsState } = assertSeededParity(37, state => {
+      for (const [id, ring] of state.rings) {
+        if (id in keep) ring.marble = keep[id] ? { color: keep[id]! } : null;
+        else ring.isRemoved = true;
+      }
+    }, { type: 'placement', data: { marbleColor: 'black', ringId: '2,3', removedRingId: null } });
+    expect(tsState.captures.player1).toEqual({ white: 1, gray: 1, black: 1 });
+    expect(jsState.captures.player1).toEqual({ white: 1, gray: 1, black: 1 });
+  });
+
+  it('matches when a placement with no ring to remove fills an already isolated group', () => {
+    const keep: Record<string, 'white' | 'gray' | 'black' | null> = {
+      '0,0': 'white', '1,0': null,
+      '0,3': null, '1,3': 'black', '1,2': 'black', '0,2': 'gray', '-1,3': 'gray', '-1,4': 'black', '0,4': 'black',
+    };
+    const { tsState } = assertSeededParity(37, state => {
+      for (const [id, ring] of state.rings) {
+        if (id in keep) ring.marble = keep[id] ? { color: keep[id]! } : null;
+        else ring.isRemoved = true;
+      }
+    }, { type: 'placement', data: { marbleColor: 'gray', ringId: '1,0', removedRingId: null } });
+    expect(tsState.captures.player1).toEqual({ white: 1, gray: 1, black: 0 });
+  });
+
   it('matches when an isolated group still has an empty ring (no capture)', () => {
     // Group {"2,0","3,0"} is isolated but "2,0" is empty → NOT captured. Both
     // engines must leave the white marble in place.

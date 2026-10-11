@@ -94,8 +94,9 @@ function getIsolatedGroups(rings) {
 
 // Mirror of GameEngine.handleIsolation: any isolated group whose rings are all
 // occupied (no empty rings) is awarded to the current player and removed from
-// play. Runs even for a single remaining group: if the last ring removal leaves
-// the whole board fully filled, those final marbles are captured.
+// play — after a ring removal, or after a placement that fills a group's last
+// vacant ring with no ring left to remove. Runs even for a single remaining
+// group: a whole board left fully filled is claimed too.
 function handleIsolation(state) {
   const groups = getIsolatedGroups(state.rings);
 
@@ -173,7 +174,9 @@ function applyMove(state, move) {
     if (move.data.removedRingId) {
       removeRing(state, move.data.removedRingId);
     } else {
-      // No removable ring at this turn — engine auto-skipped removal.
+      // No removable ring at this turn — engine auto-skipped removal (mirror of
+      // GameEngine.skipRingRemoval, which still claims a group the placement filled).
+      handleIsolation(state);
       state.pendingPlacement = null;
       state.phase = 'placement';
       state.currentPlayer = state.currentPlayer === 'player1' ? 'player2' : 'player1';

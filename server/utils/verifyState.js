@@ -44,7 +44,16 @@ function naturalWinner(state) {
       return player;
     }
   }
+  // Mirror of GameEngine.checkWinCondition: a full board is claimed by whoever
+  // filled it, and that player wins even without a capture goal. Nothing is
+  // left in play, and the side to move is the one that did not make the move.
+  if (boardCleared(state)) return state.currentPlayer === 'player1' ? 'player2' : 'player1';
   return null;
+}
+
+function boardCleared(state) {
+  for (const ring of state.rings.values()) if (!ring.isRemoved) return false;
+  return true;
 }
 
 function mainLineMoves(treeRoot) {
@@ -185,6 +194,7 @@ function winTypeFor(state, winner) {
   if (c.white >= WIN_CONDITIONS.allColors && c.gray >= WIN_CONDITIONS.allColors && c.black >= WIN_CONDITIONS.allColors) {
     return 'mixed';
   }
+  if (boardCleared(state)) return 'fullBoard';
   return 'unknown';
 }
 

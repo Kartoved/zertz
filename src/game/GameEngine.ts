@@ -231,14 +231,21 @@ export function removeRing(state: GameState, ringId: string): MarbleColor[] | fa
   return isolated;
 }
 
-export function skipRingRemoval(state: GameState): void {
+// Ends a placement turn that has no ring to remove. Returns the marbles the
+// placement claimed by isolation, like removeRing: putting a marble on the last
+// vacant ring of an already isolated group claims that group — and when it was
+// the last vacant ring of the whole board, the whole board. Returns [] and
+// changes nothing while a ring can still be removed.
+export function skipRingRemoval(state: GameState): MarbleColor[] {
   const validRings = getValidRemovableRings(state.rings);
-  if (validRings.length === 0) {
-    state.pendingPlacement = null;
-    state.phase = 'placement';
-    state.currentPlayer = state.currentPlayer === 'player1' ? 'player2' : 'player1';
-    state.moveNumber++;
-  }
+  if (validRings.length > 0) return [];
+
+  const isolated = handleIsolation(state);
+  state.pendingPlacement = null;
+  state.phase = 'placement';
+  state.currentPlayer = state.currentPlayer === 'player1' ? 'player2' : 'player1';
+  state.moveNumber++;
+  return isolated;
 }
 
 function handleIsolation(state: GameState): MarbleColor[] {
@@ -246,10 +253,10 @@ function handleIsolation(state: GameState): MarbleColor[] {
   const groups = getIsolatedGroups(state.rings);
 
   // Any isolated group whose rings are ALL occupied is captured by the player
-  // who just removed the ring. The board continues on the group(s) that still
-  // have an empty ring. This must run even when there is a single remaining
-  // group: if the last ring removal leaves the whole board fully filled, those
-  // final marbles are captured (otherwise the win was never awarded).
+  // who just moved — by removing a ring, or by filling the last vacant ring of
+  // a group. The board continues on the group(s) that still have an empty ring.
+  // This must run even when there is a single remaining group: a whole board
+  // left fully filled is claimed too, and its claimer wins (checkWinCondition).
   for (const group of groups) {
     const hasEmpty = group.some(id => {
       const ring = state.rings.get(id);
@@ -290,8 +297,24 @@ export function checkWinCondition(state: GameState): Player | null {
       return player;
     }
   }
-  
+
+  // "If all the rings were occupied before either of the players achieves one
+  // of the set goals, it is the one who makes the last move who wins" (official
+  // rules). The full board is claimed as an isolated group, so nothing is left.
+  if (boardCleared(state)) return opponentOf(state.currentPlayer);
+
   return null;
+}
+
+// No ring left in play: the last group was filled and claimed. Only a completed
+// move can get here, so the side to move is the one that did NOT make it.
+function boardCleared(state: GameState): boolean {
+  for (const ring of state.rings.values()) if (!ring.isRemoved) return false;
+  return true;
+}
+
+function opponentOf(player: Player): Player {
+  return player === 'player1' ? 'player2' : 'player1';
 }
 
 export function hasAvailableCaptures(state: GameState): boolean {
@@ -373,5 +396,6 @@ export function getWinType(state: GameState, winner: Player): string {
   ) {
     return 'mixed';
   }
+  if (boardCleared(state)) return 'fullBoard';
   return 'unknown';
 }

@@ -191,6 +191,7 @@ export const en = {
   winByBlack: 'Win by black marbles!',
   winByMixed: 'Win by mixed marbles!',
   winByTime: 'Win on time!',
+  winByFullBoard: 'Win: the board is full!',
   winUnknown: 'Win!',
   phasePlacement: 'Place a marble',
   phaseRingRemoval: 'Remove a ring',

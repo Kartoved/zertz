@@ -154,4 +154,52 @@ describe('verifySubmittedState', () => {
 
     expect(result.ok).toBe(true);
   });
+
+  describe('a placement that fills the whole board', () => {
+    // Three rings left, two occupied; the last placement fills the board, no
+    // ring can be removed, and the mover claims everything — winning even
+    // though no capture goal is reached (official rules).
+    function fullBoardGame() {
+      const setup = createInitialState(37);
+      const keep = { '0,3': 'white', '1,3': 'gray', '2,3': null };
+      for (const [id, ring] of setup.rings) {
+        if (id in keep) ring.marble = keep[id] ? { color: keep[id] } : null;
+        else ring.isRemoved = true;
+      }
+      const move = { type: 'placement', data: { marbleColor: 'black', ringId: '2,3', removedRingId: null } };
+      const after = JSON.parse(serializeState(setup));
+      after.rings = new Map(after.rings);
+      applyMove(after, move);
+      return { setupJson: serializeState(setup), move, after };
+    }
+
+    it('accepts the mover as the winner', () => {
+      const { setupJson, move, after } = fullBoardGame();
+      expect(after.captures.player1).toEqual({ white: 1, gray: 1, black: 1 });
+      after.winner = 'player1';
+      after.phase = 'gameOver';
+      const result = verifySubmittedState({
+        stateJson: serializeState(after),
+        treeJson: JSON.stringify(makeTreeWithMoves([move])),
+        boardSize: 37,
+        winType: 'fullBoard',
+        playerIndex: 1,
+        setupJson,
+      });
+      expect(result).toEqual({ ok: true });
+    });
+
+    it('rejects a state that leaves the full board without a winner', () => {
+      const { setupJson, move, after } = fullBoardGame();
+      const result = verifySubmittedState({
+        stateJson: serializeState(after),
+        treeJson: JSON.stringify(makeTreeWithMoves([move])),
+        boardSize: 37,
+        winType: null,
+        playerIndex: 1,
+        setupJson,
+      });
+      expect(result).toEqual({ ok: false, reason: 'winner-mismatch' });
+    });
+  });
 });

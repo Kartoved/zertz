@@ -6,6 +6,8 @@ import {
   hasAvailableCaptures,
   getCaptureChains,
   getWinType,
+  skipRingRemoval,
+  checkWinCondition,
 } from '../game/GameEngine';
 import { getValidRemovableRings } from '../game/Board';
 import { applyPlacement, applyRingRemoval, applyCapture, normalizePhase } from '../utils/moveActions';
@@ -243,8 +245,8 @@ function syncWinnerFromRoom(state: GameState, winnerNum: number | null): GameSta
 //     the board state makes every adjacent ring occupied/invalid at the moment
 //     the premove was saved, or when the server auto-executes a premove step
 //     whose preceding placeMarble call left no free rings):
-//     advance to 'placement' + flip currentPlayer + increment moveNumber, i.e.
-//     execute the implicit skipRingRemoval.
+//     execute the implicit skipRingRemoval (which also claims a group the
+//     placement filled — the server's replay does the same).
 //
 // Clones only when a patch is needed; returns the original reference otherwise.
 function normalizePhaseForCaptures(state: GameState): GameState {
@@ -254,10 +256,9 @@ function normalizePhaseForCaptures(state: GameState): GameState {
     const validRings = getValidRemovableRings(state.rings);
     if (validRings.length === 0) {
       const patched = cloneState(state);
-      patched.pendingPlacement = null;
-      patched.phase = 'placement';
-      patched.currentPlayer = patched.currentPlayer === 'player1' ? 'player2' : 'player1';
-      patched.moveNumber++;
+      skipRingRemoval(patched);
+      const winner = checkWinCondition(patched);
+      if (winner) { patched.winner = winner; patched.phase = 'gameOver'; }
       return patched;
     }
     return state;

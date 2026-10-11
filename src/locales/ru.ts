@@ -191,6 +191,7 @@ export const ru = {
   winByBlack: 'Победа по чёрным шарикам!',
   winByMixed: 'Победа по разным шарикам!',
   winByTime: 'Победа по времени!',
+  winByFullBoard: 'Победа: доска заполнена!',
   winUnknown: 'Победа!',
   phasePlacement: 'Размести шарик',
   phaseRingRemoval: 'Удали кольцо',

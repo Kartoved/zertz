@@ -59,6 +59,7 @@ function winMarker(winner: string | null | undefined, winType: string | null | u
   if (winType === 'black') return { symbol: '⚫', title: t.winByBlack };
   if (winType === 'mixed') return { symbol: '🎨', title: t.winByMixed };
   if (winType === 'time') return { symbol: '⏱', title: t.winByTime };
+  if (winType === 'fullBoard') return { symbol: '⬢', title: t.winByFullBoard };
   if (winType === 'surrender') return { symbol: '🏳', title: t.surrender };
   return { symbol: '★', title: t.gameOver || '' };
 }

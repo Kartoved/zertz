@@ -9,6 +9,7 @@ import {
   getAvailableCaptures,
   getCaptureChains,
   checkWinCondition,
+  getWinType,
   hasAvailableCaptures,
   moveToNotation,
 } from './GameEngine';
@@ -440,6 +441,81 @@ describe('isolation auto-capture', () => {
     // "3,0" marble should NOT be captured — the group {"2,0", "3,0"} has empty "2,0"
     expect(state.rings.get('3,0')!.marble).not.toBeNull();
     expect(state.captures.player1.white).toBe(0);
+  });
+});
+
+// ─── isolation after a placement with no ring to remove ──────────────────────
+//
+// Official rules: a group is claimed when a player "puts a marble on the last
+// vacant ring of an already isolated group", not only when a removal cuts it
+// off — and "if all the rings were occupied before either player achieves one
+// of the set goals, it is the one who makes the last move who wins". A
+// placement that leaves no ring removable used to skip isolation entirely, so
+// a full board stayed on the table and the next player had no legal move.
+
+// Keeps only `keep` on the board; every other ring is removed.
+function boardOf(keep: Record<string, MarbleColor | null>): GameState {
+  const state = createInitialState(37);
+  for (const [id, ring] of state.rings) {
+    if (id in keep) ring.marble = keep[id] ? { color: keep[id]! } : null;
+    else ring.isRemoved = true;
+  }
+  return state;
+}
+
+describe('isolation after a placement with no removable ring', () => {
+  it('filling the last vacant ring of the board claims every marble, and the mover wins', () => {
+    // A connected strip of four rings, three occupied.
+    const state = boardOf({ '0,3': 'white', '1,3': 'gray', '2,3': 'black', '3,3': null });
+    expect(placeMarble(state, '3,3', 'gray')).toBe(true);
+    expect(getValidRemovableRings(state.rings)).toEqual([]);
+
+    expect(skipRingRemoval(state)).toEqual(expect.arrayContaining(['white', 'gray', 'gray', 'black']));
+
+    expect(state.captures.player1).toEqual({ white: 1, gray: 2, black: 1 });
+    expect([...state.rings.values()].every(r => r.isRemoved)).toBe(true);
+    // No capture goal is met — the full board alone decides it.
+    expect(checkWinCondition(state)).toBe('player1');
+    expect(getWinType(state, 'player1')).toBe('fullBoard');
+  });
+
+  it('filling the last vacant ring of an already isolated group claims that group', () => {
+    // Group A: two rings, one vacant. Group B: a flower whose vacant centre
+    // has no free edge, so no ring anywhere is removable after the placement.
+    const state = boardOf({
+      '0,0': 'white', '1,0': null,
+      '0,3': null, '1,3': 'black', '1,2': 'black', '0,2': 'gray', '-1,3': 'gray', '-1,4': 'black', '0,4': 'black',
+    });
+    expect(placeMarble(state, '1,0', 'white')).toBe(true);
+    expect(getValidRemovableRings(state.rings)).toEqual([]);
+
+    expect(skipRingRemoval(state)).toEqual(['white', 'white']);
+
+    expect(state.captures.player1).toEqual({ white: 2, gray: 0, black: 0 });
+    expect(state.rings.get('0,0')!.isRemoved).toBe(true);
+    expect(state.rings.get('1,0')!.isRemoved).toBe(true);
+    // The group with a vacant ring stays in play, and so does the game.
+    expect(state.rings.get('0,3')!.isRemoved).toBe(false);
+    expect(state.rings.get('1,3')!.marble).toEqual({ color: 'black' });
+    expect(state.currentPlayer).toBe('player2');
+    expect(checkWinCondition(state)).toBeNull();
+  });
+
+  it('a capture goal reached by claiming the full board is reported as that goal', () => {
+    const state = boardOf({ '0,3': 'white', '1,3': 'white', '2,3': null });
+    state.captures.player1.white = 1;
+    placeMarble(state, '2,3', 'white');
+    skipRingRemoval(state);
+    expect(state.captures.player1.white).toBe(4);
+    expect(checkWinCondition(state)).toBe('player1');
+    expect(getWinType(state, 'player1')).toBe('white');
+  });
+
+  it('returns nothing and changes nothing when a ring can still be removed', () => {
+    const state = createInitialState();
+    placeMarble(state, '0,3', 'white');
+    expect(skipRingRemoval(state)).toEqual([]);
+    expect(state.phase).toBe('ringRemoval');
   });
 });
 
