@@ -92,6 +92,9 @@ function splitBody(body: string): Record<BlogLocale, string> {
 }
 
 export function parseMarkdownPost(slug: string, raw: string): BlogPost | null {
+  // A Windows checkout (core.autocrlf) hands us CRLF; the frontmatter parser
+  // splits on '\n' and would keep a '\r' on every value.
+  raw = raw.replace(/\r\n/g, '\n');
   const match = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
   if (!match) return null;
 
