@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateBotGame } from './botGames.js';
+import { MAX_ZEN, validateBotGame } from './botGames.js';
 
 const game = {
   player1: 'human', player2: 'greedy', boardSize: 48, winner: 'player2', winType: 'white',
@@ -20,7 +20,7 @@ describe('validateBotGame', () => {
     expect(validateBotGame({ ...game, winner: 'player3' }).ok).toBe(false);
     expect(validateBotGame({ ...game, plies: -1 }).ok).toBe(false);
     expect(validateBotGame({ ...game, zen: 'x'.repeat(10) }).ok).toBe(false);
-    expect(validateBotGame({ ...game, zen: `[${'x'.repeat(200_001)}` }).ok).toBe(false);
+    expect(validateBotGame({ ...game, zen: `[${'x'.repeat(MAX_ZEN)}` }).ok).toBe(false);
     expect(validateBotGame(null).ok).toBe(false);
   });
 });

@@ -307,6 +307,7 @@ async function ensureSchema() {
       app_version TEXT,
       created_at  TIMESTAMP NOT NULL DEFAULT NOW()
     );
+    CREATE INDEX IF NOT EXISTS idx_bot_games_created ON bot_games(created_at);
   `);
 
   // Matchmaking queue — survives server restarts and supports multiple instances.

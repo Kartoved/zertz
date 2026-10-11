@@ -6,7 +6,14 @@
  */
 
 const SIDE = /^(human|[a-z][a-z0-9-]*(:[a-zA-Z0-9=.,_-]*)?)$/;
-const MAX_ZEN = 200_000;
+// A real game is 0.4–6 KB of ZEN; the cap bounds what one request can store.
+export const MAX_ZEN = 20_000;
+
+/** Rows accepted per 24 h across everyone (a day of fast bot-vs-bot watching is ~1000). */
+export const DAILY_CAP = 2000;
+
+/** The table stops growing here, whatever happens: the server's disk is 10 GB. */
+export const MAX_TABLE_BYTES = 500 * 1024 * 1024;
 
 export function validateBotGame(body) {
   if (!body || typeof body !== 'object') return { ok: false, error: 'body required' };
