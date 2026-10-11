@@ -9,7 +9,6 @@ interface StudySidebarProps {
   currentId: number | null;
   onOpen: (slug: string) => void;
   onNew?: (parentId: number | null) => void;
-  onNewFromPosition?: () => void;
   /** Nodes to render; defaults to the signed-in user's own hierarchy. */
   nodes?: StudyTreeNode[];
   /** Reading mode: no create/rename/delete/drag, just navigation. */
@@ -23,7 +22,7 @@ interface StudySidebarProps {
 // header → top level). In `readOnly` mode (someone else's public chapters,
 // guests included) it is a plain table of contents. Content-free — bodies
 // load on open.
-export default function StudySidebar({ currentId, onOpen, onNew, onNewFromPosition, nodes, readOnly = false, heading }: StudySidebarProps) {
+export default function StudySidebar({ currentId, onOpen, onNew, nodes, readOnly = false, heading }: StudySidebarProps) {
   const { t } = useI18n();
   const { tree: ownTree, collapsed, expand, expandAll, collapseAll, toggleExpand, renameStudy, deleteStudy, moveStudy } = useStudyStore();
   const tree = nodes ?? ownTree;
@@ -148,14 +147,6 @@ export default function StudySidebar({ currentId, onOpen, onNew, onNewFromPositi
           )}
           {!readOnly && (
           <>
-          <button
-            type="button"
-            onClick={() => onNewFromPosition?.()}
-            title={t.studyNewFromPosition}
-            className="px-2 py-1 rounded-md text-sm font-semibold bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600"
-          >
-            ⊞
-          </button>
           <button
             type="button"
             onClick={() => onNew?.(null)}

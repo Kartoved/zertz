@@ -10,6 +10,7 @@ type Brush = MarbleColor | 'erase' | 'ring';
 interface PositionEditorModalProps {
   onClose: () => void;
   onCreate: (title: string, state: GameState) => Promise<void> | void;
+  initialTitle?: string;
 }
 
 // Etap D — arbitrary position editor. The board + captures always conserve the
@@ -17,11 +18,11 @@ interface PositionEditorModalProps {
 // capture draws from a shared reserve, so the invariant holds by construction.
 // Validation is balance + structure only (marbles only on present rings) — no
 // ZERTZ legality check, so reconstructed / broken positions can be entered.
-export default function PositionEditorModal({ onClose, onCreate }: PositionEditorModalProps) {
+export default function PositionEditorModal({ onClose, onCreate, initialTitle = '' }: PositionEditorModalProps) {
   const { t } = useI18n();
   const [state, setState] = useState<GameState>(() => createInitialState(37));
   const [brush, setBrush] = useState<Brush>('white');
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(initialTitle);
   const [busy, setBusy] = useState(false);
 
   const setBoardSize = (size: 37 | 48 | 61) => setState(createInitialState(size));
@@ -50,6 +51,19 @@ export default function PositionEditorModal({ onClose, onCreate }: PositionEdito
       if (r.marble) next.reserve[r.marble.color]++; // free the replaced marble
       next.reserve[brush]--;
       r.marble = { color: brush };
+      return next;
+    });
+  };
+
+  // Right click always erases a marble, whatever brush is selected.
+  const handleRingRightClick = (ringId: string) => {
+    setState(prev => {
+      const r = prev.rings.get(ringId);
+      if (!r?.marble) return prev;
+      const next = cloneState(prev);
+      const nr = next.rings.get(ringId)!;
+      next.reserve[nr.marble!.color]++;
+      nr.marble = null;
       return next;
     });
   };
@@ -135,7 +149,7 @@ export default function PositionEditorModal({ onClose, onCreate }: PositionEdito
           {/* Board */}
           <div className="flex-1 min-w-0">
             <div className="w-full max-w-[460px] mx-auto aspect-square rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
-              <HexBoard state={state} onRingClick={handleRingClick} preview editable coordinates />
+              <HexBoard state={state} onRingClick={handleRingClick} onRingRightClick={handleRingRightClick} preview editable coordinates />
             </div>
             {/* Brush palette */}
             <div className="flex flex-wrap items-center justify-center gap-2 mt-3">

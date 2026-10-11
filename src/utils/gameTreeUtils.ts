@@ -187,3 +187,45 @@ export function formatGameId(timestamp: number): string {
   const pad = (n: number) => n.toString().padStart(2, '0');
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
 }
+
+// ── Variation editing (studies) ──
+// children[0] is the main continuation at every branch point; these keep the
+// isMainLine flags in sync. All mutate the tree in place.
+
+/** Make the line through `node` the main line all the way up to the root. */
+export function promoteToMainLine(node: GameNode): void {
+  let n: GameNode = node;
+  while (n.parent) {
+    const p: GameNode = n.parent;
+    const i = p.children.indexOf(n);
+    if (i > 0) {
+      p.children.splice(i, 1);
+      p.children.unshift(n);
+      syncMainLineFlags(p);
+    }
+    n = p;
+  }
+}
+
+/** Move a variation one place up among its siblings (index 1 → becomes main). */
+export function moveVariationUp(node: GameNode): void {
+  const p = node.parent;
+  if (!p) return;
+  const i = p.children.indexOf(node);
+  if (i <= 0) return;
+  [p.children[i - 1], p.children[i]] = [p.children[i], p.children[i - 1]];
+  syncMainLineFlags(p);
+}
+
+/** Delete everything after `node` (all its continuations). */
+export function truncateAfter(node: GameNode): void {
+  node.children = [];
+}
+
+/** True when `node` is on the main line from the root. */
+export function isOnMainLine(node: GameNode): boolean {
+  for (let n: GameNode = node; n.parent; n = n.parent) {
+    if (n.parent.children[0] !== n) return false;
+  }
+  return true;
+}

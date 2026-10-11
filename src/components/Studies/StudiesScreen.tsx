@@ -6,6 +6,7 @@ import StudyBoardViewer from './StudyBoardViewer';
 import PositionEditorModal from './PositionEditorModal';
 import ImportStudyModal from './ImportStudyModal';
 import TextInputModal from './TextInputModal';
+import NewStudyModal, { type NewStudyChoice } from './NewStudyModal';
 import StudyMetaModal from './StudyMetaModal';
 import { useStudyStore } from '../../store/studyStore';
 import { zipToState } from '../../game/zip';
@@ -27,42 +28,55 @@ export default function StudiesScreen() {
   } = useStudyStore();
   const [mobileSidebar, setMobileSidebar] = useState(false);
   const [landingTab, setLandingTab] = useState<'all' | 'mine'>('all');
-  const [showEditor, setShowEditor] = useState(false);
-  const [showImport, setShowImport] = useState(false);
   const [showMeta, setShowMeta] = useState(false);
-  // Parent for a new blank study: number | null while the modal is open, undefined when closed.
+  // "New study" flow: the chooser holds the parent id (number | null = root)
+  // while open, undefined when closed; then the editor / import dialog.
   const [newParent, setNewParent] = useState<number | null | undefined>(undefined);
+  const [editorFor, setEditorFor] = useState<{ parentId: number | null; title: string } | null>(null);
+  const [importFor, setImportFor] = useState<{ parentId: number | null; title: string } | null>(null);
   const [renameOpen, setRenameOpen] = useState(false);
   const [slugOpen, setSlugOpen] = useState(false);
 
-  const handleNewStudy = async (title: string) => {
-    const parentId = newParent ?? null;
-    const r = await createStudy(parentId, title);
-    setNewParent(undefined);
+  const openCreated = (r: { slug: string; ownerName: string } | null, parentId: number | null) => {
     if (parentId != null) expand(parentId);
     if (r) navigate(`/studies/${encodeURIComponent(r.ownerName)}/${encodeURIComponent(r.slug)}`);
   };
 
+  const handleNewChoice = async (choice: NewStudyChoice) => {
+    const parentId = newParent ?? null;
+    if (choice.kind === 'blank') {
+      const r = await createStudy(parentId, choice.title, choice.boardSize);
+      setNewParent(undefined);
+      openCreated(r, parentId);
+      return;
+    }
+    setNewParent(undefined);
+    if (choice.kind === 'editor') setEditorFor({ parentId, title: choice.title });
+    else setImportFor({ parentId, title: choice.title });
+  };
+
   const handleCreateFromPosition = async (title: string, state: GameState) => {
-    const r = await createStudyFromState(title, state);
-    setShowEditor(false);
-    if (r) navigate(`/studies/${encodeURIComponent(r.ownerName)}/${encodeURIComponent(r.slug)}`);
+    const parentId = editorFor?.parentId ?? null;
+    const r = await createStudyFromState(title, state, parentId);
+    setEditorFor(null);
+    openCreated(r, parentId);
   };
 
   // Import a ZEN game or a ZIP position as a new study. Returns false on parse
   // failure so the modal can show an error.
   const handleImport = async (text: string, title: string): Promise<boolean> => {
+    const parentId = importFor?.parentId ?? null;
     try {
       let r;
       if (/\[\w+\s+"/.test(text)) {
         const { startState, root, meta } = zenToTree(text);
-        r = await createStudyFromGame(title || meta.Event || 'Imported game', startState, root);
+        r = await createStudyFromGame(title || meta.Event || 'Imported game', startState, root, parentId);
       } else {
-        r = await createStudyFromState(title || 'Imported position', zipToState(text));
+        r = await createStudyFromState(title || 'Imported position', zipToState(text), parentId);
       }
       if (!r) return false;
-      setShowImport(false);
-      navigate(`/studies/${encodeURIComponent(r.ownerName)}/${encodeURIComponent(r.slug)}`);
+      setImportFor(null);
+      openCreated(r, parentId);
       return true;
     } catch {
       return false;
@@ -165,7 +179,6 @@ export default function StudiesScreen() {
               currentId={current?.id ?? null}
               onOpen={readingOther ? openOther : open}
               onNew={setNewParent}
-              onNewFromPosition={() => setShowEditor(true)}
               nodes={sidebarNodes}
               readOnly={readingOther}
               heading={readingOther ? (ownerTreeName || owner) : undefined}
@@ -266,18 +279,6 @@ export default function StudiesScreen() {
                   >
                     + {t.studyNew}
                   </button>
-                  <button
-                    onClick={() => setShowEditor(true)}
-                    className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600"
-                  >
-                    ⊞ {t.studyNewFromPosition}
-                  </button>
-                  <button
-                    onClick={() => setShowImport(true)}
-                    className="px-3 py-1.5 rounded-lg text-sm font-semibold bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600"
-                  >
-                    ⤓ {t.studyImport}
-                  </button>
                 </div>
               )}
 
@@ -311,19 +312,18 @@ export default function StudiesScreen() {
         </main>
       </div>
 
-      {showEditor && (
-        <PositionEditorModal onClose={() => setShowEditor(false)} onCreate={handleCreateFromPosition} />
-      )}
-      {showImport && (
-        <ImportStudyModal onClose={() => setShowImport(false)} onImport={handleImport} />
-      )}
       {newParent !== undefined && (
-        <TextInputModal
-          title={t.studyNew}
-          placeholder={t.studyNewTitlePrompt}
+        <NewStudyModal
+          parentTitle={newParent != null ? tree.find(n => n.id === newParent)?.title ?? null : null}
           onClose={() => setNewParent(undefined)}
-          onSubmit={handleNewStudy}
+          onChoose={handleNewChoice}
         />
+      )}
+      {editorFor && (
+        <PositionEditorModal onClose={() => setEditorFor(null)} onCreate={handleCreateFromPosition} initialTitle={editorFor.title} />
+      )}
+      {importFor && (
+        <ImportStudyModal onClose={() => setImportFor(null)} onImport={handleImport} initialTitle={importFor.title} />
       )}
       {renameOpen && current && (
         <TextInputModal

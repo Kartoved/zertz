@@ -2,10 +2,10 @@ import { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import HexBoard from '../Board/HexBoard';
 import MarbleSelector from '../UI/MarbleSelector';
-import StudyMoveTree from './StudyMoveTree';
+import StudyMoveTree, { type StudyTreeEdit } from './StudyMoveTree';
 import { StudyNode } from '../../db/studiesApi';
 import { deserializeTree, serializeTree, deserializeState } from '../../db/apiClient';
-import { findDeepestMainLine } from '../../utils/gameTreeUtils';
+import { findDeepestMainLine, promoteToMainLine, moveVariationUp, truncateAfter } from '../../utils/gameTreeUtils';
 import { getValidRemovableRings } from '../../game/Board';
 import { stateToZip } from '../../game/zip';
 import { treeToZen } from '../../game/zen';
@@ -18,12 +18,15 @@ import {
   applyAnalysisCapture,
 } from '../../store/analysisActions';
 import { studyStateAtNode, findNodeById } from './studyState';
-import { GameNode, GameState, MarbleColor, CaptureMove, Captures, WIN_CONDITIONS, Shape } from '../../game/types';
+import { GameNode, GameState, MarbleColor, CaptureMove, Captures, WIN_CONDITIONS, Shape, MoveGlyph } from '../../game/types';
 import { useI18n } from '../../i18n';
 import { toggleShape } from '../../game/shapes';
+import { MOVE_GLYPHS, GLYPH_COLOR } from '../../game/glyphs';
 import { useCaptureSteps } from '../Board/useCaptureSteps';
 import { MarbleIcon } from '../Board/marbleStyle';
 import { useCaptureStepView, stepBack, stepForward, navigateWhole, useActiveCaptureStep } from '../../store/captureStepView';
+import OnlineChallengeModal from '../Layout/OnlineChallengeModal';
+import { useAuthStore } from '../../store/authStore';
 
 const noop = () => {};
 
@@ -63,16 +66,32 @@ function readTraining(study: StudyNode): boolean {
   return study.meta?.training ?? false;
 }
 
+// Deep link to a move: `/studies/owner/slug#m=<nodeId>`. The viewer opens on
+// that move and keeps the hash in sync while navigating, so the address bar is
+// always a shareable link to the current position.
+function nodeFromHash(root: GameNode): GameNode {
+  const m = window.location.hash.match(/^#m=(.+)$/);
+  return (m && findNodeById(root, decodeURIComponent(m[1]))) || root;
+}
+function writeMoveHash(node: GameNode): void {
+  try {
+    const url = node.parent ? `#m=${encodeURIComponent(node.id)}` : window.location.pathname + window.location.search;
+    window.history.replaceState(window.history.state, '', url);
+  } catch { /* ignore */ }
+}
+
 export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNode; onSaveTree: (treeJson: string) => Promise<void> }) {
   const { t } = useI18n();
   const canEdit = study.isOwner;
 
   // Working tree: private, mutable, discardable. Re-init on study change.
   const rootRef = useRef<GameNode>(deserializeTree(study.treeJson));
-  const [currentNode, setCurrentNode] = useState<GameNode>(rootRef.current);
-  const [boardState, setBoardState] = useState<GameState>(() => studyStateAtNode(study.setupJson, rootRef.current));
+  const [currentNode, setCurrentNode] = useState<GameNode>(() => nodeFromHash(rootRef.current));
+  const [boardState, setBoardState] = useState<GameState>(() => studyStateAtNode(study.setupJson, nodeFromHash(rootRef.current)));
   const [saving, setSaving] = useState(false);
   const [deleteBranchNode, setDeleteBranchNode] = useState<GameNode | null>(null);
+  const [playFrom, setPlayFrom] = useState<GameState | null>(null);
+  const { user } = useAuthStore();
 
   // Training mode: hide the whole solution (move tree, comments, arrows, forward
   // nav) so the learner explores freely without spoilers. Effective value =
@@ -111,8 +130,9 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
   const reinit = (treeJson: string) => {
     const fresh = deserializeTree(treeJson);
     rootRef.current = fresh;
-    setCurrentNode(fresh);
-    setBoardState(studyStateAtNode(study.setupJson, fresh));
+    const start = nodeFromHash(fresh);
+    setCurrentNode(start);
+    setBoardState(studyStateAtNode(study.setupJson, start));
     setSelectedMarble(null);
     clearSelection();
     setDirty(false);
@@ -167,7 +187,25 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
     markEdited();
   };
 
+  // Variation editing (author). Truncation is confirmed; reordering is instant.
+  const [truncateNode, setTruncateNode] = useState<GameNode | null>(null);
+  const confirmTruncate = () => {
+    const node = truncateNode;
+    setTruncateNode(null);
+    if (!node) return;
+    if (node.id !== currentNode.id && findNodeById(node, currentNode.id)) navigateTo(node);
+    truncateAfter(node);
+    markEdited();
+  };
+  const treeEdit: StudyTreeEdit = {
+    onDelete: handleDeleteBranch,
+    onPromote: (n) => { promoteToMainLine(n); markEdited(); },
+    onMoveUp: (n) => { moveVariationUp(n); markEdited(); },
+    onTruncate: (n) => setTruncateNode(n),
+  };
+
   const navigateTo = (node: GameNode) => {
+    writeMoveHash(node);
     setCurrentNode(node);
     setBoardState(studyStateAtNode(study.setupJson, node));
     setSelectedMarble(null);
@@ -196,6 +234,13 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
     /* eslint-disable-next-line */
   }, [currentNode, training]);
 
+  // Toggle a quality mark on the current move (same mark again removes it).
+  const toggleGlyph = (g: MoveGlyph) => {
+    if (!currentNode.move) return;
+    currentNode.glyph = currentNode.glyph === g ? undefined : g;
+    markEdited();
+  };
+
   const updateComment = (value: string) => {
     currentNode.comment = value || undefined;
     markEdited();
@@ -211,6 +256,19 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
   const clearShapes = () => {
     if (!currentNode.shapes?.length) return;
     currentNode.shapes = undefined;
+    markEdited();
+  };
+
+  // Wipe annotations from every move of the study (author tool, confirmed).
+  const [confirmClearAll, setConfirmClearAll] = useState(false);
+  const anyShapes = (function has(n: GameNode): boolean {
+    return !!n.shapes?.length || n.children.some(has);
+  })(rootRef.current);
+  const clearAllShapes = () => {
+    (function wipe(n: GameNode) {
+      n.shapes = undefined;
+      n.children.forEach(wipe);
+    })(rootRef.current);
     markEdited();
   };
 
@@ -357,6 +415,7 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
             shapes={training ? undefined : currentNode.shapes}
             drawable={!training}
             onShapeDraw={handleDrawShape}
+            onClearShapes={clearShapes}
             preview
             coordinates
             lastMove={currentNode.move}
@@ -372,13 +431,13 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
         </div>
         <div className={`${training ? 'hidden' : 'hidden sm:flex'} items-center justify-center gap-3 mt-2`}>
           <span className="text-[11px] text-gray-400 dark:text-gray-500">{t.studyDrawHint}</span>
-          {currentNode.shapes?.length ? (
+          {anyShapes ? (
             <button
               type="button"
-              onClick={clearShapes}
+              onClick={() => setConfirmClearAll(true)}
               className="text-[11px] px-2 py-0.5 rounded-md bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
             >
-              🗑 {t.studyClearShapes}
+              🧹 {t.studyClearAllShapes}
             </button>
           ) : null}
         </div>
@@ -405,9 +464,30 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
           {training ? (
             <p className="text-xs text-gray-400 dark:text-gray-500 py-6 text-center">🙈 {t.studyTrainingHidden}</p>
           ) : (
-            <StudyMoveTree root={rootRef.current} currentId={currentNode.id} onSelect={n => navigateWhole(n, navigateTo)} onDelete={canEdit ? handleDeleteBranch : undefined} boardSize={boardState.boardSize} />
+            <StudyMoveTree root={rootRef.current} currentId={currentNode.id} onSelect={n => navigateWhole(n, navigateTo)} edit={canEdit ? treeEdit : undefined} boardSize={boardState.boardSize} />
           )}
         </div>
+        {/* Play the current position out against someone (bots: coming soon) */}
+        {user && !training && (
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setPlayFrom(boardState)}
+              disabled={boardState.phase === 'ringRemoval' || !!boardState.winner}
+              title={t.studyPlayFromHereHint}
+              className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-900/70 disabled:opacity-40"
+            >
+              ⚔ {t.studyPlayFromHere}
+            </button>
+            <button
+              type="button"
+              disabled
+              className="flex-1 px-3 py-1.5 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-400 dark:text-gray-500 cursor-not-allowed"
+            >
+              🤖 {t.studyPlayBot} · {t.comingSoon}
+            </button>
+          </div>
+        )}
         <NotationButtons
           getZip={getZip}
           getZen={getZen}
@@ -416,7 +496,24 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
         />
         {training ? null : canEdit ? (
           <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-2">
-            <div className="flex justify-end mb-1.5">
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              {currentNode.move ? (
+                <div className="flex gap-0.5" title={t.studyMoveGlyph}>
+                  {MOVE_GLYPHS.map(g => (
+                    <button
+                      key={g}
+                      type="button"
+                      onClick={() => toggleGlyph(g)}
+                      className={`min-w-[26px] px-1 py-0.5 rounded text-xs font-bold border ${
+                        currentNode.glyph === g ? 'text-white border-transparent' : 'border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-700'
+                      }`}
+                      style={currentNode.glyph === g ? { background: GLYPH_COLOR[g] } : { color: GLYPH_COLOR[g] }}
+                    >
+                      {g}
+                    </button>
+                  ))}
+                </div>
+              ) : <span />}
               <div className="flex text-[11px] font-medium rounded-md overflow-hidden border border-gray-200 dark:border-gray-600">
                 <button type="button" onClick={() => setCommentMode('edit')}
                   className={`px-2 py-0.5 ${commentMode === 'edit' ? 'bg-indigo-500 text-white' : 'bg-gray-50 dark:bg-gray-700 text-gray-600 dark:text-gray-300'}`}>
@@ -458,6 +555,32 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
           danger
           onClose={() => setDeleteBranchNode(null)}
           onConfirm={confirmDeleteBranch}
+        />
+      )}
+      {truncateNode && (
+        <ConfirmModal
+          message={t.studyTruncateConfirm}
+          confirmLabel={t.studyTruncateAfter}
+          danger
+          onClose={() => setTruncateNode(null)}
+          onConfirm={confirmTruncate}
+        />
+      )}
+      {playFrom && (
+        <OnlineChallengeModal
+          onClose={() => setPlayFrom(null)}
+          initialStep="board"
+          initialPreset="5+5"
+          initialStartState={playFrom}
+        />
+      )}
+      {confirmClearAll && (
+        <ConfirmModal
+          message={t.studyClearAllShapesConfirm}
+          confirmLabel={t.studyClearAllShapes}
+          danger
+          onClose={() => setConfirmClearAll(false)}
+          onConfirm={() => { clearAllShapes(); setConfirmClearAll(false); }}
         />
       )}
     </div>

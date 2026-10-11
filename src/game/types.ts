@@ -33,6 +33,8 @@ export type Move =
   | { type: 'placement'; data: PlacementMove }
   | { type: 'capture'; data: CaptureMove };
 
+export type MoveGlyph = '!' | '?' | '!!' | '??' | '!?' | '?!';
+
 export type ShapeBrush = 'green' | 'red' | 'blue' | 'yellow';
 
 /** A board annotation: a circle on `orig` when `dest` is absent, otherwise an
@@ -58,6 +60,9 @@ export interface GameNode {
   /** Board annotation shapes (arrows/circles) for this position — Studies only.
    *  Also carried transparently by tree serialization. */
   shapes?: Shape[];
+  /** Move-quality mark (`!`, `?`, `!!`, `??`, `!?`, `?!`) set by a study author.
+   *  Carried by tree serialization; emitted in ZEN as a suffix (`Wd4!?`). */
+  glyph?: MoveGlyph;
 }
 
 export interface Captures {

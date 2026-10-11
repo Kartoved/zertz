@@ -215,6 +215,18 @@ export function RoomScreen() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // Whole game for "save to study": the analysis tree (main line + my
+  // variations) when analyzing, else the live game; opens on the viewed move.
+  const getStudyGame = () => {
+    const rs = useRoomStore.getState();
+    const useAnalysis = rs.isAnalyzing && rs.analysisGameTree;
+    return {
+      startState: rs.roomSetup ?? createInitialState(state.boardSize),
+      root: useAnalysis ? rs.analysisGameTree! : rs.gameTree,
+      currentNodeId: (useAnalysis ? rs.analysisCurrentNode : rs.currentNode)?.id,
+    };
+  };
+
   const getZip = () => stateToZip(state);
   const getZen = () => {
     const start = createInitialState(state.boardSize);
@@ -1036,7 +1048,7 @@ export function RoomScreen() {
                   🔬 {t.analysis}
                 </button>
               )}
-              <SaveToStudy state={boardState} />
+              <SaveToStudy state={boardState} getGame={getStudyGame} />
             </div>
           )}
 
@@ -1310,7 +1322,7 @@ export function RoomScreen() {
                 >
                   🔬 {t.analysis}
                 </button>
-                <SaveToStudy state={boardState} className="w-full px-3 py-2.5 text-sm rounded-lg bg-indigo-100 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-200 hover:bg-indigo-200 dark:hover:bg-indigo-900/70" />
+                <SaveToStudy state={boardState} getGame={getStudyGame} className="w-full px-3 py-2.5 text-sm rounded-lg bg-indigo-100 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-200 hover:bg-indigo-200 dark:hover:bg-indigo-900/70" />
                 {canCancel && (
                   <button
                     type="button"

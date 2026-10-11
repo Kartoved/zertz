@@ -27,7 +27,7 @@ interface StudyStore {
   expandAll: () => void;
   collapseAll: (ids: number[]) => void;
   openStudy: (owner: string, slug: string) => Promise<StudyNode | null>;
-  createStudy: (parentId: number | null, title: string) => Promise<{ id: number; slug: string; ownerName: string } | null>;
+  createStudy: (parentId: number | null, title: string, boardSize?: 37 | 48 | 61) => Promise<{ id: number; slug: string; ownerName: string } | null>;
   createStudyFromState: (title: string, state: GameState, parentId?: number | null) => Promise<{ id: number; slug: string; ownerName: string } | null>;
   createStudyFromGame: (title: string, setupState: GameState, root: GameNode, parentId?: number | null) => Promise<{ id: number; slug: string; ownerName: string } | null>;
   saveStudyTree: (id: number, treeJson: string) => Promise<void>;
@@ -64,10 +64,10 @@ function saveCollapsed(set: Set<number>) {
 
 // A fresh study starts from the standard opening position (board 37) with an
 // empty move tree — the position editor (Etap D) can replace the setup later.
-function blankStudyContent() {
+function blankStudyContent(boardSize: 37 | 48 | 61 = 37) {
   return {
-    boardSize: 37 as const,
-    setupJson: serializeState(createInitialState(37)),
+    boardSize,
+    setupJson: serializeState(createInitialState(boardSize)),
     treeJson: serializeTree(createRootNode()),
   };
 }
@@ -145,8 +145,8 @@ export const useStudyStore = create<StudyStore>((set, get) => ({
     }
   },
 
-  createStudy: async (parentId, title) => {
-    const { boardSize, setupJson, treeJson } = blankStudyContent();
+  createStudy: async (parentId, title, size = 37) => {
+    const { boardSize, setupJson, treeJson } = blankStudyContent(size);
     const r = await apiCreate({ parentId, title, boardSize, setupJson, treeJson });
     await get().loadTree();
     if (parentId != null) get().expand(parentId);

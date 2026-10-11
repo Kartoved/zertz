@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GameState } from '../../game/types';
+import { GameState, GameNode } from '../../game/types';
+import { serializeTree, deserializeTree } from '../../db/apiClient';
 import { StudyTreeNode } from '../../db/studiesApi';
 import { useAuthStore } from '../../store/authStore';
 import { useStudyStore } from '../../store/studyStore';
@@ -22,14 +23,28 @@ function flattenTree(nodes: StudyTreeNode[]): { id: number; title: string; depth
   return out;
 }
 
-// Captures the given board position into a new study (optionally nested under an
-// existing one). Used from game/analysis views — one click to turn any position
-// into a lesson. Renders nothing for guests.
-export default function SaveToStudy({ state, className }: { state: GameState; className?: string }) {
+export interface SaveToStudyGame {
+  /** Position the game started from. */
+  startState: GameState;
+  /** Move tree — the game's main line plus any analysis variations. */
+  root: GameNode;
+  /** Move to open the new study on. */
+  currentNodeId?: string;
+}
+
+// Saves into a new study (optionally nested under an existing one): the whole
+// game with its analysis variations when `getGame` is given (default), or just
+// the current board position. Renders nothing for guests.
+export default function SaveToStudy({ state, getGame, className }: {
+  state: GameState;
+  getGame?: () => SaveToStudyGame;
+  className?: string;
+}) {
   const { t } = useI18n();
   const { user } = useAuthStore();
   const navigate = useNavigate();
-  const { tree, loadTree, createStudyFromState } = useStudyStore();
+  const { tree, loadTree, createStudyFromState, createStudyFromGame } = useStudyStore();
+  const [what, setWhat] = useState<'game' | 'position'>('game');
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState('');
   const [parentId, setParentId] = useState<number | null>(null);
@@ -37,15 +52,25 @@ export default function SaveToStudy({ state, className }: { state: GameState; cl
 
   if (!user) return null;
 
-  const openModal = async () => { await loadTree(); setTitle(''); setParentId(null); setOpen(true); };
+  const openModal = async () => { await loadTree(); setTitle(''); setParentId(null); setWhat(getGame ? 'game' : 'position'); setOpen(true); };
 
   const save = async () => {
     if (!title.trim() || busy) return;
     setBusy(true);
     try {
-      const r = await createStudyFromState(title.trim(), state, parentId);
+      let r;
+      let hash = '';
+      if (what === 'game' && getGame) {
+        const game = getGame();
+        // Detached copy: the live/analysis tree keeps being mutated by the room.
+        const root = deserializeTree(serializeTree(game.root));
+        r = await createStudyFromGame(title.trim(), game.startState, root, parentId);
+        if (game.currentNodeId && game.currentNodeId !== root.id) hash = `#m=${encodeURIComponent(game.currentNodeId)}`;
+      } else {
+        r = await createStudyFromState(title.trim(), state, parentId);
+      }
       setOpen(false);
-      if (r) navigate(`/studies/${encodeURIComponent(r.ownerName)}/${encodeURIComponent(r.slug)}`);
+      if (r) navigate(`/studies/${encodeURIComponent(r.ownerName)}/${encodeURIComponent(r.slug)}${hash}`);
     } finally { setBusy(false); }
   };
 
@@ -72,6 +97,18 @@ export default function SaveToStudy({ state, className }: { state: GameState; cl
               autoFocus
               className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white mb-3"
             />
+            {getGame && (
+              <div className="flex flex-col gap-1.5 mb-3 text-sm text-gray-800 dark:text-gray-200">
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input type="radio" className="mt-1" checked={what === 'game'} onChange={() => setWhat('game')} />
+                  <span>{t.saveToStudyWholeGame}<span className="block text-xs text-gray-500 dark:text-gray-400">{t.saveToStudyWholeGameHint}</span></span>
+                </label>
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input type="radio" className="mt-1" checked={what === 'position'} onChange={() => setWhat('position')} />
+                  <span>{t.saveToStudyPositionOnly}</span>
+                </label>
+              </div>
+            )}
             <label className="flex flex-col gap-1 mb-4">
               <span className="text-xs font-semibold text-gray-500 dark:text-gray-400">{t.saveToStudyParent}</span>
               <select

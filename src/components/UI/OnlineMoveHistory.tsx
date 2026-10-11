@@ -4,6 +4,7 @@ import { useRoomStore } from '../../store/roomStore';
 import { useI18n } from '../../i18n';
 import { useStepFor, stepBack, stepForward, navigateWhole } from '../../store/captureStepView';
 import CaptureSubSteps from './CaptureSubSteps';
+import MoveGlyphMark from './MoveGlyphMark';
 
 interface MoveElementProps {
   node: GameNode;
@@ -26,6 +27,7 @@ function MoveElement({ node, isCurrentMove, onNavigate, activeRef }: MoveElement
     >
       {moveNum}
       {node.notation}
+      <MoveGlyphMark node={node} onDark={isCurrentMove} />
     </span>
   );
 }

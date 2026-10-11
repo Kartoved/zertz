@@ -147,6 +147,24 @@ describe('ZEN movetext (whole game)', () => {
     expect(s2).toBe(s1);
   });
 
+  it('round-trips move quality marks and accepts PGN-style $NAGs', () => {
+    const start = createInitialState(37);
+    const { root, nodes } = linearGame(start, 3);
+    nodes[0].glyph = '!?';
+    nodes[2].glyph = '??';
+    const s1 = treeToZen(start, root, { Result: '*' });
+    expect(s1).toMatch(/!\?/);
+    const parsed = zenToTree(s1);
+    expect(parsed.root.children[0].glyph).toBe('!?');
+    expect(parsed.root.children[0].children[0].glyph).toBeUndefined();
+    expect(parsed.root.children[0].children[0].children[0].glyph).toBe('??');
+    expect(treeToZen(parsed.startState, parsed.root, parsed.meta)).toBe(s1);
+
+    // `$1` after a move = "!"
+    const withNag = s1.replace('!?', ' $1');
+    expect(zenToTree(withNag).root.children[0].glyph).toBe('!');
+  });
+
   it('preserves comments, annotations (shapes) and variations', () => {
     const start = createInitialState(37);
     const { root, nodes } = linearGame(start, 4);

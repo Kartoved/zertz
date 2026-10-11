@@ -817,7 +817,12 @@ router.put('/:id/state', moveLimiter, authRequired, async (req, res) => {
     const didTurnPass = room.current_player !== nextCurrentPlayer;
     let submittedMoveNumber = 1;
     try { submittedMoveNumber = JSON.parse(stateJson).moveNumber ?? 1; } catch { /* keep default */ }
-    if (didTurnPass && submittedMoveNumber >= 3) {
+    // Games from a custom position (setup_json) don't start at move 1.
+    let startMoveNumber = 1;
+    if (room.setup_json) {
+      try { startMoveNumber = JSON.parse(room.setup_json).moveNumber ?? 1; } catch { /* keep default */ }
+    }
+    if (didTurnPass && submittedMoveNumber >= startMoveNumber + 2) {
       nextFirstMoveDeadline = null;
       nextClockRunningSince = new Date();
     } else if (didTurnPass) {

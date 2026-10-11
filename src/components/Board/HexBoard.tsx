@@ -1,6 +1,7 @@
-import { useState, useMemo, useRef, useId, useLayoutEffect, type WheelEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import { useState, useMemo, useRef, useId, useEffect, useLayoutEffect, type WheelEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { useUIStore } from '../../store/uiStore';
+import { useI18n } from '../../i18n';
 import { hexToPixel, idToAlgebraic } from '../../game/Board';
 import { getValidRemovableRings } from '../../game/Board';
 import { hasAvailableCaptures, getAvailableCaptures, applyCaptureSteps } from '../../game/GameEngine';
@@ -170,6 +171,8 @@ interface HexBoardProps {
   highlightedCaptures?: CaptureMove[];
   validRemovableRings?: string[];
   onRingClick?: (ringId: string) => void;
+  /** Right click on a ring (position editor: erase). Not combined with `drawable`. */
+  onRingRightClick?: (ringId: string) => void;
   /** Static thumbnail mode: fills its parent, no zoom/pan, no zoom badge. */
   preview?: boolean;
   /** Position-editor mode: keep removed rings as clickable ghost slots so they
@@ -184,6 +187,9 @@ interface HexBoardProps {
   /** Called when a shape is drawn (right-drag = arrow, right-click = circle).
    *  When given, the caller owns the shapes and passes them back via `shapes`. */
   onShapeDraw?: (shape: Shape) => void;
+  /** Clear every shape on this position (🧹 button / Esc). Needed when the
+   *  caller owns the shapes (`onShapeDraw`); ephemeral shapes clear themselves. */
+  onClearShapes?: () => void;
   /** Allow coordinate labels + the "a1" toggle on a `preview`-layout board
    *  (full-size boards always have them; tiny thumbnails never do). */
   coordinates?: boolean;
@@ -256,6 +262,7 @@ export default function HexBoard(props: HexBoardProps = {}) {
   const coordsAllowed = !props.preview || !!props.coordinates;
   const showCoordinates = useUIStore(s => s.showCoordinates) && coordsAllowed;
   const toggleCoordinates = useUIStore(s => s.toggleCoordinates);
+  const { t } = useI18n();
   const [zoom, setZoom] = useState(1);
   const pinchRef = useRef<{ dist: number; zoom: number } | null>(null);
 
@@ -405,6 +412,26 @@ export default function HexBoard(props: HexBoardProps = {}) {
     else props.onShapeDraw?.(shape);
   };
 
+  // 🧹 / Esc / Delete: wipe every arrow and circle on the current position.
+  const canClearShapes = !!props.drawable && !!shownShapes?.length && (ephemeralShapes || !!props.onClearShapes);
+  const clearShapes = () => {
+    if (ephemeralShapes) setLocalShapes({ key: positionKey, shapes: [] });
+    else props.onClearShapes?.();
+  };
+  const clearShapesRef = useRef(clearShapes);
+  clearShapesRef.current = clearShapes;
+  useEffect(() => {
+    if (!canClearShapes) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' && e.key !== 'Delete') return;
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+      clearShapesRef.current();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [canClearShapes]);
+
   const svgRef = useRef<SVGSVGElement>(null);
   const drawOriginRef = useRef<string | null>(null);
   const [drawState, setDrawState] = useState<{ orig: string; x: number; y: number; brush: ShapeBrush } | null>(null);
@@ -487,7 +514,16 @@ export default function HexBoard(props: HexBoardProps = {}) {
           onTouchStart={preview ? undefined : handleTouchStart}
           onTouchMove={preview ? undefined : handleTouchMove}
           onTouchEnd={preview ? undefined : handleTouchEnd}
-          onContextMenu={props.drawable ? (e) => e.preventDefault() : undefined}
+          onContextMenu={props.drawable
+            ? (e) => e.preventDefault()
+            : props.onRingRightClick
+              ? (e) => {
+                  e.preventDefault();
+                  const loc = toLocal(e.clientX, e.clientY);
+                  const ring = loc && ringAtLocal(loc.x, loc.y);
+                  if (ring) props.onRingRightClick!(ring);
+                }
+              : undefined}
           onMouseDown={props.drawable ? handleDrawDown : undefined}
           onMouseMove={props.drawable ? handleDrawMove : undefined}
           onMouseUp={props.drawable ? handleDrawUp : undefined}
@@ -625,13 +661,24 @@ export default function HexBoard(props: HexBoardProps = {}) {
             Zoom: {Math.round(zoom * 100)}%
           </div>
         )}
+        <div className="absolute top-2 right-2 flex gap-1">
+        {canClearShapes && (
+          <button
+            type="button"
+            onClick={clearShapes}
+            title={t.boardClearShapes}
+            className="px-2 py-1 rounded text-xs bg-black/50 text-white hover:bg-black/60"
+          >
+            🧹
+          </button>
+        )}
         {coordsAllowed && (
           <button
             type="button"
             onClick={toggleCoordinates}
             title="Coordinates"
             aria-pressed={showCoordinates}
-            className={`absolute top-2 right-2 px-2 py-1 rounded text-xs font-mono font-bold transition-colors ${
+            className={`px-2 py-1 rounded text-xs font-mono font-bold transition-colors ${
               showCoordinates
                 ? 'bg-blue-500 text-white'
                 : 'bg-black/50 text-white/80 hover:bg-black/60'
@@ -640,6 +687,7 @@ export default function HexBoard(props: HexBoardProps = {}) {
             a1
           </button>
         )}
+        </div>
       </div>
     </div>
   );

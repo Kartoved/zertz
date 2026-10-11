@@ -13,6 +13,9 @@ interface OnlineChallengeModalProps {
   initialStep: 'board' | 'link';
   initialPreset: TimePresetId;
   initialBoardSize?: 37 | 48 | 61;
+  /** Start the game from this position (e.g. "play from here" in a study).
+   *  Such games default to unrated, like Lichess "from position" games. */
+  initialStartState?: GameState | null;
 }
 
 export default function OnlineChallengeModal({
@@ -20,6 +23,7 @@ export default function OnlineChallengeModal({
   initialStep = 'board',
   initialPreset = '5+5',
   initialBoardSize = 37,
+  initialStartState = null,
 }: OnlineChallengeModalProps) {
   const { t } = useI18n();
   const navigate = useNavigate();
@@ -27,16 +31,16 @@ export default function OnlineChallengeModal({
   const { createRoom, isLoading: isCreatingRoom } = useRoomStore();
 
   const [onlineStep, setOnlineStep] = useState<'board' | 'link'>(initialStep);
-  const [selectedBoardSize, setSelectedBoardSize] = useState<37 | 48 | 61>(initialBoardSize);
+  const [selectedBoardSize, setSelectedBoardSize] = useState<37 | 48 | 61>(initialStartState?.boardSize ?? initialBoardSize);
   const [selectedPreset, setSelectedPreset] = useState<TimePresetId>(initialPreset);
   const [selectedPlayer, setSelectedPlayer] = useState<1 | 2 | 'random'>(1);
-  const [isRated, setIsRated] = useState(true);
+  const [isRated, setIsRated] = useState(!initialStartState);
   const [createdRoomId, setCreatedRoomId] = useState<number | null>(null);
   const [linkCopied, setLinkCopied] = useState(false);
 
   // Optional custom start position (imported ZIP). When set, board size is taken
   // from it and the size selector is disabled.
-  const [importState, setImportState] = useState<GameState | null>(null);
+  const [importState, setImportState] = useState<GameState | null>(initialStartState);
   const [showImport, setShowImport] = useState(false);
   const [importText, setImportText] = useState('');
   const [importErr, setImportErr] = useState(false);

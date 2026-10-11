@@ -24,6 +24,7 @@ import {
 import { addMoveToTree, createRootNode } from '../utils/gameTreeUtils';
 import { normalizePhase } from '../utils/moveActions';
 import { stateToZip, zipToState } from './zip';
+import { glyphFromNag, isMoveGlyph } from './glyphs';
 
 const COLOR_TO_CHAR: Record<MarbleColor, string> = { white: 'W', gray: 'G', black: 'B' };
 const CHAR_TO_COLOR: Record<string, MarbleColor> = {
@@ -181,7 +182,7 @@ function emitMove(node: GameNode, force: boolean, tokens: string[], labels: ZenL
   const full = Math.ceil(node.moveNumber / 2);
   if (node.player === 'player1') tokens.push(`${full}.`);
   else if (force) tokens.push(`${full}...`);
-  tokens.push(moveToZen(node.move!, labels));
+  tokens.push(moveToZen(node.move!, labels) + (node.glyph ?? ''));
   const cmt = emitComment(node, labels);
   if (cmt) { tokens.push(cmt); return true; }
   return false;
@@ -229,18 +230,21 @@ export function zenToTree(zen: string): { startState: GameState; root: GameNode;
       pos++;
       if (tk.type === 'NUMBER') continue;
       if (tk.type === 'COMMENT') { attachComment(lastNode, tk.value, labels); continue; }
+      if (tk.type === 'NAG') { const g = glyphFromNag(tk.value); if (g && lastNode !== root) lastNode.glyph = g; continue; }
       if (tk.type === 'LPAREN') {
         parseLine(prevNode, cloneState(prevState));
         if (toks[pos]?.type === 'RPAREN') pos++;
         continue;
       }
-      // MOVE
-      const move = zenToMove(tk.value, labels);
+      // MOVE (optionally with a glued quality mark: `Wd4!?`)
+      const gm = tk.value.match(/^(.*?)(!!|\?\?|!\?|\?!|!|\?)$/);
+      const move = zenToMove(gm ? gm[1] : tk.value, labels);
       const newNode = addMoveToTree(node, move, state.currentPlayer, state.moveNumber, state.boardSize);
       const newState = applyFullMove(state, move);
       prevNode = node; prevState = state;
       node = newNode; state = newState;
       lastNode = newNode;
+      if (gm && isMoveGlyph(gm[2])) newNode.glyph = gm[2];
     }
   };
 
@@ -305,6 +309,7 @@ function splitTags(zen: string): { meta: ZenMeta; movetext: string } {
 type Tok =
   | { type: 'MOVE'; value: string }
   | { type: 'COMMENT'; value: string }
+  | { type: 'NAG'; value: number }
   | { type: 'NUMBER' }
   | { type: 'LPAREN' }
   | { type: 'RPAREN' }
@@ -326,6 +331,7 @@ function tokenize(s: string): Tok[] {
     const nm = word.match(/^\d+\.+/); // leading "12." / "12..." (glued or standalone)
     if (nm) { word = word.slice(nm[0].length); if (word === '') { toks.push({ type: 'NUMBER' }); continue; } }
     if (/^(1-0|0-1|\*)$/.test(word)) { toks.push({ type: 'RESULT', value: word }); continue; }
+    if (/^\$\d+$/.test(word)) { toks.push({ type: 'NAG', value: Number(word.slice(1)) }); continue; }
     toks.push({ type: 'MOVE', value: word });
   }
   return toks;

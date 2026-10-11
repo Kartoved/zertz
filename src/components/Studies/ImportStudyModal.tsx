@@ -5,13 +5,15 @@ import { useI18n } from '../../i18n';
 export default function ImportStudyModal({
   onClose,
   onImport,
+  initialTitle = '',
 }: {
   onClose: () => void;
   onImport: (text: string, title: string) => Promise<boolean>;
+  initialTitle?: string;
 }) {
   const { t } = useI18n();
   const [text, setText] = useState('');
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(initialTitle);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 

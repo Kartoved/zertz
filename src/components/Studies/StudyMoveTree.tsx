@@ -1,16 +1,34 @@
 import type { ReactElement } from 'react';
 import { GameNode } from '../../game/types';
-import { useI18n } from '../../i18n';
+import { useI18n, type Dict } from '../../i18n';
 import CaptureSubSteps from '../UI/CaptureSubSteps';
+import MoveGlyphMark from '../UI/MoveGlyphMark';
 import { useStepFor } from '../../store/captureStepView';
+import { isOnMainLine } from '../../utils/gameTreeUtils';
+
+/** Author-only tree edits. Each control appears on hover, and always on the current move (touch). */
+export interface StudyTreeEdit {
+  onDelete: (node: GameNode) => void;
+  onPromote: (node: GameNode) => void;
+  onMoveUp: (node: GameNode) => void;
+  onTruncate: (node: GameNode) => void;
+}
 
 interface StudyMoveTreeProps {
   root: GameNode;
   currentId: string;
   onSelect: (node: GameNode) => void;
-  /** When provided (author editing), each move shows a ✕ to prune its branch. */
-  onDelete?: (node: GameNode) => void;
+  /** When provided (author editing), moves get variation controls. */
+  edit?: StudyTreeEdit;
   boardSize: 37 | 48 | 61;
+}
+
+interface LineCtx {
+  currentId: string;
+  onSelect: (n: GameNode) => void;
+  boardSize: 37 | 48 | 61;
+  edit?: StudyTreeEdit;
+  t: Dict;
 }
 
 function MoveChip({ node, currentId, onSelect, boardSize }: { node: GameNode; currentId: string; onSelect: (n: GameNode) => void; boardSize: 37 | 48 | 61 }) {
@@ -30,6 +48,7 @@ function MoveChip({ node, currentId, onSelect, boardSize }: { node: GameNode; cu
     >
       <span className={isCurrent ? 'text-indigo-200' : 'text-gray-400 dark:text-gray-500'}>{node.moveNumber}.</span>
       {node.notation}
+      <MoveGlyphMark node={node} onDark={isCurrent} />
       {node.comment && <span className="text-[10px] opacity-70" title={node.comment}>💬</span>}
     </span>
     <CaptureSubSteps node={node} boardSize={boardSize} isCurrent={isNode} />
@@ -37,40 +56,46 @@ function MoveChip({ node, currentId, onSelect, boardSize }: { node: GameNode; cu
   );
 }
 
+function EditControls({ node, ctx }: { node: GameNode; ctx: LineCtx }) {
+  const { edit, t } = ctx;
+  if (!edit) return null;
+  const isCurrent = node.id === ctx.currentId;
+  const index = node.parent ? node.parent.children.indexOf(node) : 0;
+  const btn = 'px-1 text-xs rounded hover:bg-gray-200 dark:hover:bg-gray-700';
+  return (
+    <span className={`ml-1 inline-flex gap-0.5 ${isCurrent ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`}>
+      {!isOnMainLine(node) && (
+        <button type="button" className={`${btn} text-indigo-500`} title={t.studyPromoteMainLine} onClick={() => edit.onPromote(node)}>⇧</button>
+      )}
+      {index > 0 && (
+        <button type="button" className={`${btn} text-indigo-500`} title={t.studyMoveVariationUp} onClick={() => edit.onMoveUp(node)}>↑</button>
+      )}
+      {node.children.length > 0 && (
+        <button type="button" className={`${btn} text-orange-500`} title={t.studyTruncateAfter} onClick={() => edit.onTruncate(node)}>✂</button>
+      )}
+      <button type="button" className={`${btn} text-red-400 hover:text-red-600`} title={t.studyDeleteFromHere} onClick={() => edit.onDelete(node)}>✕</button>
+    </span>
+  );
+}
+
 // Renders the line starting at `node` (inclusive), following the main line
 // (children[0]) flat, and emitting each sibling variation as an indented block
 // at the branch point. Classic chess-tree layout: main line stays unindented,
 // only variations step in.
-function renderLine(
-  node: GameNode,
-  depth: number,
-  currentId: string,
-  onSelect: (n: GameNode) => void,
-  boardSize: 37 | 48 | 61,
-  onDelete?: (n: GameNode) => void,
-): ReactElement[] {
+function renderLine(node: GameNode, depth: number, ctx: LineCtx): ReactElement[] {
   const rows: ReactElement[] = [];
   let cur: GameNode | null = node;
   while (cur && cur.move) {
     const here: GameNode = cur;
     rows.push(
       <div key={here.id} className="group flex items-center" style={{ paddingLeft: depth * 14 }}>
-        <MoveChip node={here} currentId={currentId} onSelect={onSelect} boardSize={boardSize} />
-        {onDelete && (
-          <button
-            type="button"
-            onClick={() => onDelete(here)}
-            className="ml-1 text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 text-xs"
-            title="✕"
-          >
-            ✕
-          </button>
-        )}
+        <MoveChip node={here} currentId={ctx.currentId} onSelect={ctx.onSelect} boardSize={ctx.boardSize} />
+        <EditControls node={here} ctx={ctx} />
       </div>
     );
     const kids = here.children.filter(k => k.move);
     for (let i = 1; i < kids.length; i++) {
-      rows.push(<div key={`${kids[i].id}-var`}>{renderLine(kids[i], depth + 1, currentId, onSelect, boardSize, onDelete)}</div>);
+      rows.push(<div key={`${kids[i].id}-var`}>{renderLine(kids[i], depth + 1, ctx)}</div>);
     }
     cur = kids[0] ?? null;
   }
@@ -79,10 +104,11 @@ function renderLine(
 
 // Navigable variation tree. Root has no move; its children are the first moves
 // (children[0] = main line, rest = first-move alternatives).
-export default function StudyMoveTree({ root, currentId, onSelect, onDelete, boardSize }: StudyMoveTreeProps) {
+export default function StudyMoveTree({ root, currentId, onSelect, edit, boardSize }: StudyMoveTreeProps) {
   const { t } = useI18n();
   const first = root.children.filter(k => k.move);
   const startCurrent = currentId === root.id;
+  const ctx: LineCtx = { currentId, onSelect, boardSize, edit, t };
   return (
     <div className="flex flex-col gap-0.5">
       {/* Zero move — the starting position; clickable, can hold a comment. */}
@@ -99,10 +125,10 @@ export default function StudyMoveTree({ root, currentId, onSelect, onDelete, boa
       </div>
       {first.length === 0 ? null : (
         <>
-          {renderLine(first[0], 0, currentId, onSelect, boardSize, onDelete)}
+          {renderLine(first[0], 0, ctx)}
           {first.slice(1).map(alt => (
             <div key={`${alt.id}-rootvar`} className="border-l border-gray-200 dark:border-gray-700">
-              {renderLine(alt, 1, currentId, onSelect, boardSize, onDelete)}
+              {renderLine(alt, 1, ctx)}
             </div>
           ))}
         </>

@@ -4,6 +4,7 @@ import { GameNode } from '../../game/types';
 import { useI18n } from '../../i18n';
 import ConfirmModal from './ConfirmModal';
 import CaptureSubSteps from './CaptureSubSteps';
+import MoveGlyphMark from './MoveGlyphMark';
 import { useStepFor, stepBack, stepForward, navigateWhole } from '../../store/captureStepView';
 
 interface MoveElementProps {
@@ -34,7 +35,7 @@ function MoveElement({ node, isCurrentMove, onNavigate, onRequestDelete, canDele
           : 'hover:bg-gray-200 dark:hover:bg-gray-700'}
       `}
     >
-      {moveNum}{node.notation}
+      {moveNum}{node.notation}<MoveGlyphMark node={node} onDark={isCurrentMove} />
     </span>
   );
 }
