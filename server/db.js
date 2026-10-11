@@ -129,6 +129,10 @@ async function ensureSchema() {
       ALTER TABLE rooms ADD COLUMN IF NOT EXISTS time_forfeit_player INTEGER;
       ALTER TABLE rooms ADD COLUMN IF NOT EXISTS premoves_json TEXT NOT NULL DEFAULT '{"player1":[],"player2":[]}';
       ALTER TABLE rooms ADD COLUMN IF NOT EXISTS setup_json TEXT;
+      -- Lichess-style abort: until both sides have made their first move the
+      -- clock does not run; instead whoever is to move must do so before this
+      -- deadline or the game is aborted (winner 0, win_type 'aborted', unrated).
+      ALTER TABLE rooms ADD COLUMN IF NOT EXISTS first_move_deadline TIMESTAMP;
       ALTER TABLE users ADD COLUMN IF NOT EXISTS last_seen TIMESTAMP NOT NULL DEFAULT NOW();
       ALTER TABLE users ADD COLUMN IF NOT EXISTS contact_link TEXT NOT NULL DEFAULT '';
       ALTER TABLE games ADD COLUMN IF NOT EXISTS is_online BOOLEAN NOT NULL DEFAULT false;
@@ -276,6 +280,11 @@ async function ensureSchema() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS blog_announced (
       slug TEXT PRIMARY KEY,
+      announced_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+    -- Releases already announced in the global chat (server/announceUpdate.js).
+    CREATE TABLE IF NOT EXISTS app_versions_announced (
+      version TEXT PRIMARY KEY,
       announced_at TIMESTAMP NOT NULL DEFAULT NOW()
     );
   `);

@@ -3,6 +3,8 @@ import { useGameStore } from '../../store/gameStore';
 import { GameNode } from '../../game/types';
 import { useI18n } from '../../i18n';
 import ConfirmModal from './ConfirmModal';
+import CaptureSubSteps from './CaptureSubSteps';
+import { useStepFor, stepBack, stepForward, navigateWhole } from '../../store/captureStepView';
 
 interface MoveElementProps {
   node: GameNode;
@@ -37,6 +39,17 @@ function MoveElement({ node, isCurrentMove, onNavigate, onRequestDelete, canDele
   );
 }
 
+// A move plus, when it is the current multi-jump capture, its jump chips.
+function MoveWithSteps(props: MoveElementProps & { boardSize: 37 | 48 | 61; stepActive: boolean }) {
+  const { boardSize, stepActive, ...rest } = props;
+  return (
+    <span className="inline-flex items-center gap-0.5">
+      <MoveElement {...rest} isCurrentMove={rest.isCurrentMove && !stepActive} />
+      <CaptureSubSteps node={rest.node} boardSize={boardSize} isCurrent={rest.isCurrentMove} />
+    </span>
+  );
+}
+
 function winMarker(winner: string | null | undefined, winType: string | null | undefined, t: ReturnType<typeof useI18n>['t']): { symbol: string; title: string } | null {
   if (!winner) return null;
   if (winner === 'cancelled') return { symbol: '✕', title: t.cancelledStatus };
@@ -49,13 +62,16 @@ function winMarker(winner: string | null | undefined, winType: string | null | u
   return { symbol: '★', title: t.gameOver || '' };
 }
 
+interface StepCtx { boardSize: 37 | 48 | 61; stepActive: boolean }
+
 function renderMoveTree(
   node: GameNode,
   currentNodeId: string,
   onNavigate: (node: GameNode) => void,
   onRequestDelete: (node: GameNode) => void,
   canDeleteNode: (node: GameNode) => boolean,
-  activeRef: React.RefObject<HTMLSpanElement>
+  activeRef: React.RefObject<HTMLSpanElement>,
+  ctx: StepCtx
 ): JSX.Element[] {
   const elements: JSX.Element[] = [];
 
@@ -63,7 +79,8 @@ function renderMoveTree(
   if (!mainChild) return elements;
 
   elements.push(
-    <MoveElement
+    <MoveWithSteps
+      {...ctx}
       key={mainChild.id}
       node={mainChild}
       isCurrentMove={mainChild.id === currentNodeId}
@@ -80,7 +97,8 @@ function renderMoveTree(
       <span key={`var-open-${variation.id}`} className="text-gray-500"> (</span>
     );
     elements.push(
-      <MoveElement
+      <MoveWithSteps
+        {...ctx}
         key={variation.id}
         node={variation}
         isCurrentMove={variation.id === currentNodeId}
@@ -90,13 +108,13 @@ function renderMoveTree(
         activeRef={activeRef}
       />
     );
-    elements.push(...renderMoveTree(variation, currentNodeId, onNavigate, onRequestDelete, canDeleteNode, activeRef));
+    elements.push(...renderMoveTree(variation, currentNodeId, onNavigate, onRequestDelete, canDeleteNode, activeRef, ctx));
     elements.push(
       <span key={`var-close-${variation.id}`} className="text-gray-500">)</span>
     );
   }
 
-  elements.push(...renderMoveTree(mainChild, currentNodeId, onNavigate, onRequestDelete, canDeleteNode, activeRef));
+  elements.push(...renderMoveTree(mainChild, currentNodeId, onNavigate, onRequestDelete, canDeleteNode, activeRef, ctx));
 
   return elements;
 }
@@ -106,11 +124,12 @@ export default function MoveHistory() {
   const { state, winType, gameTree, currentNode, navigateToNode, deleteBranchFrom, isLoadedGame } = useGameStore();
   const [pendingDelete, setPendingDelete] = useState<GameNode | null>(null);
 
+  // ←/→ walk jump by jump through multi-jump captures (see captureStepView).
+  const step = useStepFor(currentNode);
   const navigatePrev = useCallback(() => {
-    if (currentNode.parent) {
-      navigateToNode(currentNode.parent);
-    }
-  }, [currentNode, navigateToNode]);
+    stepBack(currentNode, step, navigateToNode);
+  }, [currentNode, step, navigateToNode]);
+  const navigateTo = useCallback((n: GameNode) => navigateWhole(n, navigateToNode), [navigateToNode]);
 
   const handleDelete = useCallback((node: GameNode) => {
     if (node.id === 'root') return;
@@ -124,10 +143,8 @@ export default function MoveHistory() {
   }, [isLoadedGame]);
   
   const navigateNext = useCallback(() => {
-    if (currentNode.children.length > 0) {
-      navigateToNode(currentNode.children[0]);
-    }
-  }, [currentNode, navigateToNode]);
+    stepForward(currentNode, step, navigateToNode);
+  }, [currentNode, step, navigateToNode]);
   
   // Keyboard navigation
   useEffect(() => {
@@ -151,7 +168,10 @@ export default function MoveHistory() {
     didInitialScrollRef.current = true;
   }, [currentNode.id]);
 
-  const moves = renderMoveTree(gameTree, currentNode.id, navigateToNode, setPendingDelete, canDeleteNode, activeRef);
+  const moves = renderMoveTree(gameTree, currentNode.id, navigateTo, setPendingDelete, canDeleteNode, activeRef, {
+    boardSize: state.boardSize,
+    stepActive: step != null,
+  });
   const isAtStart = currentNode.id === 'root';
   const marker = winMarker(state.winner, winType, t);
 
@@ -171,7 +191,7 @@ export default function MoveHistory() {
       >
         <span
           ref={isAtStart ? activeRef : undefined}
-          onClick={() => navigateToNode(gameTree)}
+          onClick={() => navigateTo(gameTree)}
           className={`cursor-pointer px-1 rounded transition-colors select-none whitespace-nowrap ${isAtStart ? 'bg-blue-500 text-white' : 'hover:bg-gray-200 dark:hover:bg-gray-700'}`}
         >
           {`0. ${t.moveStart}`}

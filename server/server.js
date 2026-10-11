@@ -6,6 +6,7 @@ import { fileURLToPath } from 'url';
 
 import { ensureSchema } from './db.js';
 import { startArenaEngine } from './arenaEngine.js';
+import { announceAppVersion } from './announceUpdate.js';
 import authRouter from './routes/auth.js';
 import playersRouter, { followsRouter } from './routes/players.js';
 import challengesRouter from './routes/challenges.js';
@@ -68,6 +69,7 @@ const startServer = async () => {
     await ensureSchema();
     console.log('Postgres connected.');
     startArenaEngine();
+    announceAppVersion().catch(err => console.error('[release] announce failed:', err));
   } catch (err) {
     console.error('Postgres unavailable, running without API persistence.');
   }

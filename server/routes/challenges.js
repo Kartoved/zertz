@@ -5,6 +5,18 @@ import { sendPushToUser } from '../utils/pushNotifications.js';
 
 const router = Router();
 
+// "блиц 5+5" / "заочная 7d" / "без времени" — mirror of src/utils/timeControl.ts
+// (push bodies are Russian-only, like the rest of the push copy).
+function describeTimeControl(baseMs, incMs) {
+  if (baseMs == null || incMs == null || Number(baseMs) <= 0) return 'без времени';
+  const base = Number(baseMs);
+  const inc = Number(incMs);
+  if (inc === -1) return `асинхронная ${Math.round(base / 86400000)}d`;
+  const est = base + 40 * inc;
+  const cat = est < 600000 ? 'блиц' : est < 1500000 ? 'рапид' : 'классика';
+  return `${cat} ${Math.round(base / 60000)}+${Math.round(inc / 1000)}`;
+}
+
 // Create a challenge (immediately creates a room)
 router.post('/', authRequired, async (req, res) => {
   const { toUserId, boardSize = 37, rated = true, creatorPlayer = 1, timeControlBaseMs = null, timeControlIncrementMs = null } = req.body;
@@ -72,7 +84,7 @@ router.post('/', authRequired, async (req, res) => {
     sendPushToUser(toUserId, {
       type: 'challenge',
       title: 'Zertz',
-      body: `${userRow.rows[0].username} вызывает тебя на партию!`,
+      body: `${userRow.rows[0].username} вызывает тебя на партию: ${describeTimeControl(isTimed ? timeControlBaseMs : null, isTimed ? timeControlIncrementMs : null)}, доска ${boardSize}${rated ? ', рейтинговая' : ''}`,
     });
 
     res.json({
@@ -170,10 +182,12 @@ router.get('/', authRequired, async (req, res) => {
     const result = await pool.query(
       `SELECT c.*,
         fu.username AS from_username, fu.rating AS from_rating, fu.country AS from_country,
-        tu.username AS to_username, tu.rating AS to_rating, tu.country AS to_country
+        tu.username AS to_username, tu.rating AS to_rating, tu.country AS to_country,
+        r.time_control_base_ms, r.time_control_increment_ms
        FROM challenges c
        JOIN users fu ON fu.id = c.from_user_id
        JOIN users tu ON tu.id = c.to_user_id
+       LEFT JOIN rooms r ON r.id = c.room_id
        WHERE (c.from_user_id = $1 OR c.to_user_id = $1) AND c.status = 'pending'
        ORDER BY c.created_at DESC`,
       [req.user.id]
@@ -191,6 +205,8 @@ router.get('/', authRequired, async (req, res) => {
       roomId: r.room_id,
       boardSize: r.board_size,
       rated: r.rated,
+      timeControlBaseMs: r.time_control_base_ms == null ? null : Number(r.time_control_base_ms),
+      timeControlIncrementMs: r.time_control_increment_ms == null ? null : Number(r.time_control_increment_ms),
       status: r.status,
       createdAt: r.created_at.getTime(),
     })));

@@ -90,6 +90,8 @@ interface RoomStore {
   clockP1Ms: number | null;
   clockP2Ms: number | null;
   clockRunningSince: number | null;
+  /** Opening-phase abort deadline (epoch ms) — set until both sides made their first move. */
+  firstMoveDeadline: number | null;
 
   // Chat
   messages: ChatMessage[];
@@ -188,7 +190,7 @@ function stashPendingMove(
 
 // Rebuilds board state at a node, replaying from a custom start (imported ZIP)
 // when the room has one, else from the standard board.
-function rebuildRoomState(node: GameNode, boardSize: 37 | 48 | 61, roomSetup: GameState | null): GameState {
+export function rebuildRoomState(node: GameNode, boardSize: 37 | 48 | 61, roomSetup: GameState | null): GameState {
   return roomSetup ? rebuildStateFromNodeWithStart(roomSetup, node) : rebuildStateFromNode(node, boardSize);
 }
 
@@ -337,6 +339,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
   clockP1Ms: null,
   clockP2Ms: null,
   clockRunningSince: null,
+  firstMoveDeadline: null,
 
   messages: [],
   lastMessageId: 0,
@@ -391,7 +394,8 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         timeControlIncrementMs: timeControl?.incrementMs ?? null,
         clockP1Ms: timeControl?.baseMs ?? null,
         clockP2Ms: timeControl?.baseMs ?? null,
-        clockRunningSince: timeControl ? Date.now() : null,
+        clockRunningSince: null,
+        firstMoveDeadline: null,
         messages: [],
         lastMessageId: 0,
       });
@@ -479,6 +483,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
         clockP1Ms: room.clockP1Ms,
         clockP2Ms: room.clockP2Ms,
         clockRunningSince: room.clockRunningSince,
+        firstMoveDeadline: room.firstMoveDeadline,
         tournamentId: room.tournamentId,
         berserk: room.berserk,
       });
@@ -576,6 +581,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
           clockP1Ms: room.clockP1Ms,
           clockP2Ms: room.clockP2Ms,
           clockRunningSince: room.clockRunningSince,
+          firstMoveDeadline: room.firstMoveDeadline,
           tournamentId: room.tournamentId,
           berserk: room.berserk,
           ...(mergedAnalysisTree ? { analysisGameTree: mergedAnalysisTree, lastLiveMergeAt: Date.now() } : {}),
@@ -1339,6 +1345,7 @@ export const useRoomStore = create<RoomStore>((set, get) => ({
       clockP1Ms: null,
       clockP2Ms: null,
       clockRunningSince: null,
+      firstMoveDeadline: null,
       messages: [],
       lastMessageId: 0,
       pendingPlayerChoice: null,

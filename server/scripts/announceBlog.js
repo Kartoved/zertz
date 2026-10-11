@@ -14,77 +14,8 @@
  * In Docker: docker compose exec -T web node server/scripts/announceBlog.js
  */
 
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { pool, ensureSchema } from '../db.js';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const BLOG_DIR = path.resolve(__dirname, '../../blog');
-const SYSTEM_USERNAME = 'Zertz System';
-
-// ---- Frontmatter & body parser (mirror of src/blog/parse.ts, JS edition) ----
-
-function stripQuotes(s) {
-  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
-    return s.slice(1, -1);
-  }
-  return s;
-}
-
-function parseFrontmatter(raw) {
-  const result = {};
-  const lines = raw.split('\n');
-  let i = 0;
-  while (i < lines.length) {
-    const line = lines[i];
-    if (!line.trim() || line.trimStart().startsWith('#')) { i++; continue; }
-    const m = line.match(/^([A-Za-z_][\w-]*)\s*:\s*(.*)$/);
-    if (!m) { i++; continue; }
-    const [, key, rest] = m;
-    const trimmed = rest.trim();
-    if (trimmed === '') {
-      const obj = {};
-      i++;
-      while (i < lines.length && /^\s{2,}\S/.test(lines[i])) {
-        const sub = lines[i].match(/^\s+([A-Za-z_][\w-]*)\s*:\s*(.*)$/);
-        if (sub) obj[sub[1]] = stripQuotes(sub[2].trim());
-        i++;
-      }
-      result[key] = obj;
-      continue;
-    }
-    if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
-      result[key] = trimmed.slice(1, -1).split(',').map(s => stripQuotes(s.trim())).filter(Boolean);
-    } else {
-      result[key] = stripQuotes(trimmed);
-    }
-    i++;
-  }
-  return result;
-}
-
-function parsePost(filePath) {
-  const raw = fs.readFileSync(filePath, 'utf8');
-  const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
-  if (!m) return null;
-  const fm = parseFrontmatter(m[1]);
-  const slug = fm.slug || path.basename(filePath, '.md');
-  const title = fm.title || {};
-  return {
-    slug,
-    title: { ru: title.ru || title.en || '', en: title.en || title.ru || '', eo: title.eo || title.en || '' },
-    announce: fm.announce === 'true' || fm.announce === true,
-    date: fm.date || '',
-  };
-}
-
-function loadAllPosts() {
-  if (!fs.existsSync(BLOG_DIR)) return [];
-  const files = fs.readdirSync(BLOG_DIR).filter(f => f.endsWith('.md'));
-  return files.map(f => parsePost(path.join(BLOG_DIR, f))).filter(Boolean);
-}
+import { loadAllPosts, announcePost } from '../utils/blogPosts.js';
 
 // ---- DB helpers ----
 
@@ -95,22 +26,12 @@ async function getAnnouncedSlugs() {
 
 async function announce(slug, title, dryRun) {
   // Use English title in the chat message; clients localize the destination
-  // page anyway. The format is parsed by ChatPanel / GlobalChat to render as
-  // a clickable card. Pipe separator is unlikely to appear inside titles.
-  const message = `[BLOG_POST]${slug}|${title}`;
+  // page anyway.
   if (dryRun) {
     console.log(`  [DRY] would announce: ${slug} → "${title}"`);
     return;
   }
-  await pool.query(
-    `INSERT INTO global_chat_messages (user_id, username, message) VALUES ($1, $2, $3)`,
-    [null, SYSTEM_USERNAME, message]
-  );
-  await pool.query(
-    `INSERT INTO blog_announced (slug) VALUES ($1)
-       ON CONFLICT (slug) DO UPDATE SET announced_at = NOW()`,
-    [slug]
-  );
+  await announcePost(pool, slug, title);
   console.log(`  ✓ announced: ${slug} → "${title}"`);
 }
 

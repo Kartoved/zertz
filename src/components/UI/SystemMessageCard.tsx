@@ -1,14 +1,18 @@
 import { Link } from 'react-router-dom';
 import { useI18n } from '../../i18n';
 
-// Renders a system message body. Currently supports only `[BLOG_POST]slug|title`,
-// but the dispatch shape lets us add more prefixes later (`[TOURNAMENT]…`, etc.).
+// Renders a system message body: `[BLOG_POST]slug|title`, `[APP_UPDATE]version`
+// (automatic release announcement, server/announceUpdate.js), `[TOURNAMENT]id|name`.
 // Returns `null` when the body isn't a system marker — callers fall back to
 // plain-text rendering in that case.
 export function tryRenderSystemBody(body: string): { node: React.ReactElement; kind: string } | null {
   const blog = body.match(/^\[BLOG_POST\]([^|]+)\|(.+)$/s);
   if (blog) {
     return { kind: 'blog', node: <BlogPostCard slug={blog[1]} title={blog[2]} /> };
+  }
+  const update = body.match(/^\[APP_UPDATE\](.+)$/s);
+  if (update) {
+    return { kind: 'update', node: <AppUpdateCard version={update[1].trim()} /> };
   }
   const tour = body.match(/^\[TOURNAMENT\]([^|]+)\|(.+)$/s);
   if (tour) {
@@ -29,6 +33,23 @@ function TournamentCard({ id, name }: { id: string; name: string }) {
       </div>
       <div className="text-sm font-medium text-gray-900 dark:text-white mt-0.5">
         {name}
+      </div>
+    </Link>
+  );
+}
+
+function AppUpdateCard({ version }: { version: string }) {
+  const { t } = useI18n();
+  return (
+    <Link
+      to="/news"
+      className="block bg-emerald-50 dark:bg-emerald-900/30 border border-emerald-200 dark:border-emerald-700/50 rounded-lg p-2.5 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-colors"
+    >
+      <div className="text-[10px] uppercase tracking-wide font-semibold text-emerald-700 dark:text-emerald-300">
+        🚀 {t.appUpdateTitle}
+      </div>
+      <div className="text-sm font-medium text-gray-900 dark:text-white mt-0.5">
+        v{version} · {t.appUpdateCta}
       </div>
     </Link>
   );

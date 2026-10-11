@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef } from 'react';
 import { GameNode } from '../../game/types';
 import { useRoomStore } from '../../store/roomStore';
 import { useI18n } from '../../i18n';
+import { useStepFor, stepBack, stepForward, navigateWhole } from '../../store/captureStepView';
+import CaptureSubSteps from './CaptureSubSteps';
 
 interface MoveElementProps {
   node: GameNode;
@@ -81,17 +83,16 @@ export default function OnlineMoveHistory() {
   const activeCurrentNode = isAnalyzing && analysisCurrentNode ? analysisCurrentNode : currentNode;
   const activeNavigate = isAnalyzing ? analysisNavigateToNode : navigateToNode;
 
+  // ←/→ walk jump by jump through multi-jump captures (see captureStepView).
+  const step = useStepFor(activeCurrentNode);
   const navigatePrev = useCallback(() => {
-    if (activeCurrentNode.parent) {
-      activeNavigate(activeCurrentNode.parent);
-    }
-  }, [activeCurrentNode, activeNavigate]);
+    stepBack(activeCurrentNode, step, activeNavigate);
+  }, [activeCurrentNode, step, activeNavigate]);
 
   const navigateNext = useCallback(() => {
-    if (activeCurrentNode.children.length > 0) {
-      activeNavigate(activeCurrentNode.children[0]);
-    }
-  }, [activeCurrentNode, activeNavigate]);
+    stepForward(activeCurrentNode, step, activeNavigate);
+  }, [activeCurrentNode, step, activeNavigate]);
+  const navigateTo = useCallback((n: GameNode) => navigateWhole(n, activeNavigate), [activeNavigate]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -132,19 +133,21 @@ export default function OnlineMoveHistory() {
     >
       <span
         ref={isAtStart ? activeRef : undefined}
-        onClick={() => activeNavigate(activeTree)}
+        onClick={() => navigateTo(activeTree)}
         className={`cursor-pointer px-1 rounded transition-colors select-none whitespace-nowrap ${isAtStart ? 'bg-blue-500 text-white' : 'hover:bg-gray-200 dark:hover:bg-gray-700'}`}
       >
         {`0. ${t.moveStart}`}
       </span>
       {lineMoves.map(node => (
-        <MoveElement
-          key={node.id}
-          node={node}
-          isCurrentMove={node.id === activeCurrentNode.id}
-          onNavigate={activeNavigate}
-          activeRef={activeRef}
-        />
+        <span key={node.id} className="inline-flex items-center gap-0.5">
+          <MoveElement
+            node={node}
+            isCurrentMove={node.id === activeCurrentNode.id && step == null}
+            onNavigate={navigateTo}
+            activeRef={activeRef}
+          />
+          <CaptureSubSteps node={node} boardSize={state.boardSize} isCurrent={node.id === activeCurrentNode.id} compact />
+        </span>
       ))}
       {marker && (
         <span

@@ -1,6 +1,8 @@
 import type { ReactElement } from 'react';
 import { GameNode } from '../../game/types';
 import { useI18n } from '../../i18n';
+import CaptureSubSteps from '../UI/CaptureSubSteps';
+import { useStepFor } from '../../store/captureStepView';
 
 interface StudyMoveTreeProps {
   root: GameNode;
@@ -8,11 +10,16 @@ interface StudyMoveTreeProps {
   onSelect: (node: GameNode) => void;
   /** When provided (author editing), each move shows a ✕ to prune its branch. */
   onDelete?: (node: GameNode) => void;
+  boardSize: 37 | 48 | 61;
 }
 
-function MoveChip({ node, currentId, onSelect }: { node: GameNode; currentId: string; onSelect: (n: GameNode) => void }) {
-  const isCurrent = node.id === currentId;
+function MoveChip({ node, currentId, onSelect, boardSize }: { node: GameNode; currentId: string; onSelect: (n: GameNode) => void; boardSize: 37 | 48 | 61 }) {
+  const isNode = node.id === currentId;
+  // While a jump of this capture is shown, the jump chip is highlighted instead.
+  const stepActive = useStepFor(node) != null;
+  const isCurrent = isNode && !stepActive;
   return (
+    <>
     <span
       onClick={() => onSelect(node)}
       className={`inline-flex items-center gap-1 font-mono text-[12px] leading-snug cursor-pointer rounded px-1.5 py-0.5 ${
@@ -25,6 +32,8 @@ function MoveChip({ node, currentId, onSelect }: { node: GameNode; currentId: st
       {node.notation}
       {node.comment && <span className="text-[10px] opacity-70" title={node.comment}>💬</span>}
     </span>
+    <CaptureSubSteps node={node} boardSize={boardSize} isCurrent={isNode} />
+    </>
   );
 }
 
@@ -37,6 +46,7 @@ function renderLine(
   depth: number,
   currentId: string,
   onSelect: (n: GameNode) => void,
+  boardSize: 37 | 48 | 61,
   onDelete?: (n: GameNode) => void,
 ): ReactElement[] {
   const rows: ReactElement[] = [];
@@ -45,7 +55,7 @@ function renderLine(
     const here: GameNode = cur;
     rows.push(
       <div key={here.id} className="group flex items-center" style={{ paddingLeft: depth * 14 }}>
-        <MoveChip node={here} currentId={currentId} onSelect={onSelect} />
+        <MoveChip node={here} currentId={currentId} onSelect={onSelect} boardSize={boardSize} />
         {onDelete && (
           <button
             type="button"
@@ -60,7 +70,7 @@ function renderLine(
     );
     const kids = here.children.filter(k => k.move);
     for (let i = 1; i < kids.length; i++) {
-      rows.push(<div key={`${kids[i].id}-var`}>{renderLine(kids[i], depth + 1, currentId, onSelect, onDelete)}</div>);
+      rows.push(<div key={`${kids[i].id}-var`}>{renderLine(kids[i], depth + 1, currentId, onSelect, boardSize, onDelete)}</div>);
     }
     cur = kids[0] ?? null;
   }
@@ -69,7 +79,7 @@ function renderLine(
 
 // Navigable variation tree. Root has no move; its children are the first moves
 // (children[0] = main line, rest = first-move alternatives).
-export default function StudyMoveTree({ root, currentId, onSelect, onDelete }: StudyMoveTreeProps) {
+export default function StudyMoveTree({ root, currentId, onSelect, onDelete, boardSize }: StudyMoveTreeProps) {
   const { t } = useI18n();
   const first = root.children.filter(k => k.move);
   const startCurrent = currentId === root.id;
@@ -89,10 +99,10 @@ export default function StudyMoveTree({ root, currentId, onSelect, onDelete }: S
       </div>
       {first.length === 0 ? null : (
         <>
-          {renderLine(first[0], 0, currentId, onSelect, onDelete)}
+          {renderLine(first[0], 0, currentId, onSelect, boardSize, onDelete)}
           {first.slice(1).map(alt => (
             <div key={`${alt.id}-rootvar`} className="border-l border-gray-200 dark:border-gray-700">
-              {renderLine(alt, 1, currentId, onSelect, onDelete)}
+              {renderLine(alt, 1, currentId, onSelect, boardSize, onDelete)}
             </div>
           ))}
         </>

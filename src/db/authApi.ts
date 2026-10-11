@@ -219,6 +219,8 @@ export interface Challenge {
   roomId: number;
   boardSize: number;
   rated: boolean;
+  timeControlBaseMs: number | null;
+  timeControlIncrementMs: number | null;
   status: string;
   createdAt: number;
 }

@@ -16,11 +16,15 @@ import {
   applyAnalysisPlacement,
   applyAnalysisRingRemoval,
   applyAnalysisCapture,
-  pickCaptureChain,
 } from '../../store/analysisActions';
 import { studyStateAtNode, findNodeById } from './studyState';
 import { GameNode, GameState, MarbleColor, CaptureMove, Captures, WIN_CONDITIONS, Shape } from '../../game/types';
 import { useI18n } from '../../i18n';
+import { toggleShape } from '../../game/shapes';
+import { useCaptureSteps } from '../Board/useCaptureSteps';
+import { useCaptureStepView, stepBack, stepForward, navigateWhole, useActiveCaptureStep } from '../../store/captureStepView';
+
+const noop = () => {};
 
 const MARBLE_BG: Record<MarbleColor, string> = {
   white: 'bg-white border border-gray-300',
@@ -181,9 +185,12 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
     const onKey = (e: KeyboardEvent) => {
       const el = e.target as HTMLElement | null;
       if (el && (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT')) return;
-      if (e.key === 'ArrowLeft') { if (currentNode.parent) navigateTo(currentNode.parent); }
+      // ←/→ walk jump by jump through multi-jump captures (see captureStepView).
+      const vs = useCaptureStepView.getState();
+      const step = vs.nodeId === currentNode.id ? vs.step : null;
+      if (e.key === 'ArrowLeft') stepBack(currentNode, step, navigateTo);
       // Forward navigation is disabled in training — it would reveal the solution.
-      else if (e.key === 'ArrowRight') { if (!training && currentNode.children[0]) navigateTo(currentNode.children[0]); }
+      else if (e.key === 'ArrowRight') { if (!training) stepForward(currentNode, step, navigateTo); }
       else if (e.key === 'Home') navigateTo(rootRef.current);
       else if (e.key === 'End') { if (!training) navigateTo(findDeepestMainLine(rootRef.current)); }
       else return;
@@ -199,17 +206,9 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
     markEdited();
   };
 
-  // Toggle a drawn shape on the current node: same orig+dest with same colour
-  // removes it, a different colour recolours it, otherwise it's added.
+  // Toggle a drawn shape on the current node (persisted with the study tree).
   const handleDrawShape = (shape: Shape) => {
-    const list = currentNode.shapes ? [...currentNode.shapes] : [];
-    const idx = list.findIndex(s => s.orig === shape.orig && s.dest === shape.dest);
-    if (idx >= 0) {
-      if (list[idx].brush === shape.brush) list.splice(idx, 1);
-      else list[idx] = shape;
-    } else {
-      list.push(shape);
-    }
+    const list = toggleShape(currentNode.shapes, shape);
     currentNode.shapes = list.length ? list : undefined;
     markEdited();
   };
@@ -228,6 +227,12 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
     setAvailableChains(slice.availableCaptureChains ?? []);
   };
 
+  const captureSteps = useCaptureSteps(availableChains);
+  // Stepping through a multi-jump capture in the move list: show the position
+  // after `step` jumps (parent position + those jumps), read-only.
+  const subStep = useActiveCaptureStep(currentNode);
+  const subStepBase = subStep && currentNode.parent ? studyStateAtNode(study.setupJson, currentNode.parent) : null;
+
   const validRemovableRings = boardState.phase === 'ringRemoval'
     ? getValidRemovableRings(boardState.rings)
     : [];
@@ -245,17 +250,17 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
       clearSelection();
       markEdited();
     } else if (boardState.phase === 'capture') {
-      if (selectedRingId) {
-        const chain = pickCaptureChain(availableChains, ringId, currentNode);
-        if (chain) {
-          const res = applyAnalysisCapture(boardState, currentNode, chain);
-          setBoardState(res.analysisState);
-          if (res.analysisCurrentNode) setCurrentNode(res.analysisCurrentNode);
-          clearSelection();
-          markEdited();
-          return;
-        }
+      // Jump-by-jump: each click lands one jump; the last one plays the chain.
+      const step = captureSteps.click(ringId);
+      if (step?.kind === 'complete') {
+        const res = applyAnalysisCapture(boardState, currentNode, step.chain);
+        setBoardState(res.analysisState);
+        if (res.analysisCurrentNode) setCurrentNode(res.analysisCurrentNode);
+        clearSelection();
+        markEdited();
+        return;
       }
+      if (step) return;
       if (ring.marble) selectRing(ringId);
     } else if (boardState.phase === 'placement') {
       if (!ring.marble && selectedMarble) {
@@ -348,15 +353,18 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
         </div>
         <div className="w-full max-w-[520px] mx-auto aspect-square rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
           <HexBoard
-            state={boardState}
-            selectedRingId={selectedRingId}
-            highlightedCaptures={highlightedCaptures}
-            validRemovableRings={validRemovableRings}
-            onRingClick={handleRingClick}
+            state={subStepBase ?? boardState}
+            selectedRingId={subStep && subStepBase ? subStep.jumps[subStep.step - 1].to : captureSteps.position ?? selectedRingId}
+            highlightedCaptures={subStepBase ? [] : availableChains.length ? captureSteps.nextJumps : highlightedCaptures}
+            capturePath={subStep && subStepBase ? subStep.jumps.slice(0, subStep.step) : captureSteps.path}
+            validRemovableRings={subStepBase ? [] : validRemovableRings}
+            onRingClick={subStepBase ? noop : handleRingClick}
             shapes={training ? undefined : currentNode.shapes}
             drawable={!training}
             onShapeDraw={handleDrawShape}
             preview
+            coordinates
+            lastMove={currentNode.move}
           />
         </div>
         <div className="flex items-center justify-center gap-2 mt-3">
@@ -401,7 +409,7 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
           {training ? (
             <p className="text-xs text-gray-400 dark:text-gray-500 py-6 text-center">🙈 {t.studyTrainingHidden}</p>
           ) : (
-            <StudyMoveTree root={rootRef.current} currentId={currentNode.id} onSelect={navigateTo} onDelete={canEdit ? handleDeleteBranch : undefined} />
+            <StudyMoveTree root={rootRef.current} currentId={currentNode.id} onSelect={n => navigateWhole(n, navigateTo)} onDelete={canEdit ? handleDeleteBranch : undefined} boardSize={boardState.boardSize} />
           )}
         </div>
         <NotationButtons

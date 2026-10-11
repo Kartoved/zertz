@@ -34,6 +34,7 @@ export interface RoomData {
   clockP1Ms: number | null;
   clockP2Ms: number | null;
   clockRunningSince: number | null;
+  firstMoveDeadline: number | null;
   setupJson: string | null;
   tournamentId: number | null;
   berserk: { player1: boolean; player2: boolean } | null;
@@ -107,6 +108,7 @@ export async function getRoom(id: number | string): Promise<{
   clockP1Ms: number | null;
   clockP2Ms: number | null;
   clockRunningSince: number | null;
+  firstMoveDeadline: number | null;
   setupJson: string | null;
   tournamentId: number | null;
   berserk: { player1: boolean; player2: boolean } | null;
@@ -143,6 +145,7 @@ export async function getRoom(id: number | string): Promise<{
     clockP1Ms: data.clockP1Ms,
     clockP2Ms: data.clockP2Ms,
     clockRunningSince: data.clockRunningSince,
+    firstMoveDeadline: data.firstMoveDeadline ?? null,
     setupJson: data.setupJson ?? null,
     tournamentId: data.tournamentId ?? null,
     berserk: data.berserk ?? null,

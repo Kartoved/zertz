@@ -35,3 +35,29 @@ body {
 .marble-black {
   background: radial-gradient(circle at 30% 30%, #4b5563, #1f2937);
 }
+
+/* ── Board move animations (HexBoard / HexRing) ── */
+@keyframes zz-pop {
+  0% { opacity: 0; transform: scale(0.2); }
+  70% { opacity: 1; transform: scale(1.12); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes zz-vanish {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.35); }
+}
+@keyframes zz-appear {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.zz-pop, .zz-vanish {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.zz-pop { animation: zz-pop 220ms ease-out both; }
+.zz-vanish { animation: zz-vanish 320ms ease-in both; }
+/* A marble that arrives by a jump stays hidden until the flying copy lands. */
+.zz-appear { animation: zz-appear 1ms linear both; }
+@media (prefers-reduced-motion: reduce) {
+  .zz-pop, .zz-vanish, .zz-appear { animation: none !important; }
+}

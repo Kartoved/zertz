@@ -5,6 +5,7 @@ import { useAuthStore } from '../../store/authStore';
 import { useI18n } from '../../i18n';
 import { LobbySlot } from '../../db/lobbyApi';
 import { FISCHER_PRESETS, TIME_CONTROLS } from '../Layout/MainMenu';
+import { formatTimeControlShort } from '../../utils/timeControl';
 
 interface LobbyScreenProps {
   onClose: () => void;
@@ -19,13 +20,6 @@ function formatCountdown(expiresAt: number, now: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-function formatTimeControl(_timeControlId: string, baseMs: number | null, incMs: number | null): string {
-  if (!baseMs) return '∞';
-  const mins = Math.round(baseMs / 60000);
-  if (incMs === -1) return `${mins}d`;
-  const inc = Math.round((incMs || 0) / 1000);
-  return `${mins}+${inc}`;
-}
 
 export default function LobbyScreen({ onClose }: LobbyScreenProps) {
   const navigate = useNavigate();
@@ -65,7 +59,9 @@ export default function LobbyScreen({ onClose }: LobbyScreenProps) {
 
   const handleCreate = useCallback(async () => {
     setActionError('');
-    const tc = FISCHER_PRESETS.find(p => p.id === timeControlId);
+    // timeControlId is a TIME_CONTROLS id ('blitz'…) — map it to its Fischer preset.
+    const presetId = TIME_CONTROLS.find(c => c.id === timeControlId)?.preset;
+    const tc = FISCHER_PRESETS.find(p => p.id === presetId);
     try {
       await createSlot({
         boardSize,
@@ -119,7 +115,7 @@ export default function LobbyScreen({ onClose }: LobbyScreenProps) {
               <div>
                 <p className="text-sm font-semibold text-indigo-700 dark:text-indigo-300">{t.lobbyWaiting}</p>
                 <p className="text-xs text-indigo-500 dark:text-indigo-400 mt-0.5">
-                  {boardLabel[mySlot.boardSize]} · {tcIcon(mySlot.timeControlId)} {formatTimeControl(mySlot.timeControlId, mySlot.timeControlBaseMs, mySlot.timeControlIncrementMs)}
+                  {boardLabel[mySlot.boardSize]} · {tcIcon(mySlot.timeControlId)} {formatTimeControlShort(mySlot.timeControlBaseMs, mySlot.timeControlIncrementMs)}
                   {' · '}{mySlot.rated ? t.lobbyRated : t.lobbyUnrated}
                 </p>
               </div>
@@ -246,7 +242,7 @@ export default function LobbyScreen({ onClose }: LobbyScreenProps) {
                   <div className="flex items-center gap-2 mt-1">
                     <span className="text-xs px-1.5 py-0.5 rounded bg-gray-200 dark:bg-gray-600 text-gray-600 dark:text-gray-300 font-mono">{slot.boardSize}</span>
                     <span className="text-xs text-gray-500 dark:text-gray-400">
-                      {tcIcon(slot.timeControlId)} {formatTimeControl(slot.timeControlId, slot.timeControlBaseMs, slot.timeControlIncrementMs)}
+                      {tcIcon(slot.timeControlId)} {formatTimeControlShort(slot.timeControlBaseMs, slot.timeControlIncrementMs)}
                     </span>
                     <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${slot.rated ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' : 'bg-gray-200 dark:bg-gray-600 text-gray-500 dark:text-gray-400'}`}>
                       {slot.rated ? t.lobbyRated : t.lobbyUnrated}

@@ -7,6 +7,7 @@ import { indexRoom } from '../explorer.js';
 import { verifySubmittedState, computePremoveResponse } from '../utils/verifyState.js';
 import { validateSetupState } from '../../shared/explorer/validateSetup.js';
 import { parsePremoves, selectPremoveResponse, setNotice, clearNotice } from '../utils/premoveTree.js';
+import { pgUtc } from '../utils/pgTime.js';
 import { moveLimiter, createRoomLimiter, chatLimiter, addTimeLimiter } from '../middleware/rateLimits.js';
 
 // How much time a "give opponent more time" press adds, by control type.
@@ -14,6 +15,38 @@ import { moveLimiter, createRoomLimiter, chatLimiter, addTimeLimiter } from '../
 // resets each turn) → grant a whole extra day; everything else is blitz/rapid → +15s.
 const ADD_TIME_CORRESPONDENCE_MS = 24 * 60 * 60 * 1000;
 const ADD_TIME_BLITZ_MS = 15 * 1000;
+
+// Lichess-style abort. A timed game's clock does not run until BOTH sides have
+// made their first move; meanwhile the side to move has this long to start, or
+// the game is aborted (winner 0, win_type 'aborted', no rating change).
+// Correspondence (increment -1) gets its whole per-move budget instead.
+const ABORT_WINDOW_MS = 30 * 1000;
+function firstMoveWindowMs(baseMs, incrementMs) {
+  return Number(incrementMs) === -1 ? Number(baseMs) : ABORT_WINDOW_MS;
+}
+
+// Aborts the room if its first-move deadline has passed. Atomic (guarded by
+// `winner IS NULL`), so concurrent readers can't double-flip it. Returns the
+// updated row, or null when nothing changed.
+async function abortIfFirstMoveExpired(row) {
+  if (row.winner != null || row.clock_running_since != null || row.first_move_deadline == null) return null;
+  if (new Date(row.first_move_deadline).getTime() > Date.now()) return null;
+  let stateJson = row.state_json;
+  try {
+    const s = JSON.parse(stateJson);
+    s.winner = 'cancelled';
+    stateJson = JSON.stringify(s);
+  } catch { /* keep as-is */ }
+  const res = await pool.query(
+    `UPDATE rooms
+       SET winner = 0, win_type = 'aborted', state_json = $2,
+           first_move_deadline = NULL, updated_at = NOW()
+     WHERE id = $1 AND winner IS NULL
+     RETURNING *`,
+    [row.id, stateJson]
+  );
+  return res.rows[0] ?? null;
+}
 
 // Fire-and-forget indexer call. We never want explorer-side errors to block
 // the API response, but we still want to know if it failed.
@@ -432,6 +465,9 @@ router.get('/:id', async (req, res) => {
 
     let row = result.rows[0];
 
+    const aborted = await abortIfFirstMoveExpired(row);
+    if (aborted) row = aborted;
+
     const canTimeoutByRead =
       row.winner == null &&
       row.time_control_base_ms != null &&
@@ -553,6 +589,7 @@ router.get('/:id', async (req, res) => {
       clockP1Ms: row.clock_p1_ms,
       clockP2Ms: row.clock_p2_ms,
       clockRunningSince: row.clock_running_since ? row.clock_running_since.getTime() : null,
+      firstMoveDeadline: row.first_move_deadline ? row.first_move_deadline.getTime() : null,
       setupJson: row.setup_json || null,
       tournamentId,
       berserk,
@@ -644,7 +681,9 @@ router.put('/:id/state', moveLimiter, authRequired, async (req, res) => {
       clock_p1_ms,
       clock_p2_ms,
       clock_running_since,
-      setup_json
+      first_move_deadline,
+      setup_json,
+      state_json
      FROM rooms
      WHERE id = $1`,
     [id]
@@ -656,6 +695,12 @@ router.put('/:id/state', moveLimiter, authRequired, async (req, res) => {
   }
 
   const room = roomCheck.rows[0];
+
+  // A first move submitted after the abort deadline is too late — abort instead.
+  if (await abortIfFirstMoveExpired({ ...room, id: Number(id) })) {
+    res.status(400).json({ error: 'Партия отменена: первый ход не сделан вовремя', aborted: true });
+    return;
+  }
 
   if (room.winner !== null) {
     res.status(400).json({ error: 'Игра уже завершена' });
@@ -765,8 +810,24 @@ router.put('/:id/state', moveLimiter, authRequired, async (req, res) => {
     }
   }
 
+  // Opening phase (clock not yet running): no time is deducted. White's first
+  // move hands Black a fresh abort deadline; Black's first move starts the clock.
+  let nextFirstMoveDeadline = room.first_move_deadline;
+  if (!isTimedGame && room.time_control_base_ms != null && room.time_control_increment_ms != null && !isUndo) {
+    const didTurnPass = room.current_player !== nextCurrentPlayer;
+    let submittedMoveNumber = 1;
+    try { submittedMoveNumber = JSON.parse(stateJson).moveNumber ?? 1; } catch { /* keep default */ }
+    if (didTurnPass && submittedMoveNumber >= 3) {
+      nextFirstMoveDeadline = null;
+      nextClockRunningSince = new Date();
+    } else if (didTurnPass) {
+      nextFirstMoveDeadline = new Date(Date.now() + firstMoveWindowMs(room.time_control_base_ms, room.time_control_increment_ms));
+    }
+  }
+
   if (nextWinner) {
     nextClockRunningSince = null;
+    nextFirstMoveDeadline = null;
   }
 
   await pool.query(
@@ -779,6 +840,7 @@ router.put('/:id/state', moveLimiter, authRequired, async (req, res) => {
        clock_p1_ms = $7,
        clock_p2_ms = $8,
        clock_running_since = $9,
+       first_move_deadline = $10,
        updated_at = NOW()
      WHERE id = $1`,
     [
@@ -790,7 +852,10 @@ router.put('/:id/state', moveLimiter, authRequired, async (req, res) => {
       nextWinType,
       nextClockP1,
       nextClockP2,
-      nextClockRunningSince,
+      // Bare-UTC strings: a JS Date would be serialized in the host's local
+      // timezone into these `timestamp without time zone` columns.
+      nextClockRunningSince ? pgUtc(new Date(nextClockRunningSince).getTime()) : null,
+      nextFirstMoveDeadline ? pgUtc(new Date(nextFirstMoveDeadline).getTime()) : null,
     ]
   );
 
@@ -988,6 +1053,7 @@ async function tryAutoExecutePremove(roomId, ownerPlayer, opponentPlayer) {
          clock_p1_ms = $5,
          clock_p2_ms = $6,
          clock_running_since = NOW(),
+         first_move_deadline = NULL,
          premoves_json = $7,
          updated_at = NOW()
        WHERE id = $1`,
@@ -1093,12 +1159,18 @@ router.put('/:id/join', optionalAuth, async (req, res) => {
     const col = playerIndex === 1 ? 'user1_id' : 'user2_id';
     await pool.query(`UPDATE rooms SET ${col} = $2 WHERE id = $1`, [id, userId]);
 
+    // Both seats filled → open the first-move window (the clock itself starts
+    // only after both sides' first moves; see PUT /:id/state). Re-joins don't
+    // reset it: the deadline is only set while still NULL.
     await pool.query(`
       UPDATE rooms
-      SET clock_running_since = NOW()
+      SET first_move_deadline = NOW() + make_interval(secs => (
+        CASE WHEN time_control_increment_ms = -1 THEN time_control_base_ms ELSE ${ABORT_WINDOW_MS} END
+      )::double precision / 1000)
       WHERE id = $1
         AND time_control_base_ms IS NOT NULL
         AND clock_running_since IS NULL
+        AND first_move_deadline IS NULL
         AND user1_id IS NOT NULL
         AND user2_id IS NOT NULL
         AND winner IS NULL

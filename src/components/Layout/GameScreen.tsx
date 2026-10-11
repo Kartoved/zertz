@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import HexBoard from '../Board/HexBoard';
 import MarbleSelector from '../UI/MarbleSelector';
 import GameStats from '../UI/GameStats';
@@ -6,10 +6,15 @@ import ControlPanel from '../UI/ControlPanel';
 import MoveHistory from '../UI/MoveHistory';
 import RulesContent from '../UI/RulesContent';
 import { useGameStore } from '../../store/gameStore';
+import { useCaptureSteps } from '../Board/useCaptureSteps';
+import { useActiveCaptureStep } from '../../store/captureStepView';
+import { rebuildStateFromNode, rebuildStateFromNodeWithStart } from '../../utils/gameTreeUtils';
 import { useUIStore } from '../../store/uiStore';
 import { useAuthStore } from '../../store/authStore';
 import { getWinType } from '../../game/GameEngine';
 import { getWinTypeLabel, useI18n } from '../../i18n';
+
+const noop = () => {};
 
 interface LocalPlayerStripProps {
   slot: 'player1' | 'player2';
@@ -54,6 +59,32 @@ export default function GameScreen() {
   const [showSurrenderConfirm, setShowSurrenderConfirm] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const { undo, currentNode } = useGameStore();
+  const { selectRing, handleCapture, selectedRingId, highlightedCaptures, availableCaptureChains } = useGameStore();
+  const captureSteps = useCaptureSteps(availableCaptureChains);
+  // Stepping through a multi-jump capture in the move list: show the position
+  // after `step` jumps (parent position + those jumps), read-only.
+  const subStep = useActiveCaptureStep(currentNode);
+  const subStepBase = useMemo(
+    () => {
+      if (!subStep || !currentNode.parent) return null;
+      const { customStart } = useGameStore.getState();
+      return customStart
+        ? rebuildStateFromNodeWithStart(customStart, currentNode.parent)
+        : rebuildStateFromNode(currentNode.parent, state.boardSize);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [subStep?.step, currentNode],
+  );
+  // Jump-by-jump capture input; anything else goes to the store's selection logic.
+  const handleRingClick = (ringId: string) => {
+    const step = captureSteps.click(ringId);
+    if (step?.kind === 'complete') {
+      handleCapture(step.chain);
+      return;
+    }
+    if (step) return;
+    selectRing(ringId);
+  };
   const canCancelLocal = !state.winner && (state.moveNumber ?? 0) <= 2 && currentNode.children.length === 0;
 
   const navTabs: Array<{ id: string; label: string; authOnly?: boolean }> = [
@@ -206,7 +237,16 @@ export default function GameScreen() {
             showActionsMenu={false}
           />
           <div className="flex-1 min-h-0 flex items-center justify-center p-2 lg:bg-white lg:dark:bg-gray-800 lg:rounded-xl shadow-sm overflow-hidden">
-            <HexBoard />
+            <HexBoard
+              state={subStepBase ?? undefined}
+              drawable
+              lastMove={currentNode.move}
+              onRingClick={subStepBase ? noop : handleRingClick}
+              selectedRingId={subStep && subStepBase ? subStep.jumps[subStep.step - 1].to : captureSteps.position ?? selectedRingId}
+              highlightedCaptures={subStepBase ? [] : availableCaptureChains.length ? captureSteps.nextJumps : highlightedCaptures}
+              capturePath={subStep && subStepBase ? subStep.jumps.slice(0, subStep.step) : captureSteps.path}
+              validRemovableRings={subStepBase ? [] : undefined}
+            />
           </div>
           {/* Player 2 strip + ⋯ menu (mobile) */}
           <LocalPlayerStrip

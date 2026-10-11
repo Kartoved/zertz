@@ -4,6 +4,7 @@ import { getChallenges, cancelChallenge, acceptChallenge, declineChallenge, Chal
 import { getPendingRooms, deleteRoom, PendingRoom } from '../../db/roomsApi';
 import { useAuthStore } from '../../store/authStore';
 import { useI18n } from '../../i18n';
+import { formatTimeControl } from '../../utils/timeControl';
 
 const BOARD_LABELS: Record<number, string> = {
   37: '37',
@@ -102,14 +103,6 @@ export default function ChallengesModal({ onClose }: ChallengesModalProps) {
     return d.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
   };
 
-  const formatTimeControl = (room: PendingRoom) => {
-    if (room.timeControlBaseMs && room.timeControlIncrementMs !== null) {
-      const mins = Math.round(room.timeControlBaseMs / 60000);
-      const inc = Math.round((room.timeControlIncrementMs || 0) / 1000);
-      return `${mins}+${inc}`;
-    }
-    return '∞';
-  };
 
   const outgoingCount = outgoing.length + pendingRooms.length;
 
@@ -161,7 +154,8 @@ export default function ChallengesModal({ onClose }: ChallengesModalProps) {
                       <div className="font-medium text-gray-900 dark:text-white truncate">
                         {c.fromCountry} {c.fromUsername} ({c.fromRating})
                       </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 flex gap-2">
+                      <div className="text-xs text-gray-500 dark:text-gray-400 flex flex-wrap gap-x-2">
+                        <span className="font-semibold text-indigo-600 dark:text-indigo-300">⏱ {formatTimeControl(t, c.timeControlBaseMs, c.timeControlIncrementMs)}</span>
                         <span>{t.boardLabel}: {BOARD_LABELS[c.boardSize]}</span>
                         {c.rated && <span className="text-purple-500 font-medium">{t.rated}</span>}
                         <span>{formatTime(c.createdAt)}</span>
@@ -201,7 +195,8 @@ export default function ChallengesModal({ onClose }: ChallengesModalProps) {
                       <div className="font-medium text-gray-900 dark:text-white truncate">
                         {c.toCountry} {c.toUsername} ({c.toRating})
                       </div>
-                      <div className="text-xs text-gray-500 dark:text-gray-400 flex gap-2">
+                      <div className="text-xs text-gray-500 dark:text-gray-400 flex flex-wrap gap-x-2">
+                        <span className="font-semibold text-indigo-600 dark:text-indigo-300">⏱ {formatTimeControl(t, c.timeControlBaseMs, c.timeControlIncrementMs)}</span>
                         <span>{t.boardLabel}: {BOARD_LABELS[c.boardSize]}</span>
                         {c.rated && <span className="text-purple-500 font-medium">{t.rated}</span>}
                         <span>{formatTime(c.createdAt)}</span>
@@ -227,7 +222,7 @@ export default function ChallengesModal({ onClose }: ChallengesModalProps) {
                       </div>
                       <div className="text-xs text-gray-500 dark:text-gray-400 flex gap-2 flex-wrap">
                         <span>{t.boardLabel}: {BOARD_LABELS[room.boardSize]}</span>
-                        <span>{formatTimeControl(room)}</span>
+                        <span>⏱ {formatTimeControl(t, room.timeControlBaseMs, room.timeControlIncrementMs)}</span>
                         {room.rated && <span className="text-purple-500 font-medium">{t.rated}</span>}
                         <span>{formatTime(room.createdAt)}</span>
                       </div>

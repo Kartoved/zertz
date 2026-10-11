@@ -153,6 +153,15 @@ function executeCaptureSingle(state: GameState, capture: CaptureMove): void {
   capturedRing.marble = null;
 }
 
+/** Applies the first jumps of a capture chain WITHOUT ending the turn — the
+ *  in-between position shown while a player clicks a chain jump by jump (and
+ *  when stepping through a chain in the move list). Returns a new state. */
+export function applyCaptureSteps(state: GameState, jumps: CaptureMove[]): GameState {
+  const next = cloneState(state);
+  for (const jump of jumps) executeCaptureSingle(next, jump);
+  return next;
+}
+
 export function executeCapture(state: GameState, captures: CaptureMove[]): void {
   for (const capture of captures) {
     executeCaptureSingle(state, capture);

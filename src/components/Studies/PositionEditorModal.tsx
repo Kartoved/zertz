@@ -140,7 +140,7 @@ export default function PositionEditorModal({ onClose, onCreate }: PositionEdito
           {/* Board */}
           <div className="flex-1 min-w-0">
             <div className="w-full max-w-[460px] mx-auto aspect-square rounded-xl overflow-hidden bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
-              <HexBoard state={state} onRingClick={handleRingClick} preview editable />
+              <HexBoard state={state} onRingClick={handleRingClick} preview editable coordinates />
             </div>
             {/* Brush palette */}
             <div className="flex flex-wrap items-center justify-center gap-2 mt-3">

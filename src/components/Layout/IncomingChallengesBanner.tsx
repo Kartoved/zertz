@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getChallenges, acceptChallenge, declineChallenge, Challenge } from '../../db/authApi';
 import { useAuthStore } from '../../store/authStore';
 import { useI18n } from '../../i18n';
+import { formatTimeControl } from '../../utils/timeControl';
 
 // Prominent menu banner for pending incoming challenges so they aren't missed
 // behind the header icon. Self-contained: polls, and accepts/declines inline
@@ -72,7 +73,10 @@ export default function IncomingChallengesBanner() {
                 <span className="truncate">{c.fromUsername}</span>
                 <span className="text-xs text-indigo-500 dark:text-indigo-300 flex-shrink-0">{c.fromRating}</span>
               </div>
-              <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+              <div className="flex flex-wrap items-center gap-2 mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                <span className="px-1.5 py-0.5 rounded font-semibold bg-indigo-100 dark:bg-indigo-900/50 text-indigo-700 dark:text-indigo-200">
+                  ⏱ {formatTimeControl(t, c.timeControlBaseMs, c.timeControlIncrementMs)}
+                </span>
                 <span className="font-mono px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-700">{c.boardSize}</span>
                 <span className={`px-1.5 py-0.5 rounded font-medium ${
                   c.rated

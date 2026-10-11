@@ -17,6 +17,9 @@ interface HexRingProps {
   isValidPlacement: boolean;
   /** Position-editor ghost slot for a removed ring — faint, clickable to restore. */
   ghost?: boolean;
+  /** Animate this ring's marble in: 'pop' (placement) or 'appear' after
+   *  `delayMs` (a jumping marble lands here). `key` restarts the animation. */
+  marbleAnim?: { key: number; kind: 'pop' | 'appear'; delayMs: number } | null;
   onClick?: (ringId: string) => void;
 }
 
@@ -32,6 +35,7 @@ function HexRing({
   isCaptureTarget,
   isValidPlacement,
   ghost,
+  marbleAnim,
   onClick,
 }: HexRingProps) {
   // Store values are only needed at click time, so read them lazily via
@@ -218,9 +222,14 @@ function HexRing({
       
       {/* Marble (smaller than inner hole, sits on top of ring) */}
       {ring.marble && (
-        <g style={{
-          filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.7)) drop-shadow(0 1px 3px rgba(0,0,0,0.5))',
-        }}>
+        <g
+          key={marbleAnim?.key}
+          className={marbleAnim ? (marbleAnim.kind === 'pop' ? 'zz-pop' : 'zz-appear') : undefined}
+          style={{
+            filter: 'drop-shadow(0 4px 8px rgba(0,0,0,0.7)) drop-shadow(0 1px 3px rgba(0,0,0,0.5))',
+            animationDelay: marbleAnim ? `${marbleAnim.delayMs}ms` : undefined,
+          }}
+        >
           <circle
             cx={0}
             cy={0}

@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { useRoomStore } from '../../store/roomStore';
+import { useRoomStore, rebuildRoomState } from '../../store/roomStore';
 import { useAuthStore } from '../../store/authStore';
 import { useUIStore } from '../../store/uiStore';
 import { berserkRoom } from '../../db/roomsApi';
@@ -13,7 +13,6 @@ import { getWinType, createInitialState } from '../../game/GameEngine';
 import { stateToZip } from '../../game/zip';
 import { treeToZen } from '../../game/zen';
 import NotationButtons from '../UI/NotationButtons';
-import { pickCaptureChain } from '../../store/analysisActions';
 import { GameNode } from '../../game/types';
 import { nodeDepth, mainLineNodeAtDepth } from '../../utils/gameTreeUtils';
 import PlayerProfileModal from '../Auth/PlayerProfileModal';
@@ -21,6 +20,11 @@ import RulesContent from '../UI/RulesContent';
 import OnlineMoveHistory from '../UI/OnlineMoveHistory';
 import OpeningExplorerPanel from './OpeningExplorerPanel';
 import { getWinTypeLabel, useI18n } from '../../i18n';
+import { formatTimeControl } from '../../utils/timeControl';
+import { useCaptureSteps } from '../Board/useCaptureSteps';
+import { useActiveCaptureStep } from '../../store/captureStepView';
+
+const noop = () => {};
 
 export function RoomScreen() {
   const { t } = useI18n();
@@ -93,6 +97,7 @@ export function RoomScreen() {
     clockP1Ms,
     clockP2Ms,
     clockRunningSince,
+    firstMoveDeadline,
     surrender,
     addTime,
     cancelGame,
@@ -189,6 +194,18 @@ export function RoomScreen() {
   }, [premoveToast]);
 
   const isTimedGame = timeControlBaseMs != null;
+  const captureSteps = useCaptureSteps(availableCaptureChains);
+  // Stepping through a multi-jump capture in the move list: show the position
+  // after `step` jumps (parent position + those jumps), read-only.
+  const activeNode = isAnalyzing && analysisCurrentNode ? analysisCurrentNode : currentNode;
+  const subStep = useActiveCaptureStep(activeNode);
+  const subStepBase = useMemo(
+    () => (subStep && activeNode.parent
+      ? rebuildRoomState(activeNode.parent, state.boardSize, useRoomStore.getState().roomSetup)
+      : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [subStep?.step, activeNode],
+  );
 
   useEffect(() => {
     if (!isTimedGame || state.winner) return;
@@ -279,6 +296,14 @@ export function RoomScreen() {
 
   const p1ClockMs = getDisplayClockMs('player1');
   const p2ClockMs = getDisplayClockMs('player2');
+
+  // Opening phase: the clock waits for both first moves; the side to move has
+  // until `firstMoveDeadline` or the server aborts the game.
+  const firstMoveMsLeft = firstMoveDeadline != null && !clockRunningSince && !state.winner
+    ? Math.max(0, firstMoveDeadline - clockNowMs)
+    : null;
+  const isMyFirstMove = myPlayer != null && state.currentPlayer === (myPlayer === 1 ? 'player1' : 'player2');
+  const timeControlLabel = formatTimeControl(t, timeControlBaseMs, timeControlIncrementMs);
 
   // In analysis mode, the board mirrors `analysisState`; otherwise the live state.
   const boardState = isAnalyzing && analysisState ? analysisState : state;
@@ -575,18 +600,13 @@ export function RoomScreen() {
         effectiveHandleRingRemoval(ringId);
       }
     } else if (boardState.phase === 'capture') {
-      // Match the chain whose *terminal* landing equals the clicked ring.
-      // Chains share an intermediate `to` when they branch — only the terminal
-      // is unique per chain, so matching there disambiguates the user's intent.
-      if (selectedRingId) {
-        // In analysis, disambiguate same-terminal chains so a second capture
-        // branch can be built (see pickCaptureChain).
-        const chain = pickCaptureChain(availableCaptureChains, ringId, isAnalyzing ? analysisCurrentNode : null);
-        if (chain) {
-          effectiveHandleCapture(chain);
-          return;
-        }
+      // Jump-by-jump: each click lands one jump; the last one submits the chain.
+      const step = captureSteps.click(ringId);
+      if (step?.kind === 'complete') {
+        effectiveHandleCapture(step.chain);
+        return;
       }
+      if (step) return;
       if (ring.marble) {
         effectiveSelectRing(ringId);
       }
@@ -701,6 +721,12 @@ export function RoomScreen() {
             <h1 className="text-lg md:text-xl font-bold text-gray-800 dark:text-gray-200">
               ZÈRTZ Online
             </h1>
+            <span
+              title={t.timeControl}
+              className="px-2 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+            >
+              ⏱ {timeControlLabel}
+            </span>
           </div>
 
           <div className="hidden md:block flex-1 min-w-[220px] md:mx-3">
@@ -1093,16 +1119,30 @@ export function RoomScreen() {
               🔬 {t.analysisMode}
             </div>
           )}
+          {/* First-move abort countdown (all sizes) */}
+          {firstMoveMsLeft != null && !isAnalyzing && (
+            <div className={`mx-3 mt-1 px-3 py-1.5 rounded-lg text-center text-xs sm:text-sm font-medium border ${
+              isMyFirstMove
+                ? 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-700 text-red-700 dark:text-red-200'
+                : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300'
+            }`}>
+              {isMyFirstMove ? t.firstMoveYou : t.firstMoveOpponent}{' '}
+              <span className="font-mono font-bold">{formatClock(firstMoveMsLeft)}</span>
+            </div>
+          )}
           {/* Opponent strip (mobile only) */}
           {mobileOpponentStrip}
           {/* Board */}
           <div className="flex-1 min-h-0 flex items-center justify-center overflow-hidden">
             <HexBoard
-              state={boardState}
-              onRingClick={handleRingClick}
-              selectedRingId={selectedRingId}
-              highlightedCaptures={highlightedCaptures}
-              validRemovableRings={validRemovableRings}
+              state={subStepBase ?? boardState}
+              onRingClick={subStepBase ? noop : handleRingClick}
+              selectedRingId={subStep && subStepBase ? subStep.jumps[subStep.step - 1].to : captureSteps.position ?? selectedRingId}
+              highlightedCaptures={subStepBase ? [] : availableCaptureChains.length ? captureSteps.nextJumps : highlightedCaptures}
+              capturePath={subStep && subStepBase ? subStep.jumps.slice(0, subStep.step) : captureSteps.path}
+              validRemovableRings={subStepBase ? [] : validRemovableRings}
+              drawable
+              lastMove={activeNode?.move}
             />
           </div>
           {/* You strip (mobile only) */}
@@ -1341,9 +1381,9 @@ export function RoomScreen() {
             {isCancelled ? (
               <>
                 <div className="text-2xl font-bold text-gray-600 dark:text-gray-300 mb-2">
-                  ✕ {t.gameCancelled}
+                  ✕ {winType === 'aborted' ? t.gameAborted : t.gameCancelled}
                 </div>
-                <div className="text-gray-500 dark:text-gray-400 mb-6">{t.cancelledStatus}</div>
+                <div className="text-gray-500 dark:text-gray-400 mb-6">{winType === 'aborted' ? t.abortedStatus : t.cancelledStatus}</div>
               </>
             ) : (
               <>

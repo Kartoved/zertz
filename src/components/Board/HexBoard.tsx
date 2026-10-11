@@ -1,11 +1,13 @@
-import { useState, useMemo, useRef, useId, type WheelEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import { useState, useMemo, useRef, useId, useLayoutEffect, type WheelEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { useUIStore } from '../../store/uiStore';
 import { hexToPixel, idToAlgebraic } from '../../game/Board';
 import { getValidRemovableRings } from '../../game/Board';
-import { hasAvailableCaptures, getAvailableCaptures } from '../../game/GameEngine';
+import { hasAvailableCaptures, getAvailableCaptures, applyCaptureSteps } from '../../game/GameEngine';
 import HexRing from './HexRing';
-import { GameState, CaptureMove, Shape, ShapeBrush } from '../../game/types';
+import { toggleShape } from '../../game/shapes';
+import { diffBoards, snapshotBoard, type BoardAnim, type BoardSnap } from './boardAnimation';
+import { GameState, CaptureMove, Shape, ShapeBrush, Move, MarbleColor } from '../../game/types';
 
 const HEX_SIZE = 28;
 const BOARD_PADDING = 60;
@@ -26,6 +28,86 @@ function brushFromEvent(e: { shiftKey: boolean; altKey: boolean; ctrlKey: boolea
 }
 
 type Pt = { x: number; y: number };
+
+const LAST_MOVE_COLOR = '#facc15';
+
+const MARBLE_FILL: Record<MarbleColor, { fill: string; stroke: string }> = {
+  white: { fill: '#f0f0f0', stroke: '#b0b0b0' },
+  gray: { fill: '#8b919c', stroke: '#3d4350' },
+  black: { fill: '#374151', stroke: '#000000' },
+};
+
+function prefersReducedMotion(): boolean {
+  try {
+    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return false;
+  }
+}
+
+/** A marble copy flying hop by hop along `points`, then fading out where the
+ *  real marble appears. Driven by the Web Animations API (SVG transforms). */
+function FlyingMarble({ color, points, hopMs, animKey }: { color: MarbleColor; points: Pt[]; hopMs: number; animKey: number }) {
+  const ref = useRef<SVGGElement>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || points.length < 2 || typeof el.animate !== 'function') return;
+    const total = hopMs * (points.length - 1);
+    const move = el.animate(
+      points.map(p => ({ transform: `translate(${p.x}px, ${p.y}px)` })),
+      { duration: total, easing: 'ease-in-out', fill: 'forwards' },
+    );
+    const fade = el.animate([{ opacity: 1 }, { opacity: 0 }], { delay: total, duration: 60, fill: 'forwards' });
+    return () => { move.cancel(); fade.cancel(); };
+    // Keyed on the animation, not on `points` (a fresh array every parent render).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [animKey]);
+  const c = MARBLE_FILL[color];
+  return (
+    <g ref={ref} style={{ transform: `translate(${points[0].x}px, ${points[0].y}px)` }}>
+      <circle r={HEX_SIZE * 0.58} fill={c.fill} stroke={c.stroke} strokeWidth={1.5}
+        style={{ filter: 'drop-shadow(0 6px 8px rgba(0,0,0,0.6))' }} />
+    </g>
+  );
+}
+
+/** Lichess-style "last move" marks: a halo where a marble landed, a dashed ghost
+ *  where a ring was taken away, and the jump path of a capture chain. */
+function LastMoveMarks({ move, pointOf }: { move: Move; pointOf: (id: string) => Pt | null }) {
+  const halo = (p: Pt, key: string) => (
+    <circle key={key} cx={p.x} cy={p.y} r={HEX_SIZE * 1.02} fill="none" stroke={LAST_MOVE_COLOR} strokeWidth={HEX_SIZE * 0.13} opacity={0.75} />
+  );
+  if (move.type === 'placement') {
+    const placed = pointOf(move.data.ringId);
+    const removed = move.data.removedRingId ? pointOf(move.data.removedRingId) : null;
+    return (
+      <>
+        {placed && halo(placed, 'placed')}
+        {removed && (
+          <circle cx={removed.x} cy={removed.y} r={HEX_SIZE * 0.85} fill={LAST_MOVE_COLOR} fillOpacity={0.12}
+            stroke={LAST_MOVE_COLOR} strokeWidth={HEX_SIZE * 0.08} strokeDasharray={`${HEX_SIZE * 0.25} ${HEX_SIZE * 0.18}`} opacity={0.8} />
+        )}
+      </>
+    );
+  }
+  const jumps = [move.data, ...(move.data.chain || [])];
+  const path = [pointOf(jumps[0].from), ...jumps.map(j => pointOf(j.to))].filter((p): p is Pt => !!p);
+  const end = path[path.length - 1];
+  return (
+    <>
+      {path.length > 1 && (
+        <polyline points={path.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke={LAST_MOVE_COLOR}
+          strokeWidth={HEX_SIZE * 0.1} strokeLinecap="round" strokeLinejoin="round" opacity={0.55} />
+      )}
+      {path[0] && <circle cx={path[0].x} cy={path[0].y} r={HEX_SIZE * 0.9} fill="none" stroke={LAST_MOVE_COLOR} strokeWidth={HEX_SIZE * 0.08} opacity={0.6} />}
+      {jumps.map((j, i) => {
+        const c = pointOf(j.captured);
+        return c ? <circle key={`cap-${i}`} cx={c.x} cy={c.y} r={HEX_SIZE * 0.22} fill={LAST_MOVE_COLOR} opacity={0.7} /> : null;
+      })}
+      {end && halo(end, 'end')}
+    </>
+  );
+}
 
 function Arrow({ x1, y1, x2, y2, color, opacity = 0.85 }: { x1: number; y1: number; x2: number; y2: number; color: string; opacity?: number }) {
   const dx = x2 - x1, dy = y2 - y1;
@@ -81,10 +163,21 @@ interface HexBoardProps {
   editable?: boolean;
   /** Annotation shapes (arrows/circles) to render over the board. */
   shapes?: Shape[];
-  /** Enable right-click drawing of shapes (desktop). Emits completed shapes. */
+  /** Enable right-click drawing of shapes (desktop). Without `onShapeDraw` the
+   *  shapes are ephemeral (Lichess-style): kept inside the board, visible only to
+   *  this viewer, wiped on any position change or a left click. */
   drawable?: boolean;
-  /** Called when a shape is drawn (right-drag = arrow, right-click = circle). */
+  /** Called when a shape is drawn (right-drag = arrow, right-click = circle).
+   *  When given, the caller owns the shapes and passes them back via `shapes`. */
   onShapeDraw?: (shape: Shape) => void;
+  /** Allow coordinate labels + the "a1" toggle on a `preview`-layout board
+   *  (full-size boards always have them; tiny thumbnails never do). */
+  coordinates?: boolean;
+  /** The move that led to this position — highlighted on the board. */
+  lastMove?: Move | null;
+  /** Jumps of a capture chain taken so far (jump-by-jump input): the board
+   *  shows the in-between position and marks the jumped path. */
+  capturePath?: CaptureMove[];
 }
 
 export default function HexBoard(props: HexBoardProps = {}) {
@@ -92,7 +185,46 @@ export default function HexBoard(props: HexBoardProps = {}) {
   // board — which passes everything as props — returns its stable prop
   // reference and never re-renders on unrelated gameStore changes, while a live
   // board still reacts to just these slices.
-  const state = useGameStore(s => props.state || s.state);
+  const baseState = useGameStore(s => props.state || s.state);
+  const capturePath = props.capturePath;
+  const state = useMemo(
+    () => (capturePath?.length ? applyCaptureSteps(baseState, capturePath) : baseState),
+    [baseState, capturePath],
+  );
+
+  // ── Move animations ──
+  // Compare each new position with the previous one; a single forward step is
+  // animated (see boardAnimation.ts). Runs in a layout effect so the re-render
+  // with the animation lands before the browser paints the new position.
+  const animEnabled = !props.preview && !props.editable;
+  const prevSnapRef = useRef<BoardSnap | null>(null);
+  const animKeyRef = useRef(0);
+  const [anim, setAnim] = useState<(BoardAnim & { key: number }) | null>(null);
+  const hintPath = useMemo((): string[] | null => {
+    if (capturePath?.length) {
+      const j = capturePath[capturePath.length - 1];
+      return [j.from, j.to];
+    }
+    const m = props.lastMove;
+    if (m?.type === 'capture') {
+      const jumps = [m.data, ...(m.data.chain || [])];
+      return [jumps[0].from, ...jumps.map(j => j.to)];
+    }
+    return null;
+  }, [capturePath, props.lastMove]);
+  useLayoutEffect(() => {
+    const snap = snapshotBoard(state);
+    const prev = prevSnapRef.current;
+    prevSnapRef.current = snap;
+    if (!animEnabled || !prev) return;
+    const next = prefersReducedMotion() ? null : diffBoards(prev, snap, hintPath);
+    if (!next) { setAnim(null); return; }
+    const key = ++animKeyRef.current;
+    setAnim({ ...next, key });
+    const timer = setTimeout(() => setAnim(cur => (cur?.key === key ? null : cur)), next.totalMs + 80);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
   const selectedRingId = useGameStore(s => (props.selectedRingId !== undefined ? props.selectedRingId : s.selectedRingId));
   const highlightedCaptures = useGameStore(s => props.highlightedCaptures || s.highlightedCaptures);
   // Unique per-instance prefix for SVG gradient ids. Multiple HexBoards can be on
@@ -103,7 +235,8 @@ export default function HexBoard(props: HexBoardProps = {}) {
   const gradPrefix = `hb${useId().replace(/:/g, '')}`;
   // Coordinate labels are a shared, persisted UI preference (see uiStore). Never
   // shown in tiny thumbnail (preview) boards.
-  const showCoordinates = useUIStore(s => s.showCoordinates) && !props.preview;
+  const coordsAllowed = !props.preview || !!props.coordinates;
+  const showCoordinates = useUIStore(s => s.showCoordinates) && coordsAllowed;
   const toggleCoordinates = useUIStore(s => s.toggleCoordinates);
   const [zoom, setZoom] = useState(1);
   const pinchRef = useRef<{ dist: number; zoom: number } | null>(null);
@@ -158,7 +291,8 @@ export default function HexBoard(props: HexBoardProps = {}) {
   
   // In preview (thumbnail) mode the board should fill the square edge-to-edge,
   // so pad only by a ring radius instead of the full interactive breathing room.
-  const pad = props.preview ? HEX_SIZE + 6 : BOARD_PADDING;
+  // Coordinate labels sit HEX_SIZE+6 beyond the outer rings — leave room for them.
+  const pad = props.preview ? (showCoordinates ? HEX_SIZE * 2 + 14 : HEX_SIZE + 6) : BOARD_PADDING;
   const width = bounds.maxX - bounds.minX + pad * 2;
   const height = bounds.maxY - bounds.minY + pad * 2;
   const offsetX = -bounds.minX + pad;
@@ -180,12 +314,14 @@ export default function HexBoard(props: HexBoardProps = {}) {
   }, [state.phase, state.rings, props.validRemovableRings]);
   
   const captureTargets = useMemo(() => {
+    // Mid-chain only the jumping marble may move on — don't advertise others.
+    if (capturePath?.length) return new Set<string>();
     if (hasAvailableCaptures(state)) {
       const captures = getAvailableCaptures(state);
       return new Set(captures.map(c => c.from));
     }
     return new Set<string>();
-  }, [state]);
+  }, [state, capturePath]);
   
   const highlightedRings = useMemo(() => {
     return new Set(highlightedCaptures.map(c => c.to));
@@ -231,7 +367,26 @@ export default function HexBoard(props: HexBoardProps = {}) {
     setZoom(newZoom);
   };
 
-  // ── Right-click annotation drawing (desktop; Studies) ──
+  // ── Right-click annotation drawing (desktop) ──
+  // Ephemeral mode keeps shapes tagged with the position they were drawn on, so
+  // they vanish as soon as the position changes. The key is content-based, not
+  // `state` identity: online polling re-deserializes an identical state.
+  const ephemeralShapes = !!props.drawable && !props.onShapeDraw;
+  const positionKey = useMemo(() => {
+    if (!ephemeralShapes) return '';
+    let k = `${state.moveNumber}|${state.phase}|${state.currentPlayer}|`;
+    for (const r of state.rings.values()) k += r.isRemoved ? 'x' : r.marble ? r.marble.color[0] : '.';
+    return k;
+  }, [ephemeralShapes, state]);
+  const [localShapes, setLocalShapes] = useState<{ key: string; shapes: Shape[] }>({ key: '', shapes: [] });
+  const shownShapes = ephemeralShapes
+    ? (localShapes.key === positionKey ? localShapes.shapes : [])
+    : props.shapes;
+  const emitShape = (shape: Shape) => {
+    if (ephemeralShapes) setLocalShapes({ key: positionKey, shapes: toggleShape(shownShapes, shape) });
+    else props.onShapeDraw?.(shape);
+  };
+
   const svgRef = useRef<SVGSVGElement>(null);
   const drawOriginRef = useRef<string | null>(null);
   const [drawState, setDrawState] = useState<{ orig: string; x: number; y: number; brush: ShapeBrush } | null>(null);
@@ -257,6 +412,10 @@ export default function HexBoard(props: HexBoardProps = {}) {
   };
 
   const handleDrawDown = (e: ReactMouseEvent<SVGSVGElement>) => {
+    if (e.button === 0 && ephemeralShapes && shownShapes?.length) {
+      setLocalShapes({ key: positionKey, shapes: [] });
+      return;
+    }
     if (e.button !== 2) return;
     const loc = toLocal(e.clientX, e.clientY);
     const ring = loc && ringAtLocal(loc.x, loc.y);
@@ -281,10 +440,18 @@ export default function HexBoard(props: HexBoardProps = {}) {
     const loc = toLocal(e.clientX, e.clientY);
     const dest = loc ? ringAtLocal(loc.x, loc.y) : null;
     const brush = brushFromEvent(e);
-    props.onShapeDraw?.(dest && dest !== orig ? { orig, dest, brush } : { orig, brush });
+    emitShape(dest && dest !== orig ? { orig, dest, brush } : { orig, brush });
   };
 
   const cancelDraw = () => { drawOriginRef.current = null; setDrawState(null); };
+
+  // Pixel position of any ring id, including removed rings (not in `positions`).
+  const pointOf = (id: string): Pt | null => {
+    const p = positions.get(id);
+    if (p) return p;
+    const ring = state.rings.get(id);
+    return ring ? hexToPixel(ring.q, ring.r, RING_SPACING) : null;
+  };
 
   const { preview } = props;
 
@@ -333,10 +500,63 @@ export default function HexBoard(props: HexBoardProps = {}) {
                   isCaptureTarget={isCaptureTarget}
                   isValidPlacement={isValidPlacement}
                   ghost={ring.isRemoved}
+                  marbleAnim={anim?.dest?.id === ring.id ? { key: anim.key, kind: anim.dest.kind, delayMs: anim.dest.delayMs } : null}
                   onClick={props.onRingClick}
                 />
               );
             })}
+
+            {/* Move animation overlays: vanishing rings/marbles, flying marble */}
+            {anim && (
+              <g key={anim.key} style={{ pointerEvents: 'none' }}>
+                {anim.vanishRings.map(v => {
+                  const p = pointOf(v.id);
+                  return p ? (
+                    <g key={`vr-${v.id}`} transform={`translate(${p.x}, ${p.y})`}>
+                      <circle className="zz-vanish" style={{ animationDelay: `${v.delayMs}ms` }}
+                        r={HEX_SIZE * 0.61} fill="none" stroke="#1f1f1f" strokeWidth={HEX_SIZE * 0.48} />
+                    </g>
+                  ) : null;
+                })}
+                {anim.vanishMarbles.map(v => {
+                  const p = pointOf(v.id);
+                  const c = MARBLE_FILL[v.color];
+                  return p ? (
+                    <g key={`vm-${v.id}`} transform={`translate(${p.x}, ${p.y})`}>
+                      <circle className="zz-vanish" style={{ animationDelay: `${v.delayMs}ms` }}
+                        r={HEX_SIZE * 0.58} fill={c.fill} stroke={c.stroke} strokeWidth={1.5} />
+                    </g>
+                  ) : null;
+                })}
+                {anim.flight && (
+                  <FlyingMarble
+                    color={anim.flight.color}
+                    hopMs={anim.flight.hopMs}
+                    animKey={anim.key}
+                    points={anim.flight.path.map(id => pointOf(id)).filter((p): p is Pt => !!p)}
+                  />
+                )}
+              </g>
+            )}
+
+            {/* Jumps already taken in a half-entered capture chain */}
+            {capturePath && capturePath.length > 0 && (
+              <g style={{ pointerEvents: 'none' }}>
+                <polyline
+                  points={[capturePath[0].from, ...capturePath.map(j => j.to)]
+                    .map(id => pointOf(id)).filter((p): p is Pt => !!p).map(p => `${p.x},${p.y}`).join(' ')}
+                  fill="none" stroke="#22c55e" strokeWidth={HEX_SIZE * 0.14} strokeLinecap="round" strokeLinejoin="round"
+                  strokeDasharray={`${HEX_SIZE * 0.3} ${HEX_SIZE * 0.2}`} opacity={0.8}
+                />
+              </g>
+            )}
+
+            {/* Last move highlight */}
+            {props.lastMove && !capturePath?.length && (
+              <g style={{ pointerEvents: 'none' }}>
+                <LastMoveMarks move={props.lastMove} pointOf={pointOf} />
+              </g>
+            )}
 
             {/* Coordinate labels above/below each column */}
             {coordLabels.length > 0 && (
@@ -361,9 +581,9 @@ export default function HexBoard(props: HexBoardProps = {}) {
             )}
 
             {/* Annotation shapes (arrows/circles) + live drawing preview */}
-            {(props.shapes?.length || drawState) && (
+            {(shownShapes?.length || drawState) && (
               <g style={{ pointerEvents: 'none' }}>
-                {props.shapes?.map((s, i) => <ShapeMark key={`sh-${i}-${s.orig}-${s.dest ?? ''}`} shape={s} positions={positions} />)}
+                {shownShapes?.map((s, i) => <ShapeMark key={`sh-${i}-${s.orig}-${s.dest ?? ''}`} shape={s} positions={positions} />)}
                 {drawState && <ShapePreview draw={drawState} positions={positions} />}
               </g>
             )}
@@ -374,7 +594,7 @@ export default function HexBoard(props: HexBoardProps = {}) {
             Zoom: {Math.round(zoom * 100)}%
           </div>
         )}
-        {!preview && (
+        {coordsAllowed && (
           <button
             type="button"
             onClick={toggleCoordinates}
