@@ -59,6 +59,9 @@ Unit tests live in `src/game/GameEngine.test.ts` (Vitest). Playwright is install
 - `arena.ts` — match runner: book openings, colours swapped within each opening pair, each bot its OWN random stream (keyed by bot, not seat — else a bot vs itself replays one game), Elo by games and by pairs (the honest one), `noMarbles` reported apart
 - `openings.ts` + `positions/book{37,48,61}.ts` — level openings (nothing captured, nothing capturable), stored as MOVES, not ZIP (a ZIP re-anchors on read)
 - `record.ts` — a bot game as a tree + ZEN
+- `levels.ts` — what the site offers: `PLAY_LEVELS` (Novice = `safe-random`, Amateur = `greedy`; Strong = the search bot to come), `WATCH_BOTS` for bot vs bot, speeds. `worker.ts` takes a bot spec, so a site game is played by exactly the measured bot.
+
+**Bot modes on the site** (`BotGameModal`, `gameStore`): `bots: {player1, player2}` holds a spec per side (null = a person); "Me vs bot" and "Bot vs bot" (paced by `botDelayMs`, pause/resume, browsing pauses it, rematch swaps colours/bots). A worker answer is dropped if the position moved on meanwhile. Undo against a bot takes back the bot's answer too. Every finished bot game goes to `POST /api/bot-games` → table `bot_games` (ZEN + specs + result; `server/utils/botGames.js` validates). `server/scripts/exportBotGames.js` prints them as arena-style JSONL; the server's nightly backup writes `~/zertz-backups/site-bot-games.jsonl`, and the author's PC pulls it into `Desktop\zertz-matches` next to the stand's recorded matches (`match.ts --record` writes there by default).
 
 Scripts (`npx vite-node scripts/<name>.ts -- …`): `match.ts` (`--a --b --games --board=48 --jobs=4 --record --out`; never more jobs than the 4 physical cores), `book.ts` (rebuild a book), `gamestats.ts` (what recorded matches say about the rules).
 
@@ -129,6 +132,7 @@ Express app with JWT auth middleware. All routes under `/api`, static `dist/` se
 | `/api/explorer` | `routes/explorer.js` | Opening-explorer position lookup (aggregates + per-game refs) |
 | `/api/studies` | `routes/studies.js` | Studies (Lichess-style lessons): Notion-like hierarchy CRUD, public list, per-`:owner/:slug` fetch, per-author visible tree (`GET /tree/:owner`, guests included), move/reorder, deep clone |
 | `/api/tournaments` | `routes/tournaments.js` | Arena tournaments: create (one-off / recurring `/schedules`), list, detail+standings (`GET /:id`), join/pause/resume, edit/delete, per-tournament games (`GET /:id/games`). See the Arena convention below + `docs/ARENA_TOURNAMENTS.md`. |
+| `/api/bot-games` | `routes/botGames.js` | Finished games with a bot (human vs bot, bot vs bot) reported by the client — write-only corpus for the bot's tools |
 
 `server/db.js` owns the PostgreSQL pool and creates all tables on startup (idempotent). Tables include `position_moves` (per-position move aggregates) and `position_games` (per-game references; see `shared/explorer/`), plus the arena tables `tournaments`, `tournament_players`, `tournament_games`, `tournament_schedules`.
 
