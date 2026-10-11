@@ -31,6 +31,11 @@ docker compose up -d db   # postgres on 5432 (db service only — see note below
 
 **Deployment: Docker Compose on a VDS.** Production now runs `docker compose up -d` (both `web` + `db`) on a self-hosted VDS — no longer Railway. Containers default to UTC (no `TZ` set), which the clock logic relies on (see the timestamp convention below). The `railway:*` package scripts are legacy.
 
+- The checkout is `/opt/zertz`, owned by root: deploy is `sudo git pull --ff-only && sudo docker compose up -d --build` there. Bump `src/version.ts` and write the `blog/v<version>.md` post first — the release announces itself in global chat on start.
+- The db port is bound to `127.0.0.1` (use an SSH tunnel for a GUI client). The real password is `DB_PASSWORD` in the server's `.env` (read by both services); the `zertz_secret_password` default in the compose file is for local development only — it is public, and the port was brute-forced (370k failed logins) while it was exposed. Never publish 5432 on all interfaces again.
+- Container logs are capped (json-file, 3 × 10 MB).
+- Backups: `~/bin/zertz-backup.sh` (cron 03:30 server time) dumps to `~/zertz-backups` and keeps 14 days; the author's PC pulls them daily into `Desktop\zertz-backups` (Task Scheduler "ZERTZ backup pull"). Dumps contain emails and password hashes — never commit them. Take a fresh dump before any data migration.
+
 Environment: copy `.env.example` → `.env`, set `JWT_SECRET`. Backend connects to Postgres via `DATABASE_URL` or individual `PG*` env vars.
 
 Unit tests live in `src/game/GameEngine.test.ts` (Vitest). Playwright is installed but e2e test files haven't been written.
