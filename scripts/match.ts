@@ -4,8 +4,9 @@
  *   npx vite-node scripts/match.ts -- --a=greedy --b=minimax-easy --games=200
  *
  * Options: --board=48 (37/48/61), --seed=1, --jobs=4, --book=0 with --opening=N
- * for raw random plies instead of the book, --record --out=file.jsonl to keep
- * every game as ZEN.
+ * for raw random plies instead of the book, --record to keep every game as
+ * ZEN — in --out=file.jsonl, by default ../zertz-matches/<a>-vs-<b>-<board>-<time>.jsonl
+ * (next to the repo, not in it: the games are kept, not committed).
  *
  * Bots are spec strings (src/ai/botSpec.ts). Every game's seed comes from its
  * index, so the same options give the same match however many --jobs play it;
@@ -18,7 +19,7 @@
 
 import { spawn } from 'node:child_process';
 import { cpus } from 'node:os';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { MatchGame, formatMatch, playMatchGame, scoreForA, summarizeMatch } from '../src/ai/arena';
 import { botFromSpec } from '../src/ai/botSpec';
@@ -93,7 +94,13 @@ async function runParent(): Promise<void> {
   console.log(formatMatch(summarizeMatch(a, b, played), played));
   console.log(`  wall ${((Date.now() - started) / 1000).toFixed(0)}s`);
 
-  // --out=file.jsonl keeps every game, for questions nobody thought to ask yet.
-  const out = args.get('out');
-  if (out) writeFileSync(out, played.map(g => JSON.stringify(g) + '\n').join(''));
+  // Every recorded game is kept, for questions nobody thought to ask yet.
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[-:]/g, '').replace('T', '-');
+  const safe = (spec: string) => spec.replace(/[^a-z0-9=.,-]+/gi, '_');
+  const out = args.get('out') ?? (record ? resolve('..', 'zertz-matches', `${safe(a)}-vs-${safe(b)}-${boardSize}-${stamp}.jsonl`) : undefined);
+  if (out) {
+    mkdirSync(resolve(out, '..'), { recursive: true });
+    writeFileSync(out, played.map(g => JSON.stringify(g) + '\n').join(''));
+    console.log(`  games: ${out}`);
+  }
 }
