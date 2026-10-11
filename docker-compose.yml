@@ -9,7 +9,8 @@ services:
       - PGPORT=5432
       - PGDATABASE=zertz
       - PGUSER=zertz
-      - PGPASSWORD=zertz_secret_password
+      # Production sets DB_PASSWORD in .env; the default is for local development only.
+      - PGPASSWORD=${DB_PASSWORD:-zertz_secret_password}
       - PORT=5050
       - JWT_SECRET=${JWT_SECRET}
       - VAPID_PUBLIC_KEY=${VAPID_PUBLIC_KEY}
@@ -20,15 +21,21 @@ services:
       db:
         condition: service_healthy
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   db:
     image: postgres:15-alpine
+    # Loopback only: reachable from this host (and an SSH tunnel), never from the internet.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     environment:
       - POSTGRES_DB=zertz
       - POSTGRES_USER=zertz
-      - POSTGRES_PASSWORD=zertz_secret_password
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-zertz_secret_password}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -37,6 +44,11 @@ services:
       timeout: 5s
       retries: 5
     restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
 volumes:
   postgres_data:
