@@ -23,6 +23,33 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.21.0',
+    date: '2026-10-11',
+    changes: {
+      ru: [
+        '🤖 Игра против бота вернулась: кнопка «С ботом» в меню, уровни «Новичок» и «Любитель», любое поле',
+        '👀 Бот против бота: выберите двух ботов и скорость и смотрите; пауза, перелистывание ходов, реванш с поменянными цветами',
+        '↶ «Отменить» против бота забирает и ответ бота — вы сразу на своём ходу',
+        '📊 Партии с ботом сохраняются — по ним мы проверяем и учим будущего сильного бота',
+        'Версия обновлена до v0.21.0',
+      ],
+      en: [
+        '🤖 Playing the bot is back: the “Vs bot” button in the menu, Novice and Amateur levels, any board',
+        '👀 Bot vs bot: pick two bots and a speed and watch; pause, browse the moves, rematch with colours swapped',
+        '↶ “Undo” against the bot takes back the bot’s answer too — you are straight back on your turn',
+        '📊 Games with a bot are saved — they are how we test and train the strong bot to come',
+        'Version updated to v0.21.0',
+      ],
+      eo: [
+        '🤖 Ludi kontraŭ la roboto revenis: la butono «Kontraŭ roboto» en la menuo, niveloj Komencanto kaj Amatoro, ajna tabulo',
+        '👀 Roboto kontraŭ roboto: elektu du robotojn kaj rapidon kaj spektu; paŭzo, foliumado de movoj, revanĉo kun interŝanĝitaj koloroj',
+        '↶ «Malfari» kontraŭ la roboto reprenas ankaŭ ĝian respondon — vi tuj revenas al via vico',
+        '📊 Ludoj kun roboto konserviĝas — per ili ni testas kaj trejnas la venontan fortan roboton',
+        'Versio ĝisdatigita al v0.21.0',
+      ],
+    },
+  },
+  {
     version: '0.20.0',
     date: '2026-10-11',
     changes: {
