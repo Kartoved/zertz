@@ -52,7 +52,7 @@ function LocalPlayerStrip({ isActive, captures, name, showActionsMenu, onOpenAct
 
 export default function GameScreen() {
   const { t } = useI18n();
-  const { state, playerNames, newGame, cancelGame, botPlayer, isBotThinking } = useGameStore();
+  const { state, playerNames, newGame, newBotGame, cancelGame, bots, botDelayMs, isBotThinking, botPaused, botStuck, toggleBotPause } = useGameStore();
   const { toggleDarkMode, isDarkMode, setScreen } = useUIStore();
   const { user } = useAuthStore();
   const [showRematchDialog, setShowRematchDialog] = useState(false);
@@ -77,8 +77,12 @@ export default function GameScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [subStep?.step, currentNode],
   );
+  // Whose turn it is: a person's, or a bot's (then the board does not take clicks).
+  const isBotTurn = !!bots[state.currentPlayer];
+  const botVsBot = !!bots.player1 && !!bots.player2;
   // Jump-by-jump capture input; anything else goes to the store's selection logic.
   const handleRingClick = (ringId: string) => {
+    if (isBotTurn) return;
     const step = captureSteps.click(ringId);
     if (step?.kind === 'complete') {
       handleCapture(step.chain);
@@ -111,6 +115,30 @@ export default function GameScreen() {
   };
   
   const isGameOver = state.phase === 'gameOver';
+
+  // Bot-vs-bot: who is to move, pause/resume; also where a bot with no legal move says so.
+  const botWatchControls = (
+    <div className="space-y-2">
+      {botStuck ? (
+        <p className="text-sm text-amber-600 dark:text-amber-400">{t.botNoMove}</p>
+      ) : (
+        <div className={`flex items-center gap-2 py-1 text-sm text-indigo-600 dark:text-indigo-400 font-medium ${isBotThinking && !botPaused ? 'animate-pulse' : ''}`}>
+          {state.currentPlayer === 'player1' ? playerNames.player1 : playerNames.player2}
+        </div>
+      )}
+      {botVsBot && !botStuck && (
+        <>
+          <button
+            onClick={toggleBotPause}
+            className="w-full py-2 rounded-lg text-sm font-semibold bg-indigo-500 hover:bg-indigo-600 text-white transition-colors"
+          >
+            {botPaused ? `▶ ${t.botResume}` : `⏸ ${t.botPause}`}
+          </button>
+          {botPaused && <p className="text-xs text-gray-500 dark:text-gray-400">{t.botPausedNote}</p>}
+        </>
+      )}
+    </div>
+  );
   const isCancelled = state.winner === 'cancelled';
   const winType = state.winner && !isCancelled ? getWinType(state, state.winner as import('../../game/types').Player) : null;
   const winnerName = isCancelled ? '' : (state.winner === 'player1' ? playerNames.player1 : playerNames.player2);
@@ -214,7 +242,9 @@ export default function GameScreen() {
 
           {!isGameOver && (
             <div className="p-3 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
-              {isBotThinking && botPlayer === state.currentPlayer ? (
+              {botVsBot || botStuck ? (
+                botWatchControls
+              ) : isBotTurn ? (
                 <div className="flex items-center gap-2 py-2 text-sm text-indigo-600 dark:text-indigo-400 font-medium animate-pulse">
                   🤖 {t.botThinking}
                 </div>
@@ -222,7 +252,7 @@ export default function GameScreen() {
                 <MarbleSelector />
               )}
               <div className="mt-3">
-                <ControlPanel onSurrender={() => setShowSurrenderConfirm(true)} onCancel={cancelGame} />
+                <ControlPanel onSurrender={() => setShowSurrenderConfirm(true)} onCancel={cancelGame} hideResign={botVsBot} />
               </div>
             </div>
           )}
@@ -285,9 +315,11 @@ export default function GameScreen() {
             onOpenActions={() => setShowMobileActions(true)}
           />
           {/* Marble picker (mobile, when placement phase) */}
-          {!isGameOver && state.phase === 'placement' && (
+          {!isGameOver && (botVsBot || botStuck || state.phase === 'placement') && (
             <div className="lg:hidden p-2 bg-white dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700">
-              {isBotThinking && botPlayer === state.currentPlayer ? (
+              {botVsBot || botStuck ? (
+                botWatchControls
+              ) : isBotTurn ? (
                 <div className="flex items-center justify-center gap-2 py-2 text-sm text-indigo-600 dark:text-indigo-400 font-medium animate-pulse">
                   🤖 {t.botThinking}
                 </div>
@@ -314,7 +346,7 @@ export default function GameScreen() {
             >
               ↶ {t.undo}
             </button>
-            {canCancelLocal && (
+            {canCancelLocal && !botVsBot && (
               <button
                 type="button"
                 onClick={() => { cancelGame(); setShowMobileActions(false); }}
@@ -323,13 +355,15 @@ export default function GameScreen() {
                 ✕ {t.cancelGame}
               </button>
             )}
-            <button
-              type="button"
-              onClick={() => { setShowMobileActions(false); setShowSurrenderConfirm(true); }}
-              className="w-full px-3 py-2.5 text-sm rounded-lg bg-red-500 hover:bg-red-600 text-white"
-            >
-              🏳️ {t.surrender}
-            </button>
+            {!botVsBot && (
+              <button
+                type="button"
+                onClick={() => { setShowMobileActions(false); setShowSurrenderConfirm(true); }}
+                className="w-full px-3 py-2.5 text-sm rounded-lg bg-red-500 hover:bg-red-600 text-white"
+              >
+                🏳️ {t.surrender}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setShowMobileActions(false)}
@@ -358,7 +392,13 @@ export default function GameScreen() {
                 <button
                   key={boardSize}
                   onClick={() => {
-                    newGame(boardSize);
+                    // A rematch with a bot keeps the bots and swaps the colours —
+                    // for two bots that is the other half of an arena pair.
+                    if (bots.player1 || bots.player2) {
+                      newBotGame({ boardSize, bots: { player1: bots.player2, player2: bots.player1 }, delayMs: botDelayMs });
+                    } else {
+                      newGame(boardSize);
+                    }
                     setShowRematchDialog(false);
                   }}
                   className="w-full p-3 text-left bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors"

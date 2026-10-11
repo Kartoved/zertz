@@ -44,3 +44,12 @@ export const createRoomLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many rooms created, please wait' },
 });
+
+// Finished bot games reported by the client (one per game; bot-vs-bot can be quick).
+export const botGameLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000, // 10 min
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many bot games reported' },
+});

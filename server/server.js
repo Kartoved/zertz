@@ -19,6 +19,7 @@ import lobbyRouter from './routes/lobby.js';
 import explorerRouter from './routes/explorer.js';
 import studiesRouter from './routes/studies.js';
 import tournamentsRouter from './routes/tournaments.js';
+import botGamesRouter from './routes/botGames.js';
 import {
   authLimiter,
   chatLimiter,
@@ -26,7 +27,7 @@ import {
   createRoomLimiter,
 } from './middleware/rateLimits.js';
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 const app = express();
 const port = process.env.PORT || 5050;
@@ -53,6 +54,7 @@ app.use('/api/lobby', createRoomLimiter, lobbyRouter);
 app.use('/api/explorer', explorerRouter);
 app.use('/api/studies', studiesRouter);
 app.use('/api/tournaments', tournamentsRouter); // per-route limiters applied inside
+app.use('/api/bot-games', botGamesRouter);       // per-route limiters applied inside
 
 // Serve static files
 const __filename = fileURLToPath(import.meta.url);

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-export type NavTab = 'playOnline' | 'playLocal' | 'loadGame' | 'import' | 'rules' | 'players' | 'challenges' | 'lobby';
+export type NavTab = 'playOnline' | 'playLocal' | 'playBot' | 'loadGame' | 'import' | 'rules' | 'players' | 'challenges' | 'lobby';
 
 export function useMainMenuModals() {
   const [showLoadDialog, setShowLoadDialog] = useState(false);
@@ -22,6 +22,7 @@ export function useMainMenuModals() {
     switch (tab) {
       case 'playOnline': setShowOnlineDialog(true); break;
       case 'playLocal': setShowBoardDialog(true); break;
+      case 'playBot': setShowBotDialog(true); break;
       case 'loadGame': setShowLoadDialog(true); break;
       case 'import': setShowImportDialog(true); break;
       case 'rules': setShowRulesModal(true); break;

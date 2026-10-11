@@ -10,6 +10,7 @@ import { TIME_CONTROLS } from '../Layout/MainMenu';
 interface RoomsPanelProps {
   onCreateGame: () => void;
   onPlayLocal: () => void;
+  onPlayBot: () => void;
 }
 
 function formatTimeControl(baseMs: number | null, incMs: number | null): string {
@@ -42,7 +43,7 @@ function RoomMeta({ room, t }: { room: PendingRoom; t: any }) {
   );
 }
 
-export default function RoomsPanel({ onCreateGame, onPlayLocal }: RoomsPanelProps) {
+export default function RoomsPanel({ onCreateGame, onPlayLocal, onPlayBot }: RoomsPanelProps) {
   const { t } = useI18n();
   const navigate = useNavigate();
   const { user } = useAuthStore();
@@ -127,6 +128,15 @@ export default function RoomsPanel({ onCreateGame, onPlayLocal }: RoomsPanelProp
           👥 {t.playLocal}
         </button>
       </div>
+      <button
+        type="button"
+        onClick={onPlayBot}
+        className="w-full py-2.5 px-3 rounded-xl font-semibold text-base transition-all
+          bg-white dark:bg-gray-800 text-indigo-600 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800
+          hover:bg-gray-50 dark:hover:bg-gray-700 active:scale-95"
+      >
+        🤖 {t.playVsBot}
+      </button>
 
       {!user && (
         <p className="text-sm text-gray-500 dark:text-gray-400 text-center">

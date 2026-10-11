@@ -28,8 +28,17 @@ import {
   isDescendant,
   formatGameId,
   syncMainLineFlags,
+  nodeDepth,
 } from '../utils/gameTreeUtils';
-import { BotLevel, BotMove } from '../ai/minimax';
+import type { BotMove } from '../ai/apply';
+import { BotGameConfig, BotSides, VS_HUMAN_DELAY_MS, botLabel } from '../ai/levels';
+import { treeToZen } from '../game/zen';
+import { saveBotGame } from '../db/botGamesApi';
+import { getI18nFromStorage } from '../i18n';
+import { APP_VERSION } from '../version';
+
+const NO_BOTS: BotSides = { player1: null, player2: null };
+const bothBots = (bots: BotSides) => !!bots.player1 && !!bots.player2;
 
 interface GameStore {
   state: GameState;
@@ -49,16 +58,26 @@ interface GameStore {
   winType: string | null;
   isLoadedGame: boolean;
 
-  // Bot
-  botPlayer: Player | null;
-  botLevel: BotLevel;
+  // Bots: the spec playing each side (null = a person), see ai/levels.ts.
+  bots: BotSides;
+  /** Least time between a bot's move and the previous one (bot-vs-bot pacing). */
+  botDelayMs: number;
+  botPaused: boolean;
+  /** The bot to move had no legal move (empty pool, nothing captured) — the game stopped. */
+  botStuck: boolean;
+  /** This game's result already went to /api/bot-games. */
+  botGameReported: boolean;
   isBotThinking: boolean;
 
   newGame: (boardSize?: 37 | 48 | 61) => void;
   loadPosition: (state: GameState) => void;
   loadTree: (startState: GameState, root: GameNode, names?: { player1: string; player2: string }) => void;
-  newBotGame: (boardSize: 37 | 48 | 61, botPlayer: Player, level: BotLevel) => void;
+  newBotGame: (config: BotGameConfig) => void;
   triggerBotMove: () => void;
+  toggleBotPause: () => void;
+  /** After every completed move: save, report a finished bot game, or let the next bot move. */
+  afterMove: () => void;
+  reportBotGame: () => void;
   selectMarbleColor: (color: MarbleColor | null) => void;
   selectRing: (ringId: string) => void;
   handlePlacement: (ringId: string) => void;
@@ -94,8 +113,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   savedGames: [],
   winType: null,
   isLoadedGame: false,
-  botPlayer: null,
-  botLevel: 'medium',
+  bots: NO_BOTS,
+  botDelayMs: VS_HUMAN_DELAY_MS,
+  botPaused: false,
+  botStuck: false,
+  botGameReported: false,
   isBotThinking: false,
   
   newGame: (boardSize = 37) => {
@@ -117,7 +139,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       gameId: newGameId,
       winType: null,
       isLoadedGame: false,
-      botPlayer: null,
+      bots: NO_BOTS,
+      botPaused: false,
+      botStuck: false,
       isBotThinking: false,
     });
   },
@@ -141,7 +165,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
       gameId: formatGameId(Date.now()),
       winType: null,
       isLoadedGame: false,
-      botPlayer: null,
+      bots: NO_BOTS,
+      botPaused: false,
+      botStuck: false,
       isBotThinking: false,
     });
   },
@@ -164,24 +190,29 @@ export const useGameStore = create<GameStore>((set, get) => ({
       gameId: formatGameId(Date.now()),
       winType: null,
       isLoadedGame: true,
-      botPlayer: null,
+      bots: NO_BOTS,
+      botPaused: false,
+      botStuck: false,
       isBotThinking: false,
     });
   },
 
-  newBotGame: (boardSize, botPlayer, level) => {
+  newBotGame: ({ boardSize, bots, delayMs }) => {
     const rootNode = createRootNode();
     const newGameId = formatGameId(Date.now());
     const authUser = useAuthStore.getState().user;
     const defaults = getDefaultPlayerNames();
-    const player1Name = authUser ? authUser.username : defaults.player1;
-    const names = {
-      player1: botPlayer === 'player1' ? 'Bot' : player1Name,
-      player2: botPlayer === 'player2' ? 'Bot' : defaults.player2,
+    const { t } = getI18nFromStorage();
+    const name = (side: Player, fallback: string) => {
+      const spec = bots[side];
+      return spec ? `🤖 ${botLabel(t, spec)}` : fallback;
     };
-    const initialState = createInitialState(boardSize);
+    const names = {
+      player1: name('player1', authUser ? authUser.username : defaults.player1),
+      player2: name('player2', defaults.player2),
+    };
     set({
-      state: initialState,
+      state: createInitialState(boardSize),
       gameTree: rootNode,
       currentNode: rootNode,
       selectedMarbleColor: null,
@@ -193,16 +224,17 @@ export const useGameStore = create<GameStore>((set, get) => ({
       gameId: newGameId,
       winType: null,
       isLoadedGame: false,
-      botPlayer,
-      botLevel: level,
+      bots,
+      botDelayMs: delayMs,
+      botPaused: false,
+      botStuck: false,
+      botGameReported: false,
       isBotThinking: false,
     });
-    // If bot goes first, trigger immediately
-    if (initialState.currentPlayer === botPlayer) {
-      setTimeout(() => get().triggerBotMove(), 100);
-    }
+    // If a bot moves first, start it.
+    setTimeout(() => get().triggerBotMove(), 100);
   },
-  
+
   selectMarbleColor: (color) => {
     set({ selectedMarbleColor: color, selectedRingId: null });
   },
@@ -258,8 +290,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!needsRingRemoval) {
       const newNode = addMoveToTree(currentNode, move, state.currentPlayer, state.moveNumber, state.boardSize);
       set({ state: newState, currentNode: newNode, selectedMarbleColor: null, selectedRingId: null, winType });
-      get().autoSave();
-      if (!winner) setTimeout(() => get().triggerBotMove(), 0);
+      get().afterMove();
     } else {
       set({ state: newState, selectedMarbleColor: null });
     }
@@ -293,8 +324,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (winner) playWinSound();
 
     set({ state: newState, currentNode: newNode, selectedRingId: null, winType });
-    get().autoSave();
-    if (!winner) setTimeout(() => get().triggerBotMove(), 0);
+    get().afterMove();
   },
 
   handleCapture: (captures) => {
@@ -308,24 +338,32 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (winner) playWinSound();
 
     set({ state: newState, currentNode: newNode, selectedRingId: null, highlightedCaptures: [], availableCaptureChains: [], winType });
-    get().autoSave();
-    if (!winner) setTimeout(() => get().triggerBotMove(), 0);
+    get().afterMove();
   },
   
   undo: () => {
-    const { state, currentNode } = get();
-    if (!currentNode.parent || state.winner) return;
+    const undoOnce = (): boolean => {
+      const { state, currentNode } = get();
+      if (!currentNode.parent || state.winner) return false;
 
-    // Delete the state node from tree
-    const parentNode = currentNode.parent;
-    const idx = parentNode.children.indexOf(currentNode);
-    if (idx > -1) {
-      parentNode.children.splice(idx, 1);
-    }
-    
-    // We already have rebuild logic down in navigateToNode
-    get().navigateToNode(parentNode);
+      // Delete the state node from tree
+      const parentNode = currentNode.parent;
+      const idx = parentNode.children.indexOf(currentNode);
+      if (idx > -1) {
+        parentNode.children.splice(idx, 1);
+      }
+
+      // We already have rebuild logic down in navigateToNode
+      get().navigateToNode(parentNode);
+      return true;
+    };
+    if (!undoOnce()) return;
+    // Against a bot, take back the bot's answer too: back to the person's turn.
+    const { bots, state } = get();
+    if (!bothBots(bots) && bots[state.currentPlayer]) undoOnce();
     playUndoSound();
+    // Back at the start with the bot to move (it plays first): let it move again.
+    if (bots[get().state.currentPlayer]) setTimeout(() => get().triggerBotMove(), 0);
   },
 
   surrender: () => {
@@ -339,6 +377,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       winType: 'surrender',
     });
     get().autoSave();
+    get().reportBotGame();
   },
 
   cancelGame: () => {
@@ -352,6 +391,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       winType: 'cancelled',
     });
     get().autoSave();
+    get().reportBotGame();
   },
   
   setPlayerNames: (player1, player2) => {
@@ -420,7 +460,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
   
   navigateToNode: (targetNode: GameNode) => {
-    const { customStart, state } = get();
+    const { customStart, state, bots } = get();
+    if (bothBots(bots)) set({ botPaused: true });
     const newState = customStart
       ? rebuildStateFromNodeWithStart(customStart, targetNode)
       : rebuildStateFromNode(targetNode, state.boardSize);
@@ -436,43 +477,88 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
   
   triggerBotMove: () => {
-    const { state, botPlayer, botLevel, isBotThinking } = get();
-    if (!botPlayer || state.winner || isBotThinking) return;
-    if (state.currentPlayer !== botPlayer) return;
+    const { state, bots, isBotThinking, botPaused, botDelayMs, currentNode, gameId } = get();
+    const spec = bots[state.currentPlayer];
+    if (!spec || state.winner || isBotThinking || botPaused) return;
     if (state.phase === 'ringRemoval') return;
 
     set({ isBotThinking: true });
-
+    const started = Date.now();
     const worker = new Worker(new URL('../ai/worker.ts', import.meta.url), { type: 'module' });
-    worker.onmessage = (e: MessageEvent<{ move: BotMove }>) => {
-      worker.terminate();
-      set({ isBotThinking: false });
+    const done = () => { worker.terminate(); set({ isBotThinking: false }); };
 
-      const { move } = e.data;
-      if (get().state.winner) return;
+    worker.onmessage = (e: MessageEvent<{ move: BotMove | null }>) => {
+      // A bot-vs-bot game is paced so a person can follow it.
+      const wait = Math.max(0, botDelayMs - (Date.now() - started));
+      setTimeout(() => {
+        done();
+        const now = get();
+        // The position moved on while the bot thought (new game, undo, browsing,
+        // pause): the answer belongs to a position that is no longer on the board.
+        if (now.gameId !== gameId || now.currentNode !== currentNode || now.state.winner || now.botPaused) return;
 
-      if (move.type === 'capture') {
-        get().handleCapture(move.chain);
-      } else {
-        // Set marble color so handlePlacement can read it, then place
-        set({ selectedMarbleColor: move.color });
-        get().handlePlacement(move.ringId);
-        // If ring removal is needed, handle it synchronously after state settles
-        if (move.removedRingId) {
-          const afterPlace = get().state;
-          if (afterPlace.phase === 'ringRemoval') {
+        const { move } = e.data;
+        if (!move) {
+          set({ botStuck: true });
+          return;
+        }
+        if (move.type === 'capture') {
+          get().handleCapture(move.chain);
+        } else {
+          // Set marble color so handlePlacement can read it, then place
+          set({ selectedMarbleColor: move.color });
+          get().handlePlacement(move.ringId);
+          // If ring removal is needed, handle it synchronously after state settles
+          if (move.removedRingId && get().state.phase === 'ringRemoval') {
             get().handleRingRemoval(move.removedRingId);
           }
         }
-      }
+      }, wait);
     };
     worker.onerror = (err) => {
       console.error('[Bot] worker error:', err);
-      worker.terminate();
-      set({ isBotThinking: false });
+      done();
     };
 
-    worker.postMessage({ state, botPlayer, level: botLevel });
+    worker.postMessage({ state, spec });
+  },
+
+  toggleBotPause: () => {
+    const paused = !get().botPaused;
+    set({ botPaused: paused });
+    if (!paused) setTimeout(() => get().triggerBotMove(), 0);
+  },
+
+  afterMove: () => {
+    const { state, bots } = get();
+    // A bot-vs-bot game is reported once at the end; saving it every move would
+    // only flood the games list.
+    if (!bothBots(bots)) get().autoSave();
+    if (state.winner) get().reportBotGame();
+    else setTimeout(() => get().triggerBotMove(), 0);
+  },
+
+  reportBotGame: () => {
+    const { bots, botGameReported, state, gameTree, customStart, playerNames, winType, currentNode } = get();
+    if (botGameReported || !state.winner || (!bots.player1 && !bots.player2)) return;
+    set({ botGameReported: true });
+    const winner = state.winner === 'player1' || state.winner === 'player2' ? state.winner : null;
+    const zen = treeToZen(customStart ?? createInitialState(state.boardSize), gameTree, {
+      Player1: playerNames.player1,
+      Player2: playerNames.player2,
+      Result: winner === 'player1' ? '1-0' : winner === 'player2' ? '0-1' : '*',
+      ...(winType ? { WinType: winType } : {}),
+    });
+    saveBotGame({
+      player1: bots.player1 ?? 'human',
+      player2: bots.player2 ?? 'human',
+      boardSize: state.boardSize,
+      winner,
+      winType,
+      plies: nodeDepth(currentNode),
+      zen,
+      appVersion: APP_VERSION,
+    }).catch(err => console.warn('[Bot] game not reported:', err));
   },
 
   autoSave: async () => {

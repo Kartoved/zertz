@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import { Pool, types } from 'pg';
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 // All TIMESTAMP columns store UTC wall-clock values (the DB session runs in UTC
 // and every write uses NOW()). By default node-postgres parses a bare
@@ -286,6 +286,26 @@ async function ensureSchema() {
     CREATE TABLE IF NOT EXISTS app_versions_announced (
       version TEXT PRIMARY KEY,
       announced_at TIMESTAMP NOT NULL DEFAULT NOW()
+    );
+  `);
+
+  // Every finished game with a bot in it (human vs bot, or bot vs bot watched on
+  // the site), kept as ZEN for the bot's measuring tools — a game a person
+  // played against the bot is worth more than any copied position
+  // (docs/BOT_LESSONS_FROM_QUANTUM.md). Written by POST /api/bot-games.
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS bot_games (
+      id          SERIAL PRIMARY KEY,
+      user_id     INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      player1     TEXT NOT NULL,
+      player2     TEXT NOT NULL,
+      board_size  INTEGER NOT NULL,
+      winner      TEXT,
+      win_type    TEXT,
+      plies       INTEGER NOT NULL,
+      zen         TEXT NOT NULL,
+      app_version TEXT,
+      created_at  TIMESTAMP NOT NULL DEFAULT NOW()
     );
   `);
 

@@ -9,9 +9,11 @@ import NotationButtons from './NotationButtons';
 interface ControlPanelProps {
   onSurrender?: () => void;
   onCancel?: () => void;
+  /** Bot vs bot: nobody to resign or cancel for. */
+  hideResign?: boolean;
 }
 
-export default function ControlPanel({ onSurrender, onCancel }: ControlPanelProps) {
+export default function ControlPanel({ onSurrender, onCancel, hideResign = false }: ControlPanelProps) {
   const { t } = useI18n();
   const { undo, currentNode, state, gameTree, playerNames } = useGameStore();
   const { setScreen } = useUIStore();
@@ -49,7 +51,7 @@ export default function ControlPanel({ onSurrender, onCancel }: ControlPanelProp
         ↶ {t.undo}
       </button>
 
-      {canCancel && (
+      {canCancel && !hideResign && (
         <button
           onClick={onCancel}
           className="px-4 py-2 bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 rounded-lg hover:bg-orange-200 dark:hover:bg-orange-900/70 transition-colors"
@@ -58,12 +60,14 @@ export default function ControlPanel({ onSurrender, onCancel }: ControlPanelProp
         </button>
       )}
 
-      <button
-        onClick={handleSurrender}
-        className="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg transition-colors text-white"
-      >
-        🏳️ {t.surrender}
-      </button>
+      {!hideResign && (
+        <button
+          onClick={handleSurrender}
+          className="px-4 py-2 bg-red-500 hover:bg-red-600 rounded-lg transition-colors text-white"
+        >
+          🏳️ {t.surrender}
+        </button>
+      )}
 
       <NotationButtons getZip={getZip} getZen={getZen} className="contents" />
     </div>

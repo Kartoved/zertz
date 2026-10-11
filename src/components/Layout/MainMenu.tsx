@@ -110,8 +110,8 @@ export default function MainMenu() {
     modals.setShowBoardDialog(false);
   };
 
-  const handleStartBotGame = (boardSize: 37 | 48 | 61, botPlayer: import('../../game/types').Player, level: import('../../ai/minimax').BotLevel) => {
-    newBotGame(boardSize, botPlayer, level);
+  const handleStartBotGame = (config: import('../../ai/levels').BotGameConfig) => {
+    newBotGame(config);
     setScreen('game');
     modals.setShowBotDialog(false);
   };
@@ -154,6 +154,7 @@ export default function MainMenu() {
 
   const navTabs: Array<{ id: NavTab; label: string; authOnly?: boolean }> = [
     { id: 'playLocal', label: t.playLocal },
+    { id: 'playBot', label: `🤖 ${t.playVsBot}` },
     { id: 'loadGame', label: t.loadGame },
     { id: 'import', label: t.importPosition },
     { id: 'rules', label: t.rules },
@@ -203,6 +204,12 @@ export default function MainMenu() {
                   className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
                 >
                   {t.playLocal}
+                </button>
+                <button
+                  onClick={() => { modals.handleNavTab('playBot'); setActiveDropdown(null); }}
+                  className="w-full text-left px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                >
+                  🤖 {t.playVsBot}
                 </button>
                 <button
                   onClick={() => { modals.handleNavTab('loadGame'); setActiveDropdown(null); }}
@@ -676,6 +683,7 @@ export default function MainMenu() {
                 modals.setShowOnlineDialog(true);
               }}
               onPlayLocal={() => modals.setShowBoardDialog(true)}
+              onPlayBot={() => modals.setShowBotDialog(true)}
             />
 
           </div>
