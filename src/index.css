@@ -58,6 +58,14 @@ body {
 .zz-vanish { animation: zz-vanish 320ms ease-in both; }
 /* A marble that arrives by a jump stays hidden until the flying copy lands. */
 .zz-appear { animation: zz-appear 1ms linear both; }
+/* Capture trace on the last move: visible ~0.5 s, then fades away. */
+@keyframes zz-trace-fade {
+  0%, 62% { opacity: 1; }
+  100% { opacity: 0; }
+}
+.zz-trace-fade { animation: zz-trace-fade 0.8s ease-in forwards; }
 @media (prefers-reduced-motion: reduce) {
   .zz-pop, .zz-vanish, .zz-appear { animation: none !important; }
+  /* No fade animation — just drop the trace after the same delay. */
+  .zz-trace-fade { animation: zz-trace-fade 0.8s steps(1, end) forwards; }
 }

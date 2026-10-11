@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { WIN_CONDITIONS } from '../../game/types';
 import { useI18n } from '../../i18n';
+import { MarbleIcon } from '../Board/marbleStyle';
 
 interface GameStatsProps {
   compact?: boolean;
@@ -33,25 +34,25 @@ export default function GameStats({ compact = false, hideLabels = false }: GameS
   
   const renderCaptures = (player: 'player1' | 'player2') => {
     const caps = state.captures[player];
-    const marbleClass = (compact && !hideLabels) ? 'w-3 h-3' : 'w-4 h-4';
+    const marbleSize = (compact && !hideLabels) ? 13 : 17;
     const textClass = (compact && !hideLabels) ? 'text-xs' : '';
     const containerFlex = hideLabels ? 'flex-1 justify-center' : '';
     return (
       <div className={`flex gap-3 items-center ${containerFlex}`}>
         <span className={`flex items-center gap-1.5 ${textClass}`}>
-          <div className={`${marbleClass} rounded-full bg-white border border-gray-300 shadow-sm`} />
+          <MarbleIcon color="white" size={marbleSize} />
           <span className={caps.white >= WIN_CONDITIONS.white ? 'text-green-500 font-bold' : 'text-gray-800 dark:text-gray-200'}>
             {caps.white}
           </span>
         </span>
         <span className={`flex items-center gap-1.5 ${textClass}`}>
-          <div className={`${marbleClass} rounded-full bg-gray-400 shadow-sm`} />
+          <MarbleIcon color="gray" size={marbleSize} />
           <span className={caps.gray >= WIN_CONDITIONS.gray ? 'text-green-500 font-bold' : 'text-gray-800 dark:text-gray-200'}>
             {caps.gray}
           </span>
         </span>
         <span className={`flex items-center gap-1.5 ${textClass}`}>
-          <div className={`${marbleClass} rounded-full bg-gray-700 shadow-sm`} />
+          <MarbleIcon color="black" size={marbleSize} />
           <span className={caps.black >= WIN_CONDITIONS.black ? 'text-green-500 font-bold' : 'text-gray-800 dark:text-gray-200'}>
             {caps.black}
           </span>

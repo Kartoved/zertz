@@ -7,6 +7,7 @@ import { hasAvailableCaptures, getAvailableCaptures, applyCaptureSteps } from '.
 import HexRing from './HexRing';
 import { toggleShape } from '../../game/shapes';
 import { diffBoards, snapshotBoard, type BoardAnim, type BoardSnap } from './boardAnimation';
+import { Marble, MarbleDefs, seedFromId } from './marbleStyle';
 import { GameState, CaptureMove, Shape, ShapeBrush, Move, MarbleColor } from '../../game/types';
 
 const HEX_SIZE = 28;
@@ -30,12 +31,17 @@ function brushFromEvent(e: { shiftKey: boolean; altKey: boolean; ctrlKey: boolea
 type Pt = { x: number; y: number };
 
 const LAST_MOVE_COLOR = '#facc15';
+/** Capture paths (in progress and last move) and the captured-marble dots. */
+const CAPTURE_COLOR = '#ef4444';
 
-const MARBLE_FILL: Record<MarbleColor, { fill: string; stroke: string }> = {
-  white: { fill: '#f0f0f0', stroke: '#b0b0b0' },
-  gray: { fill: '#8b919c', stroke: '#3d4350' },
-  black: { fill: '#374151', stroke: '#000000' },
-};
+/** A faded copy of a captured marble on the ring it was taken from. */
+function CapturedGhost({ p, color, prefix, ringId }: { p: Pt; color: MarbleColor; prefix: string; ringId: string }) {
+  return (
+    <g transform={`translate(${p.x}, ${p.y})`}>
+      <Marble prefix={prefix} color={color} r={HEX_SIZE * 0.58} seed={seedFromId(ringId)} opacity={0.5} />
+    </g>
+  );
+}
 
 function prefersReducedMotion(): boolean {
   try {
@@ -47,7 +53,7 @@ function prefersReducedMotion(): boolean {
 
 /** A marble copy flying hop by hop along `points`, then fading out where the
  *  real marble appears. Driven by the Web Animations API (SVG transforms). */
-function FlyingMarble({ color, points, hopMs, animKey }: { color: MarbleColor; points: Pt[]; hopMs: number; animKey: number }) {
+function FlyingMarble({ color, points, hopMs, animKey, prefix }: { color: MarbleColor; points: Pt[]; hopMs: number; animKey: number; prefix: string }) {
   const ref = useRef<SVGGElement>(null);
   useLayoutEffect(() => {
     const el = ref.current;
@@ -62,18 +68,16 @@ function FlyingMarble({ color, points, hopMs, animKey }: { color: MarbleColor; p
     // Keyed on the animation, not on `points` (a fresh array every parent render).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [animKey]);
-  const c = MARBLE_FILL[color];
   return (
-    <g ref={ref} style={{ transform: `translate(${points[0].x}px, ${points[0].y}px)` }}>
-      <circle r={HEX_SIZE * 0.58} fill={c.fill} stroke={c.stroke} strokeWidth={1.5}
-        style={{ filter: 'drop-shadow(0 6px 8px rgba(0,0,0,0.6))' }} />
+    <g ref={ref} style={{ transform: `translate(${points[0].x}px, ${points[0].y}px)`, filter: 'drop-shadow(0 6px 8px rgba(0,0,0,0.6))' }}>
+      <Marble prefix={prefix} color={color} r={HEX_SIZE * 0.58} />
     </g>
   );
 }
 
 /** Lichess-style "last move" marks: a halo where a marble landed, a dashed ghost
  *  where a ring was taken away, and the jump path of a capture chain. */
-function LastMoveMarks({ move, pointOf }: { move: Move; pointOf: (id: string) => Pt | null }) {
+function LastMoveMarks({ move, pointOf, prefix, fadeTrace }: { move: Move; pointOf: (id: string) => Pt | null; prefix: string; fadeTrace?: boolean }) {
   const halo = (p: Pt, key: string) => (
     <circle key={key} cx={p.x} cy={p.y} r={HEX_SIZE * 1.02} fill="none" stroke={LAST_MOVE_COLOR} strokeWidth={HEX_SIZE * 0.13} opacity={0.75} />
   );
@@ -93,17 +97,27 @@ function LastMoveMarks({ move, pointOf }: { move: Move; pointOf: (id: string) =>
   const jumps = [move.data, ...(move.data.chain || [])];
   const path = [pointOf(jumps[0].from), ...jumps.map(j => pointOf(j.to))].filter((p): p is Pt => !!p);
   const end = path[path.length - 1];
+  // The capture trace (path, captured ghosts + dots) can fade out so it doesn't
+  // clutter the next move; the from/to halos stay. Keyed on the move's content
+  // so a re-render (e.g. an online poll) doesn't restart the fade.
+  const traceKey = jumps.map(j => `${j.from}>${j.to}`).join('|');
   return (
     <>
-      {path.length > 1 && (
-        <polyline points={path.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke={LAST_MOVE_COLOR}
-          strokeWidth={HEX_SIZE * 0.1} strokeLinecap="round" strokeLinejoin="round" opacity={0.55} />
-      )}
+      <g key={traceKey} className={fadeTrace ? 'zz-trace-fade' : undefined}>
+        {jumps.map((j, i) => {
+          const c = pointOf(j.captured);
+          return c && j.capturedColor ? <CapturedGhost key={`cg-${i}`} p={c} color={j.capturedColor} prefix={prefix} ringId={j.captured} /> : null;
+        })}
+        {path.length > 1 && (
+          <polyline points={path.map(p => `${p.x},${p.y}`).join(' ')} fill="none" stroke={CAPTURE_COLOR}
+            strokeWidth={HEX_SIZE * 0.1} strokeLinecap="round" strokeLinejoin="round" opacity={0.55} />
+        )}
+        {jumps.map((j, i) => {
+          const c = pointOf(j.captured);
+          return c ? <circle key={`cap-${i}`} cx={c.x} cy={c.y} r={HEX_SIZE * 0.22} fill={CAPTURE_COLOR} opacity={0.8} /> : null;
+        })}
+      </g>
       {path[0] && <circle cx={path[0].x} cy={path[0].y} r={HEX_SIZE * 0.9} fill="none" stroke={LAST_MOVE_COLOR} strokeWidth={HEX_SIZE * 0.08} opacity={0.6} />}
-      {jumps.map((j, i) => {
-        const c = pointOf(j.captured);
-        return c ? <circle key={`cap-${i}`} cx={c.x} cy={c.y} r={HEX_SIZE * 0.22} fill={LAST_MOVE_COLOR} opacity={0.7} /> : null;
-      })}
       {end && halo(end, 'end')}
     </>
   );
@@ -175,6 +189,10 @@ interface HexBoardProps {
   coordinates?: boolean;
   /** The move that led to this position — highlighted on the board. */
   lastMove?: Move | null;
+  /** Fade a capture's trace (path + captured marbles) out after a moment —
+   *  for the live end of a line, where it would get in the way of the next move.
+   *  When browsing history it should stay (leave this off). */
+  fadeLastMoveTrace?: boolean;
   /** Jumps of a capture chain taken so far (jump-by-jump input): the board
    *  shows the in-between position and marks the jumped path. */
   capturePath?: CaptureMove[];
@@ -475,6 +493,7 @@ export default function HexBoard(props: HexBoardProps = {}) {
           onMouseUp={props.drawable ? handleDrawUp : undefined}
           onMouseLeave={props.drawable ? cancelDraw : undefined}
         >
+          <MarbleDefs prefix={gradPrefix} />
           <g transform={`translate(${offsetX}, ${offsetY})`}>
             {rings.map(ring => {
               const pos = positions.get(ring.id);
@@ -520,11 +539,11 @@ export default function HexBoard(props: HexBoardProps = {}) {
                 })}
                 {anim.vanishMarbles.map(v => {
                   const p = pointOf(v.id);
-                  const c = MARBLE_FILL[v.color];
                   return p ? (
                     <g key={`vm-${v.id}`} transform={`translate(${p.x}, ${p.y})`}>
-                      <circle className="zz-vanish" style={{ animationDelay: `${v.delayMs}ms` }}
-                        r={HEX_SIZE * 0.58} fill={c.fill} stroke={c.stroke} strokeWidth={1.5} />
+                      <g className="zz-vanish" style={{ animationDelay: `${v.delayMs}ms` }}>
+                        <Marble prefix={gradPrefix} color={v.color} r={HEX_SIZE * 0.58} seed={seedFromId(v.id)} />
+                      </g>
                     </g>
                   ) : null;
                 })}
@@ -533,6 +552,7 @@ export default function HexBoard(props: HexBoardProps = {}) {
                     color={anim.flight.color}
                     hopMs={anim.flight.hopMs}
                     animKey={anim.key}
+                    prefix={gradPrefix}
                     points={anim.flight.path.map(id => pointOf(id)).filter((p): p is Pt => !!p)}
                   />
                 )}
@@ -542,19 +562,30 @@ export default function HexBoard(props: HexBoardProps = {}) {
             {/* Jumps already taken in a half-entered capture chain */}
             {capturePath && capturePath.length > 0 && (
               <g style={{ pointerEvents: 'none' }}>
+                {/* Faded ghosts of the marbles captured so far, so it's clear what was taken */}
+                {capturePath.map((j, i) => {
+                  const c = pointOf(j.captured);
+                  const color = j.capturedColor ?? baseState.rings.get(j.captured)?.marble?.color;
+                  return c && color ? <CapturedGhost key={`cg-${i}`} p={c} color={color} prefix={gradPrefix} ringId={j.captured} /> : null;
+                })}
                 <polyline
                   points={[capturePath[0].from, ...capturePath.map(j => j.to)]
                     .map(id => pointOf(id)).filter((p): p is Pt => !!p).map(p => `${p.x},${p.y}`).join(' ')}
-                  fill="none" stroke="#22c55e" strokeWidth={HEX_SIZE * 0.14} strokeLinecap="round" strokeLinejoin="round"
+                  fill="none" stroke={CAPTURE_COLOR} strokeWidth={HEX_SIZE * 0.14} strokeLinecap="round" strokeLinejoin="round"
                   strokeDasharray={`${HEX_SIZE * 0.3} ${HEX_SIZE * 0.2}`} opacity={0.8}
                 />
+                {/* Captured-so-far marks, like the last-move highlight's dots */}
+                {capturePath.map((j, i) => {
+                  const c = pointOf(j.captured);
+                  return c ? <circle key={`cp-${i}`} cx={c.x} cy={c.y} r={HEX_SIZE * 0.22} fill={CAPTURE_COLOR} opacity={0.9} /> : null;
+                })}
               </g>
             )}
 
             {/* Last move highlight */}
             {props.lastMove && !capturePath?.length && (
               <g style={{ pointerEvents: 'none' }}>
-                <LastMoveMarks move={props.lastMove} pointOf={pointOf} />
+                <LastMoveMarks move={props.lastMove} pointOf={pointOf} prefix={gradPrefix} fadeTrace={props.fadeLastMoveTrace} />
               </g>
             )}
 

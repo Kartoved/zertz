@@ -3,14 +3,9 @@ import HexBoard from '../Board/HexBoard';
 import { createInitialState, cloneState } from '../../game/GameEngine';
 import { GameState, MarbleColor, Player } from '../../game/types';
 import { useI18n } from '../../i18n';
+import { MarbleIcon } from '../Board/marbleStyle';
 
 type Brush = MarbleColor | 'erase' | 'ring';
-
-const MARBLE_STYLE: Record<MarbleColor, string> = {
-  white: 'radial-gradient(circle at 30% 30%, #ffffff, #e0e0e0)',
-  gray: 'radial-gradient(circle at 30% 30%, #9ca3af, #6b7280)',
-  black: 'radial-gradient(circle at 30% 30%, #6b7280, #374151)',
-};
 
 interface PositionEditorModalProps {
   onClose: () => void;
@@ -91,7 +86,7 @@ export default function PositionEditorModal({ onClose, onCreate }: PositionEdito
   };
 
   const Swatch = ({ color }: { color: MarbleColor }) => (
-    <span className="w-5 h-5 rounded-full border border-black/10 shadow-sm inline-block" style={{ background: MARBLE_STYLE[color] }} />
+    <span className="inline-flex"><MarbleIcon color={color} size={20} /></span>
   );
 
   const brushBtn = (b: Brush, node: React.ReactNode, label: string) => (

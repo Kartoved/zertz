@@ -22,22 +22,17 @@ import { GameNode, GameState, MarbleColor, CaptureMove, Captures, WIN_CONDITIONS
 import { useI18n } from '../../i18n';
 import { toggleShape } from '../../game/shapes';
 import { useCaptureSteps } from '../Board/useCaptureSteps';
+import { MarbleIcon } from '../Board/marbleStyle';
 import { useCaptureStepView, stepBack, stepForward, navigateWhole, useActiveCaptureStep } from '../../store/captureStepView';
 
 const noop = () => {};
-
-const MARBLE_BG: Record<MarbleColor, string> = {
-  white: 'bg-white border border-gray-300',
-  gray: 'bg-gray-400',
-  black: 'bg-gray-700',
-};
 
 // One player's captured-marble tally, highlighting any color that reached its
 // win threshold.
 function CapturesCard({ label, caps, active }: { label: string; caps: Captures; active: boolean }) {
   const cell = (color: MarbleColor, n: number, win: number) => (
     <span className="flex items-center gap-1">
-      <span className={`w-3.5 h-3.5 rounded-full shadow-sm ${MARBLE_BG[color]}`} />
+      <MarbleIcon color={color} size={15} />
       <span className={`text-xs ${n >= win ? 'text-green-500 font-bold' : 'text-gray-700 dark:text-gray-200'}`}>{n}</span>
     </span>
   );
@@ -365,6 +360,7 @@ export default function StudyBoardViewer({ study, onSaveTree }: { study: StudyNo
             preview
             coordinates
             lastMove={currentNode.move}
+            fadeLastMoveTrace={currentNode.children.length === 0}
           />
         </div>
         <div className="flex items-center justify-center gap-2 mt-3">

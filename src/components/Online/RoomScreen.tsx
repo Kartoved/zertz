@@ -23,6 +23,8 @@ import { getWinTypeLabel, useI18n } from '../../i18n';
 import { formatTimeControl } from '../../utils/timeControl';
 import { useCaptureSteps } from '../Board/useCaptureSteps';
 import { useActiveCaptureStep } from '../../store/captureStepView';
+import { MarbleIcon } from '../Board/marbleStyle';
+import GameResultBar from '../UI/GameResultBar';
 
 const noop = () => {};
 
@@ -40,7 +42,6 @@ export function RoomScreen() {
   const [chatCollapsed, setChatCollapsed] = useState(false);
   const [showMobileActions, setShowMobileActions] = useState(false);
   const [selectedPlayerId, setSelectedPlayerId] = useState<number | null>(null);
-  const [winnerModalDismissed, setWinnerModalDismissed] = useState(false);
   const [showRulesModal, setShowRulesModal] = useState(false);
   const [showSurrenderConfirm, setShowSurrenderConfirm] = useState(false);
   const [clockNowMs, setClockNowMs] = useState(() => Date.now());
@@ -143,12 +144,6 @@ export function RoomScreen() {
     }, 2000);
     return () => clearInterval(interval);
   }, [pollRoom, pollMessages]);
-
-  useEffect(() => {
-    if (!state.winner) {
-      setWinnerModalDismissed(false);
-    }
-  }, [state.winner]);
 
   // Toast when a live move arrives during analysis. Tracked via a timestamp
   // bumped by pollRoom; we compare against the last-seen value to ignore the
@@ -505,9 +500,9 @@ export function RoomScreen() {
       }`}>
         {/* Captures */}
         <div className="flex gap-1 text-xs font-medium text-gray-800 dark:text-gray-200 flex-shrink-0">
-          <span>⚪{caps.white}</span>
-          <span>🔘{caps.gray}</span>
-          <span>⚫{caps.black}</span>
+          <span className="inline-flex items-center gap-0.5"><MarbleIcon color="white" size={14} />{caps.white}</span>
+          <span className="inline-flex items-center gap-0.5"><MarbleIcon color="gray" size={14} />{caps.gray}</span>
+          <span className="inline-flex items-center gap-0.5"><MarbleIcon color="black" size={14} />{caps.black}</span>
         </div>
         {/* Name + sub-line (rating / phase) */}
         <div className="flex-1 min-w-0">
@@ -888,9 +883,9 @@ export function RoomScreen() {
               </div>
             )}
             <div className="flex gap-2 text-xs lg:text-sm text-gray-800 dark:text-gray-200">
-              <span>⚪ {safeCaptures.player1.white}</span>
-              <span>🔘 {safeCaptures.player1.gray}</span>
-              <span>⚫ {safeCaptures.player1.black}</span>
+              <span className="inline-flex items-center gap-1"><MarbleIcon color="white" size={18} />{safeCaptures.player1.white}</span>
+              <span className="inline-flex items-center gap-1"><MarbleIcon color="gray" size={18} />{safeCaptures.player1.gray}</span>
+              <span className="inline-flex items-center gap-1"><MarbleIcon color="black" size={18} />{safeCaptures.player1.black}</span>
             </div>
             {displayTurnPlayer === 'player1' && !boardState.winner && (
               <div className="mt-2 text-sm font-medium text-blue-700 dark:text-blue-200">
@@ -962,9 +957,9 @@ export function RoomScreen() {
               </div>
             )}
             <div className="flex gap-2 text-xs lg:text-sm text-gray-800 dark:text-gray-200">
-              <span>⚪ {safeCaptures.player2.white}</span>
-              <span>🔘 {safeCaptures.player2.gray}</span>
-              <span>⚫ {safeCaptures.player2.black}</span>
+              <span className="inline-flex items-center gap-1"><MarbleIcon color="white" size={18} />{safeCaptures.player2.white}</span>
+              <span className="inline-flex items-center gap-1"><MarbleIcon color="gray" size={18} />{safeCaptures.player2.gray}</span>
+              <span className="inline-flex items-center gap-1"><MarbleIcon color="black" size={18} />{safeCaptures.player2.black}</span>
             </div>
             {displayTurnPlayer === 'player2' && !boardState.winner && (
               <div className="mt-2 text-sm font-medium text-blue-700 dark:text-blue-200">
@@ -1119,6 +1114,14 @@ export function RoomScreen() {
               🔬 {t.analysisMode}
             </div>
           )}
+          {/* Game result (replaces the old blocking winner popup) */}
+          {state.winner && !isAnalyzing && (
+            <GameResultBar
+              cancelled={isCancelled}
+              title={isCancelled ? (winType === 'aborted' ? t.gameAborted : t.gameCancelled) : winnerName}
+              subtitle={isCancelled ? (winType === 'aborted' ? t.abortedStatus : t.cancelledStatus) : `${t.gameOver} · ${getWinTypeLabel(t, winnerWinType)}`}
+            />
+          )}
           {/* First-move abort countdown (all sizes) */}
           {firstMoveMsLeft != null && !isAnalyzing && (
             <div className={`mx-3 mt-1 px-3 py-1.5 rounded-lg text-center text-xs sm:text-sm font-medium border ${
@@ -1143,6 +1146,7 @@ export function RoomScreen() {
               validRemovableRings={subStepBase ? [] : validRemovableRings}
               drawable
               lastMove={activeNode?.move}
+              fadeLastMoveTrace={activeNode.children.length === 0}
             />
           </div>
           {/* You strip (mobile only) */}
@@ -1373,37 +1377,6 @@ export function RoomScreen() {
           playerId={selectedPlayerId}
           onClose={() => setSelectedPlayerId(null)}
         />
-      )}
-
-      {state.winner && !winnerModalDismissed && !isAnalyzing && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-6 text-center">
-            {isCancelled ? (
-              <>
-                <div className="text-2xl font-bold text-gray-600 dark:text-gray-300 mb-2">
-                  ✕ {winType === 'aborted' ? t.gameAborted : t.gameCancelled}
-                </div>
-                <div className="text-gray-500 dark:text-gray-400 mb-6">{winType === 'aborted' ? t.abortedStatus : t.cancelledStatus}</div>
-              </>
-            ) : (
-              <>
-                <div className="text-3xl font-bold text-green-700 dark:text-green-300 mb-2">
-                  🏆 {winnerName}
-                </div>
-                <div className="text-gray-600 dark:text-gray-300 mb-1">{t.gameOver}</div>
-                <div className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                  {getWinTypeLabel(t, winnerWinType)}
-                </div>
-              </>
-            )}
-            <button
-              onClick={() => setWinnerModalDismissed(true)}
-              className="px-5 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold transition-colors"
-            >
-              {t.close}
-            </button>
-          </div>
-        </div>
       )}
 
       {pendingPlayerChoice && (

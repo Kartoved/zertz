@@ -13,6 +13,8 @@ import { useUIStore } from '../../store/uiStore';
 import { useAuthStore } from '../../store/authStore';
 import { getWinType } from '../../game/GameEngine';
 import { getWinTypeLabel, useI18n } from '../../i18n';
+import { MarbleIcon } from '../Board/marbleStyle';
+import GameResultBar from '../UI/GameResultBar';
 
 const noop = () => {};
 
@@ -30,9 +32,9 @@ function LocalPlayerStrip({ isActive, captures, name, showActionsMenu, onOpenAct
       isActive ? 'bg-blue-100 dark:bg-blue-900 ring-1 ring-blue-500' : 'bg-white dark:bg-gray-800'
     } border-b border-gray-200 dark:border-gray-700`}>
       <div className="flex gap-1 text-xs font-medium text-gray-800 dark:text-gray-200 flex-shrink-0">
-        <span>⚪{captures.white}</span>
-        <span>🔘{captures.gray}</span>
-        <span>⚫{captures.black}</span>
+        <span className="inline-flex items-center gap-0.5"><MarbleIcon color="white" size={14} />{captures.white}</span>
+        <span className="inline-flex items-center gap-0.5"><MarbleIcon color="gray" size={14} />{captures.gray}</span>
+        <span className="inline-flex items-center gap-0.5"><MarbleIcon color="black" size={14} />{captures.black}</span>
       </div>
       <div className="flex-1 min-w-0 font-semibold text-sm text-gray-800 dark:text-gray-200 truncate">{name}</div>
       {showActionsMenu && onOpenActions && (
@@ -228,6 +230,30 @@ export default function GameScreen() {
 
         {/* Board container — mobile: framed by compact strips; desktop: just the board */}
         <div className="flex-1 min-w-0 flex flex-col">
+          {/* Game result (replaces the old blocking winner popup) */}
+          {isGameOver && (
+            <GameResultBar
+              cancelled={isCancelled}
+              title={isCancelled ? t.gameCancelled : winnerName}
+              subtitle={isCancelled ? t.cancelledStatus : `${t.gameOver} · ${winType ? getWinTypeLabel(t, winType) : t.winUnknown}`}
+              actions={
+                <>
+                  <button
+                    onClick={() => setShowRematchDialog(true)}
+                    className="px-3 py-1.5 text-sm bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold transition-colors"
+                  >
+                    {t.rematch}
+                  </button>
+                  <button
+                    onClick={() => setScreen('menu')}
+                    className="px-3 py-1.5 text-sm bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                  >
+                    {t.backToMenu}
+                  </button>
+                </>
+              }
+            />
+          )}
           {/* Player 1 strip (mobile) */}
           <LocalPlayerStrip
             slot="player1"
@@ -241,6 +267,7 @@ export default function GameScreen() {
               state={subStepBase ?? undefined}
               drawable
               lastMove={currentNode.move}
+              fadeLastMoveTrace={currentNode.children.length === 0}
               onRingClick={subStepBase ? noop : handleRingClick}
               selectedRingId={subStep && subStepBase ? subStep.jumps[subStep.step - 1].to : captureSteps.position ?? selectedRingId}
               highlightedCaptures={subStepBase ? [] : availableCaptureChains.length ? captureSteps.nextJumps : highlightedCaptures}
@@ -310,45 +337,6 @@ export default function GameScreen() {
             >
               {t.cancel}
             </button>
-          </div>
-        </div>
-      )}
-
-      {isGameOver && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-md w-full p-6 text-center">
-            {isCancelled ? (
-              <>
-                <div className="text-2xl font-bold text-gray-600 dark:text-gray-300 mb-2">
-                  ✕ {t.gameCancelled}
-                </div>
-                <div className="text-gray-500 dark:text-gray-400 mb-6">{t.cancelledStatus}</div>
-              </>
-            ) : (
-              <>
-                <div className="text-3xl font-bold text-green-700 dark:text-green-300 mb-2">
-                  🎉 {winnerName}!
-                </div>
-                <div className="text-base text-gray-700 dark:text-gray-300 mb-6">
-                  {winType ? getWinTypeLabel(t, winType) : t.winUnknown}
-                </div>
-              </>
-            )}
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowRematchDialog(true)}
-                className="flex-1 py-2 px-4 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold transition-colors"
-              >
-                {t.rematch}
-              </button>
-              <button
-                onClick={() => setScreen('menu')}
-                className="flex-1 py-2 px-4 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-              >
-                {t.backToMenu}
-              </button>
-            </div>
           </div>
         </div>
       )}

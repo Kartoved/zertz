@@ -2,6 +2,7 @@ import { MarbleColor, GameState, Captures } from '../../game/types';
 import { useGameStore } from '../../store/gameStore';
 import { hasAvailableCaptures } from '../../game/GameEngine';
 import { useI18n } from '../../i18n';
+import { MarbleIcon } from '../Board/marbleStyle';
 
 interface MarbleSelectorProps {
   reserve?: { white: number; gray: number; black: number };
@@ -56,21 +57,7 @@ export default function MarbleSelector(props: MarbleSelectorProps = {}) {
               ${(isDisabled || count === 0) ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
             `}
           >
-            <div
-              className={`
-                w-10 h-10 rounded-full border-[3px] shadow-sm
-                ${color === 'white' ? 'bg-white border-gray-300' : ''}
-                ${color === 'gray' ? 'bg-gray-400 border-gray-500' : ''}
-                ${color === 'black' ? 'bg-gray-700 border-gray-800' : ''}
-              `}
-              style={{
-                background: color === 'white' 
-                  ? 'radial-gradient(circle at 30% 30%, #ffffff, #e0e0e0)'
-                  : color === 'gray'
-                  ? 'radial-gradient(circle at 30% 30%, #9ca3af, #6b7280)'
-                  : 'radial-gradient(circle at 30% 30%, #6b7280, #374151)',
-              }}
-            />
+            <MarbleIcon color={color} size={40} />
             <span className="text-sm font-bold dark:text-gray-300">
               {count}
             </span>

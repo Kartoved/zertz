@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { Ring } from '../../game/types';
 import { useGameStore } from '../../store/gameStore';
 import { pickCaptureChain } from '../../store/analysisActions';
+import { Marble, seedFromId } from './marbleStyle';
 
 interface HexRingProps {
   ring: Ring;
@@ -146,70 +147,6 @@ function HexRing({
           <stop offset="0%" stopColor="#4a4a4a" />
           <stop offset="100%" stopColor="#000000" />
         </radialGradient>
-        {ring.marble && (
-          <>
-            <radialGradient
-              id={`marble-gradient-${gid}`}
-              cx="35%"
-              cy="35%"
-              r="65%"
-              fx="30%"
-              fy="30%"
-            >
-              {ring.marble.color === 'white' && (
-                <>
-                  <stop offset="0%" stopColor="#ffffff" />
-                  <stop offset="40%" stopColor="#f5f5f5" />
-                  <stop offset="80%" stopColor="#e0e0e0" />
-                  <stop offset="100%" stopColor="#c8c8c8" />
-                </>
-              )}
-              {ring.marble.color === 'gray' && (
-                <>
-                  <stop offset="0%" stopColor="#b8bcc4" />
-                  <stop offset="40%" stopColor="#8b919c" />
-                  <stop offset="80%" stopColor="#5c6370" />
-                  <stop offset="100%" stopColor="#3d4350" />
-                </>
-              )}
-              {ring.marble.color === 'black' && (
-                <>
-                  <stop offset="0%" stopColor="#6b7280" />
-                  <stop offset="50%" stopColor="#374151" />
-                  <stop offset="100%" stopColor="#111827" />
-                </>
-              )}
-            </radialGradient>
-            {/* Specular highlight */}
-            <radialGradient
-              id={`marble-highlight-${gid}`}
-              cx="30%"
-              cy="25%"
-              r="30%"
-              fx="28%"
-              fy="22%"
-            >
-              {ring.marble.color === 'white' && (
-                <>
-                  <stop offset="0%" stopColor="rgba(255,255,255,0.95)" />
-                  <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-                </>
-              )}
-              {ring.marble.color === 'gray' && (
-                <>
-                  <stop offset="0%" stopColor="rgba(255,255,255,0.6)" />
-                  <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-                </>
-              )}
-              {ring.marble.color === 'black' && (
-                <>
-                  <stop offset="0%" stopColor="rgba(255,255,255,0.35)" />
-                  <stop offset="100%" stopColor="rgba(255,255,255,0)" />
-                </>
-              )}
-            </radialGradient>
-          </>
-        )}
       </defs>
       <path
         d={ringPath}
@@ -230,25 +167,7 @@ function HexRing({
             animationDelay: marbleAnim ? `${marbleAnim.delayMs}ms` : undefined,
           }}
         >
-          <circle
-            cx={0}
-            cy={0}
-            r={marbleRadius}
-            fill={`url(#marble-gradient-${gid})`}
-            stroke={
-              ring.marble.color === 'white' ? '#b0b0b0' :
-              ring.marble.color === 'gray' ? '#3d4350' :
-              '#000000'
-            }
-            strokeWidth={1.5}
-          />
-          {/* Specular highlight overlay */}
-          <circle
-            cx={0}
-            cy={0}
-            r={marbleRadius}
-            fill={`url(#marble-highlight-${gid})`}
-          />
+          <Marble prefix={idPrefix} color={ring.marble.color} r={marbleRadius} seed={seedFromId(ring.id)} />
         </g>
       )}
     </g>
