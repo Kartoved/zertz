@@ -23,6 +23,42 @@ interface ChangelogEntry {
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: '0.20.0',
+    date: '2026-10-11',
+    changes: {
+      ru: [
+        '⏱ Часы не идут, пока оба игрока не сделали первый ход. Не успел за 30 секунд — партия отменяется без рейтинга. Старые такие поражения пересчитаны, рейтинг возвращён',
+        '🎯 Цепочку взятий теперь ведёте прыжок за прыжком, а в истории ходов её можно пройти по прыжкам',
+        '✨ Подсветка последнего хода, анимация ходов, стрелки правой кнопкой мыши на любой доске',
+        '🏁 Итог партии — строкой под доской вместо окна поверх неё',
+        '⬢ Новое правило по официальным правилам: заполнил последнее кольцо отрезанной группы — она твоя; заполнилась вся доска — побеждает сделавший последний ход',
+        '📚 Студии: одна кнопка «Новая студия», оценки ходов (!, ?, !? …), работа с вариантами, сохранение всей партии с вариантами, «Сыграть с позиции»',
+        '⏰ Контроль времени виден в вызовах, уведомлениях и в шапке партии; партии из лобби больше не теряют часы',
+        'Версия обновлена до v0.20.0',
+      ],
+      en: [
+        '⏱ The clock waits until both players have made a first move. Miss your 30 seconds and the game is aborted, unrated. Old losses of this kind were re-scored and the rating returned',
+        '🎯 Capture chains are now entered jump by jump, and the move list steps through them jump by jump',
+        '✨ Last-move highlight, move animations, right-click arrows on every board',
+        '🏁 The game result is a bar under the board instead of a popup over it',
+        '⬢ A rule from the official rules: fill the last ring of a cut-off group and it is yours; fill the whole board and the last mover wins',
+        '📚 Studies: one “New study” button, move marks (!, ?, !? …), variation editing, saving a whole game with its variations, “Play from position”',
+        '⏰ The time control is shown in challenges, notifications and the game header; lobby games no longer lose their clock',
+        'Version updated to v0.20.0',
+      ],
+      eo: [
+        '⏱ La horloĝo atendas, ĝis ambaŭ ludantoj faris unuan movon. Maltrafu viajn 30 sekundojn kaj la ludo nuliĝas, sen poentaro. Malnovaj tiaj malvenkoj estis rekalkulitaj kaj la poentaro redonita',
+        '🎯 Prenaj ĉenoj nun enmetiĝas salto post salto, kaj la movlisto trairas ilin salto post salto',
+        '✨ Reliefigo de la lasta movo, animaciitaj movoj, sagoj per dekstra klako sur ĉiu tabulo',
+        '🏁 La rezulto de la ludo estas strio sub la tabulo anstataŭ ŝprucfenestro super ĝi',
+        '⬢ Regulo el la oficialaj reguloj: plenigu la lastan ringon de detranĉita grupo kaj ĝi estas via; plenigu la tutan tabulon kaj venkas la lasta movinto',
+        '📚 Studioj: unu butono «Nova studio», taksoj de movoj (!, ?, !? …), redaktado de variantoj, konservado de tuta ludo kun variantoj, «Ludi el pozicio»',
+        '⏰ La tempokontrolo videblas en defioj, sciigoj kaj la kapo de la ludo; vestiblaj ludoj ne plu perdas sian horloĝon',
+        'Versio ĝisdatigita al v0.20.0',
+      ],
+    },
+  },
+  {
     version: '0.19.1',
     date: '2026-09-05',
     changes: {
