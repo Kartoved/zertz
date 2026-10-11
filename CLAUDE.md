@@ -50,10 +50,17 @@ Unit tests live in `src/game/GameEngine.test.ts` (Vitest). Playwright is install
 - `GameEngine.ts` — state machine: `placeMarble` → `removeRing` → `executeCapture` → win check; handles mandatory captures and isolation auto-capture
 - `GameEngine.test.ts` — Vitest unit tests for the engine
 
-**AI** (`src/ai/`) — bot opponent, runs in a Web Worker:
-- `minimax.ts` — minimax with alpha-beta pruning
+**AI** (`src/ai/`) — bot opponent, runs in a Web Worker. Being rebuilt on the Quantum Battle approach (`docs/BOT_LESSONS_FROM_QUANTUM.md`): measuring stand first, then a flat engine and search. Tune on the **48** board.
+- `minimax.ts` — the shipped bot: full-width minimax, only `easy` (1 ply) finishes on 48/61
 - `evaluate.ts` — position evaluation heuristic
 - `worker.ts` — Web Worker wrapper (keeps UI responsive during search)
+- `apply.ts` — `BotMove`, `applyBotMove` (the UI's own move path), `generateAllMoves` (every legal move; the removable set is computed once — placing on R only takes R out of it), `moveKey`/`moveFromKey`
+- `bots.ts` / `botSpec.ts` — the `Bot` interface and the yardstick ladder as spec strings: `random`, `safe-random`, `minimax-easy`, `greedy` (1 ply + capture quiescence)
+- `arena.ts` — match runner: book openings, colours swapped within each opening pair, each bot its OWN random stream (keyed by bot, not seat — else a bot vs itself replays one game), Elo by games and by pairs (the honest one), `noMarbles` reported apart
+- `openings.ts` + `positions/book{37,48,61}.ts` — level openings (nothing captured, nothing capturable), stored as MOVES, not ZIP (a ZIP re-anchors on read)
+- `record.ts` — a bot game as a tree + ZEN
+
+Scripts (`npx vite-node scripts/<name>.ts -- …`): `match.ts` (`--a --b --games --board=48 --jobs=4 --record --out`; never more jobs than the 4 physical cores), `book.ts` (rebuild a book), `gamestats.ts` (what recorded matches say about the rules).
 
 **State management** (`src/store/`) — Zustand:
 - `gameStore.ts` — local game (IndexedDB persistence, game tree navigation, undo)
